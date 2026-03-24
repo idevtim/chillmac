@@ -13,6 +13,8 @@ struct PopoverView: View {
     var onCpuTap: (() -> Void)?
     var onTemperatureTap: (() -> Void)?
 
+    @State private var appeared = false
+
     var body: some View {
         ZStack {
             // Dark blue-green gradient background
@@ -51,6 +53,12 @@ struct PopoverView: View {
             }
         }
         .frame(width: 420, height: 640)
+        .onAppear {
+            appeared = true
+        }
+        .onDisappear {
+            appeared = false
+        }
     }
 
     // MARK: - Header
@@ -88,6 +96,9 @@ struct PopoverView: View {
         .padding(.horizontal, 20)
         .padding(.top, 18)
         .padding(.bottom, 12)
+        .opacity(appeared ? 1 : 0)
+        .offset(y: appeared ? 0 : 8)
+        .animation(.easeOut(duration: 0.3), value: appeared)
     }
 
     private var thermalStatus: String {
@@ -122,48 +133,28 @@ struct PopoverView: View {
             GridItem(.flexible(), spacing: 12)
         ]
 
+        let cards: [(icon: String, title: String, subtitle: String, accent: Color, onTap: (() -> Void)?)] = [
+            ("cpu", systemInfo.chipName, "Processor", .teal, nil),
+            ("memorychip", systemInfo.ramAmount, "Memory", .green, onMemoryTap),
+            ("internaldrive", systemInfo.diskUsage, "Disk Available", .blue, onDiskTap),
+            ("battery.100", "\(batteryInfo.currentCharge)%", batteryInfo.isCharging ? "Charging" : "Battery", .yellow, onBatteryTap),
+            ("cpu", String(format: "%.0f%%", cpuInfo.totalUsage), "CPU", .teal, onCpuTap),
+            ("thermometer.medium", maxTempDisplay, "Temperatures", thermalStatusColor, onTemperatureTap),
+        ]
+
         return LazyVGrid(columns: columns, spacing: 12) {
-            InfoCard(
-                icon: "cpu",
-                title: systemInfo.chipName,
-                subtitle: "Processor",
-                accent: .teal
-            )
-            InfoCard(
-                icon: "memorychip",
-                title: systemInfo.ramAmount,
-                subtitle: "Memory",
-                accent: .green,
-                onTap: onMemoryTap
-            )
-            InfoCard(
-                icon: "internaldrive",
-                title: systemInfo.diskUsage,
-                subtitle: "Disk Available",
-                accent: .blue,
-                onTap: onDiskTap
-            )
-            InfoCard(
-                icon: "battery.100",
-                title: "\(batteryInfo.currentCharge)%",
-                subtitle: batteryInfo.isCharging ? "Charging" : "Battery",
-                accent: .yellow,
-                onTap: onBatteryTap
-            )
-            InfoCard(
-                icon: "cpu",
-                title: String(format: "%.0f%%", cpuInfo.totalUsage),
-                subtitle: "CPU",
-                accent: .teal,
-                onTap: onCpuTap
-            )
-            InfoCard(
-                icon: "thermometer.medium",
-                title: maxTempDisplay,
-                subtitle: "Temperatures",
-                accent: thermalStatusColor,
-                onTap: onTemperatureTap
-            )
+            ForEach(Array(cards.enumerated()), id: \.offset) { index, card in
+                InfoCard(
+                    icon: card.icon,
+                    title: card.title,
+                    subtitle: card.subtitle,
+                    accent: card.accent,
+                    onTap: card.onTap
+                )
+                .opacity(appeared ? 1 : 0)
+                .offset(y: appeared ? 0 : 12)
+                .animation(.easeOut(duration: 0.3).delay(0.05 + Double(index) * 0.05), value: appeared)
+            }
         }
     }
 
@@ -172,9 +163,14 @@ struct PopoverView: View {
     private var fansSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             CardSectionHeader(title: "Fans")
+                .opacity(appeared ? 1 : 0)
+                .animation(.easeOut(duration: 0.3).delay(0.35), value: appeared)
 
-            ForEach(monitor.fans) { fan in
+            ForEach(Array(monitor.fans.enumerated()), id: \.element.id) { index, fan in
                 FanRowView(fan: fan, helper: helper, monitor: monitor)
+                    .opacity(appeared ? 1 : 0)
+                    .offset(y: appeared ? 0 : 12)
+                    .animation(.easeOut(duration: 0.3).delay(0.4 + Double(index) * 0.05), value: appeared)
             }
 
             if monitor.fans.isEmpty {
@@ -190,6 +186,8 @@ struct PopoverView: View {
                 .frame(maxWidth: .infinity, alignment: .center)
                 .background(Color.white.opacity(0.06))
                 .cornerRadius(12)
+                .opacity(appeared ? 1 : 0)
+                .animation(.easeOut(duration: 0.3).delay(0.4), value: appeared)
             }
         }
     }
@@ -245,6 +243,8 @@ struct PopoverView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
         .background(Color.black.opacity(0.25))
+        .opacity(appeared ? 1 : 0)
+        .animation(.easeOut(duration: 0.3).delay(0.15), value: appeared)
     }
 }
 

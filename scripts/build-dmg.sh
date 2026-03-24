@@ -1,0 +1,159 @@
+#!/bin/bash
+set -euo pipefail
+
+# ─── Configuration ───────────────────────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+
+# Load credentials from .env
+if [ -f "$PROJECT_DIR/.env" ]; then
+  set -a
+  source "$PROJECT_DIR/.env"
+  set +a
+else
+  echo "❌ .env file not found at $PROJECT_DIR/.env"
+  exit 1
+fi
+
+APP_NAME="ChillMac"
+BUNDLE_ID="com.timothymurphy.ChillMac"
+HELPER_BUNDLE_ID="com.timothymurphy.ChillMac.Helper"
+SIGNING_IDENTITY="Developer ID Application: Tim Murphy ($APPLE_TEAM_ID)"
+TEAM_ID="$APPLE_TEAM_ID"
+BUILD_DIR="$PROJECT_DIR/build"
+ARCHIVE_PATH="$BUILD_DIR/$APP_NAME.xcarchive"
+APP_PATH="$BUILD_DIR/$APP_NAME.app"
+DMG_PATH="$BUILD_DIR/$APP_NAME.dmg"
+
+# ─── Clean ───────────────────────────────────────────────────────────────────
+echo "🧹 Cleaning build directory..."
+rm -rf "$BUILD_DIR"
+mkdir -p "$BUILD_DIR"
+
+# ─── Build ───────────────────────────────────────────────────────────────────
+echo "🔨 Building $APP_NAME..."
+xcodebuild \
+  -project "$PROJECT_DIR/$APP_NAME.xcodeproj" \
+  -scheme "$APP_NAME" \
+  -configuration Release \
+  -archivePath "$ARCHIVE_PATH" \
+  archive \
+  CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
+  DEVELOPMENT_TEAM="$TEAM_ID" \
+  OTHER_CODE_SIGN_FLAGS="--timestamp --options runtime" \
+  2>&1 | tail -20
+
+# ─── Export ──────────────────────────────────────────────────────────────────
+echo "📦 Exporting archive..."
+cat > "$BUILD_DIR/export-options.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>developer-id</string>
+    <key>teamID</key>
+    <string>$TEAM_ID</string>
+    <key>signingStyle</key>
+    <string>manual</string>
+    <key>signingCertificate</key>
+    <string>Developer ID Application</string>
+</dict>
+</plist>
+PLIST
+
+xcodebuild \
+  -exportArchive \
+  -archivePath "$ARCHIVE_PATH" \
+  -exportPath "$BUILD_DIR/export" \
+  -exportOptionsPlist "$BUILD_DIR/export-options.plist" \
+  2>&1 | tail -10
+
+cp -R "$BUILD_DIR/export/$APP_NAME.app" "$APP_PATH"
+
+# ─── Deep sign (Electron-style: sign inside-out) ────────────────────────────
+echo "🔏 Deep code signing (inside-out)..."
+
+# 1. Sign the helper first (innermost)
+HELPER_PATH="$APP_PATH/Contents/Library/LaunchServices/$HELPER_BUNDLE_ID"
+if [ -f "$HELPER_PATH" ]; then
+  codesign --force --timestamp --options runtime \
+    --sign "$SIGNING_IDENTITY" \
+    "$HELPER_PATH"
+  echo "   ✓ Helper signed"
+fi
+
+# 2. Sign any frameworks/dylibs (if added later)
+find "$APP_PATH/Contents/Frameworks" -name "*.framework" -o -name "*.dylib" 2>/dev/null | while read -r lib; do
+  codesign --force --timestamp --options runtime \
+    --sign "$SIGNING_IDENTITY" \
+    "$lib"
+  echo "   ✓ Signed: $(basename "$lib")"
+done
+
+# 3. Sign the main app (outermost)
+codesign --force --timestamp --options runtime \
+  --sign "$SIGNING_IDENTITY" \
+  --entitlements "$PROJECT_DIR/ChillMac/ChillMac.entitlements" \
+  "$APP_PATH"
+echo "   ✓ App signed"
+
+# ─── Verify ─────────────────────────────────────────────────────────────────
+echo "🔍 Verifying code signature..."
+codesign --verify --deep --strict --verbose=2 "$APP_PATH" 2>&1
+spctl --assess --type execute --verbose "$APP_PATH" 2>&1 || echo "   ⚠ spctl check failed (expected before notarization)"
+
+# ─── Create DMG ──────────────────────────────────────────────────────────────
+echo "💿 Creating DMG..."
+rm -f "$DMG_PATH"
+create-dmg \
+  --volname "$APP_NAME" \
+  --volicon "$APP_PATH/Contents/Resources/AppIcon.icns" \
+  --window-pos 200 120 \
+  --window-size 600 400 \
+  --icon-size 100 \
+  --icon "$APP_NAME.app" 150 190 \
+  --hide-extension "$APP_NAME.app" \
+  --app-drop-link 450 190 \
+  "$DMG_PATH" \
+  "$APP_PATH" \
+  2>&1 || {
+    # Fallback if no icon file exists yet
+    echo "   ⚠ Retrying without volicon..."
+    rm -f "$DMG_PATH"
+    create-dmg \
+      --volname "$APP_NAME" \
+      --window-pos 200 120 \
+      --window-size 600 400 \
+      --icon-size 100 \
+      --icon "$APP_NAME.app" 150 190 \
+      --hide-extension "$APP_NAME.app" \
+      --app-drop-link 450 190 \
+      "$DMG_PATH" \
+      "$APP_PATH"
+  }
+
+# ─── Sign the DMG ───────────────────────────────────────────────────────────
+echo "🔏 Signing DMG..."
+codesign --force --timestamp \
+  --sign "$SIGNING_IDENTITY" \
+  "$DMG_PATH"
+
+# ─── Notarize ───────────────────────────────────────────────────────────────
+echo "📤 Submitting to Apple notary service..."
+xcrun notarytool submit "$DMG_PATH" \
+  --apple-id "$APPLE_ID" \
+  --team-id "$TEAM_ID" \
+  --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+  --wait
+
+echo "📎 Stapling notarization ticket..."
+xcrun stapler staple "$DMG_PATH"
+
+# ─── Final verification ─────────────────────────────────────────────────────
+echo "🔍 Final Gatekeeper check..."
+spctl --assess --type open --context context:primary-signature --verbose "$DMG_PATH" 2>&1
+
+echo ""
+echo "✅ Done! Ready to distribute:"
+echo "   $DMG_PATH"

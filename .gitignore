@@ -17,3 +17,6 @@ DerivedData/
 
 # Archives
 *.xcarchive
+
+# Env
+.env

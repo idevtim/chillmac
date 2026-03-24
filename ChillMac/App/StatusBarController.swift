@@ -32,6 +32,7 @@ final class StatusBarController: NSObject {
 
         popover.behavior = .applicationDefined
         popover.animates = false
+        popover.appearance = NSAppearance(named: .darkAqua)
 
         let hostingController = NSHostingController(
             rootView: PopoverView(
