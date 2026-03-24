@@ -111,14 +111,18 @@ struct DiskDetailView: View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
+                    Image(systemName: "internaldrive")
+                        .font(.system(size: 14))
+                        .foregroundColor(usageColor)
                     Text("Usage")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.white)
                     Spacer()
-                    Text(usagePercent)
-                        .font(.system(size: 14, weight: .bold, design: .monospaced))
-                        .foregroundColor(usageColor)
                 }
+
+                Text(usagePercent)
+                    .font(.system(size: 20, weight: .bold, design: .monospaced))
+                    .foregroundColor(usageColor)
 
                 Text(usageDescription)
                     .font(.system(size: 11))
@@ -135,14 +139,18 @@ struct DiskDetailView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
+                    Image(systemName: "thermometer.medium")
+                        .font(.system(size: 14))
+                        .foregroundColor(diskTempColor)
                     Text("SSD Temp")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.white)
                     Spacer()
-                    Text(settings.formatTemperature(avgDiskTemp))
-                        .font(.system(size: 13, weight: .bold, design: .monospaced))
-                        .foregroundColor(diskTempColor)
                 }
+
+                Text(settings.formatTemperature(avgDiskTemp))
+                    .font(.system(size: 20, weight: .bold, design: .monospaced))
+                    .foregroundColor(diskTempColor)
 
                 Text(diskTempDescription)
                     .font(.system(size: 11))

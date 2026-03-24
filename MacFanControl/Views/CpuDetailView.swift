@@ -94,10 +94,11 @@ struct CpuDetailView: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.white)
                     Spacer()
-                    Text(systemInfo.uptime)
-                        .font(.system(size: 14, weight: .bold, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.8))
                 }
+
+                Text(systemInfo.uptime)
+                    .font(.system(size: 20, weight: .bold, design: .monospaced))
+                    .foregroundColor(.mint)
 
                 Text(uptimeDescription)
                     .font(.system(size: 11))

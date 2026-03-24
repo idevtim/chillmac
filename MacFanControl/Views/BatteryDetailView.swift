@@ -141,10 +141,11 @@ struct BatteryDetailView: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.white)
                     Spacer()
-                    Text("\(batteryInfo.healthPercent)%")
-                        .font(.system(size: 14, weight: .bold, design: .monospaced))
-                        .foregroundColor(healthColor)
                 }
+
+                Text("\(batteryInfo.healthPercent)%")
+                    .font(.system(size: 20, weight: .bold, design: .monospaced))
+                    .foregroundColor(healthColor)
 
                 Text(healthDescription)
                     .font(.system(size: 11))

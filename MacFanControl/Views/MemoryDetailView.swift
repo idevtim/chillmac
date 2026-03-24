@@ -113,14 +113,18 @@ struct MemoryDetailView: View {
             // Pressure card
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
+                    Image(systemName: "gauge.with.needle")
+                        .font(.system(size: 14))
+                        .foregroundColor(pressureColor)
                     Text("Pressure")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.white)
                     Spacer()
-                    Text(String(format: "%.0f%%", memoryInfo.pressurePercent))
-                        .font(.system(size: 14, weight: .bold, design: .monospaced))
-                        .foregroundColor(pressureColor)
                 }
+
+                Text(String(format: "%.0f%%", memoryInfo.pressurePercent))
+                    .font(.system(size: 20, weight: .bold, design: .monospaced))
+                    .foregroundColor(pressureColor)
 
                 Text(pressureDescription)
                     .font(.system(size: 11))
@@ -138,14 +142,18 @@ struct MemoryDetailView: View {
             // Swap card
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
+                    Image(systemName: "arrow.triangle.swap")
+                        .font(.system(size: 14))
+                        .foregroundColor(.cyan)
                     Text("Swap File")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.white)
                     Spacer()
-                    Text(MemoryInfo.formatBytes(memoryInfo.swapUsed))
-                        .font(.system(size: 14, weight: .bold, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.8))
                 }
+
+                Text(MemoryInfo.formatBytes(memoryInfo.swapUsed))
+                    .font(.system(size: 20, weight: .bold, design: .monospaced))
+                    .foregroundColor(.cyan)
 
                 Text("Virtual memory on disk")
                     .font(.system(size: 11))
