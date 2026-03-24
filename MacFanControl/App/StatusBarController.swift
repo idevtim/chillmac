@@ -24,6 +24,12 @@ final class StatusBarController: NSObject {
 
         super.init()
 
+        // Start secondary monitors paused — they'll start when popover opens
+        cpuInfo.stopMonitoring()
+        memoryInfo.stopMonitoring()
+        batteryInfo.stopMonitoring()
+        systemInfo.stopMonitoring()
+
         popover.behavior = .applicationDefined
         popover.animates = false
 
@@ -73,6 +79,11 @@ final class StatusBarController: NSObject {
 
             self.detailPanel.close()
             self.popover.performClose(nil)
+            // Pause secondary monitors when popover closes
+            self.cpuInfo.stopMonitoring()
+            self.memoryInfo.stopMonitoring()
+            self.batteryInfo.stopMonitoring()
+            self.systemInfo.stopMonitoring()
         }
     }
 
@@ -86,7 +97,17 @@ final class StatusBarController: NSObject {
         if popover.isShown {
             detailPanel.close()
             popover.performClose(sender)
+            // Pause secondary monitors when popover closes
+            cpuInfo.stopMonitoring()
+            memoryInfo.stopMonitoring()
+            batteryInfo.stopMonitoring()
+            systemInfo.stopMonitoring()
         } else if let button = statusItem.button {
+            // Resume secondary monitors when popover opens
+            cpuInfo.startMonitoring()
+            memoryInfo.startMonitoring()
+            batteryInfo.startMonitoring()
+            systemInfo.startMonitoring()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             NSApp.activate(ignoringOtherApps: true)
             popover.contentViewController?.view.window?.makeKeyAndOrderFront(nil)

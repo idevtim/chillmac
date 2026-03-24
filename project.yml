@@ -1,4 +1,4 @@
-name: MacFanControl
+name: ChillMac
 options:
   bundleIdPrefix: com.timothymurphy
   deploymentTarget:

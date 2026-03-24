@@ -13,6 +13,9 @@ final class FanMonitor: ObservableObject {
     private var smc: SMCConnection?
     private var timer: Timer?
     private var discoveredSensors: [String: TemperatureSensor] = [:]
+    /// After initial discovery, only poll keys that have been found at least once
+    private var activeSensorKeys: Set<String>?
+    private var discoveryPollCount: Int = 0
 
     func startMonitoring() {
         do {
@@ -87,13 +90,26 @@ final class FanMonitor: ObservableObject {
             }
         }
 
-        // Read temperature sensors — keep previously discovered sensors stable
-        for (key, label) in SMCKey.temperatureKeys {
+        // Read temperature sensors — after 5 full discovery passes, only poll active keys
+        discoveryPollCount += 1
+        let keysToProbe: [(key: String, label: String)]
+        if let activeKeys = activeSensorKeys {
+            keysToProbe = SMCKey.temperatureKeys.filter { activeKeys.contains($0.key) }
+        } else {
+            keysToProbe = SMCKey.temperatureKeys
+        }
+
+        for (key, label) in keysToProbe {
             if let temp = try? smc.readTemperature(key: key), temp > 0, temp < 150 {
                 discoveredSensors[key] = TemperatureSensor(id: key, label: label, temperature: temp)
             }
-            // If key was discovered before but fails now, keep the last known value
         }
+
+        // After 5 discovery passes, lock to only discovered keys
+        if activeSensorKeys == nil && discoveryPollCount >= 5 && !discoveredSensors.isEmpty {
+            activeSensorKeys = Set(discoveredSensors.keys)
+        }
+
         let stableSensors = SMCKey.temperatureKeys.compactMap { key, _ in
             discoveredSensors[key]
         }

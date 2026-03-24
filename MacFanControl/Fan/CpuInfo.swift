@@ -15,6 +15,8 @@ final class CpuInfo: ObservableObject {
     private var timer: Timer?
     private var previousInfo: host_cpu_load_info?
     private let maxHistory = 120
+    private let hostPort = mach_host_self()
+    private var pollCount: UInt = 0
 
     struct CpuProcess: Identifiable {
         let id = UUID()
@@ -24,6 +26,7 @@ final class CpuInfo: ObservableObject {
     }
 
     func startMonitoring() {
+        guard timer == nil else { return }
         previousInfo = fetchCpuLoadInfo()
         timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             self?.refresh()
@@ -36,7 +39,6 @@ final class CpuInfo: ObservableObject {
     }
 
     private func refresh() {
-        // CPU ticks are fast — read on main thread
         guard let current = fetchCpuLoadInfo(), let previous = previousInfo else {
             previousInfo = fetchCpuLoadInfo()
             return
@@ -72,6 +74,10 @@ final class CpuInfo: ObservableObject {
             systemHistory.removeFirst(systemHistory.count - maxHistory)
         }
 
+        // Fetch top processes every 5th poll (10 seconds) instead of every 2 seconds
+        pollCount += 1
+        guard pollCount % 5 == 0 else { return }
+
         // Snapshot app bundle info on main thread before dispatching to background
         var appBundles: [(path: String, icon: NSImage, name: String)] = []
         for app in NSWorkspace.shared.runningApplications where app.activationPolicy == .regular {
@@ -96,9 +102,8 @@ final class CpuInfo: ObservableObject {
 
         let result = withUnsafeMutablePointer(to: &info) {
             $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                host_statistics(mach_host_self(), HOST_CPU_LOAD_INFO, $0, &count)
+                host_statistics(self.hostPort, HOST_CPU_LOAD_INFO, $0, &count)
             }
-
         }
 
         return result == KERN_SUCCESS ? info : nil
@@ -120,7 +125,6 @@ final class CpuInfo: ObservableObject {
 
         guard let output = String(data: data, encoding: .utf8) else { return [] }
 
-        // Aggregate CPU % by app bundle (matching subprocess paths to parent app bundles)
         var cpuByApp: [String: (cpu: Double, icon: NSImage, name: String)] = [:]
 
         for line in output.split(separator: "\n") {
@@ -131,7 +135,6 @@ final class CpuInfo: ObservableObject {
             guard let cpu = Double(tokens[1]), cpu > 0 else { continue }
             let comm = String(tokens[2])
 
-            // Find which app bundle this process belongs to
             for app in appBundles {
                 if comm.hasPrefix(app.path) {
                     cpuByApp[app.name, default: (0, app.icon, app.name)].cpu += cpu

@@ -14,6 +14,7 @@ final class MemoryInfo: ObservableObject {
     let totalMemory = ProcessInfo.processInfo.physicalMemory
 
     private var timer: Timer?
+    private let hostPort = mach_host_self()
 
     struct ProcessMemory: Identifiable {
         let id = UUID()
@@ -23,6 +24,7 @@ final class MemoryInfo: ObservableObject {
     }
 
     func startMonitoring() {
+        guard timer == nil else { return }
         refresh()
         timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
             self?.refresh()
@@ -35,12 +37,21 @@ final class MemoryInfo: ObservableObject {
     }
 
     private func refresh() {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        // Snapshot running apps on main thread (NSWorkspace is not thread-safe)
+        let apps = NSWorkspace.shared.runningApplications.filter {
+            $0.activationPolicy == .regular
+        }
+        let appSnapshots = apps.compactMap { app -> (pid: pid_t, name: String, icon: NSImage?)? in
+            let name = app.localizedName ?? (app.bundleURL?.deletingPathExtension().lastPathComponent ?? "Unknown")
+            return (app.processIdentifier, name, app.icon)
+        }
+
+        DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self else { return }
 
             let stats = self.fetchVMStats()
             let swap = self.fetchSwap()
-            let procs = self.fetchTopProcesses()
+            let procs = self.fetchTopProcesses(appSnapshots: appSnapshots)
 
             DispatchQueue.main.async {
                 self.activeMemory = stats.active
@@ -62,7 +73,7 @@ final class MemoryInfo: ObservableObject {
 
         let result = withUnsafeMutablePointer(to: &info) {
             $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count)
+                host_statistics64(self.hostPort, HOST_VM_INFO64, $0, &count)
             }
         }
 
@@ -84,31 +95,21 @@ final class MemoryInfo: ObservableObject {
         return swap.xsu_used
     }
 
-    private func fetchTopProcesses(limit: Int = 5) -> [ProcessMemory] {
-        // Only show real GUI apps from NSWorkspace
-        let apps = NSWorkspace.shared.runningApplications.filter {
-            $0.activationPolicy == .regular
-        }
-
+    private func fetchTopProcesses(appSnapshots: [(pid: pid_t, name: String, icon: NSImage?)], limit: Int = 5) -> [ProcessMemory] {
         var results: [ProcessMemory] = []
 
-        for app in apps {
-            let pid = app.processIdentifier
-            let name = app.localizedName ?? (app.bundleURL?.deletingPathExtension().lastPathComponent ?? "Unknown")
-            let icon = app.icon
-
-            // Get memory usage via proc_pid_rusage
+        for app in appSnapshots {
             var info = rusage_info_v0()
             let ret = withUnsafeMutablePointer(to: &info) {
                 $0.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { ptr in
-                    proc_pid_rusage(pid, RUSAGE_INFO_V0, ptr)
+                    proc_pid_rusage(app.pid, RUSAGE_INFO_V0, ptr)
                 }
             }
             guard ret == 0 else { continue }
             let memBytes = UInt64(info.ri_phys_footprint)
             guard memBytes > 0 else { continue }
 
-            results.append(ProcessMemory(name: name, memoryBytes: memBytes, icon: icon))
+            results.append(ProcessMemory(name: app.name, memoryBytes: memBytes, icon: app.icon))
         }
 
         return results

@@ -16,6 +16,7 @@ final class BatteryInfo: ObservableObject {
     private var timer: Timer?
 
     func startMonitoring() {
+        guard timer == nil else { return }
         refresh()
         timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
             self?.refresh()
