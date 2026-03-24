@@ -279,32 +279,32 @@ struct CpuGraphView: View {
                     .stroke(Color.white.opacity(0.06), lineWidth: 0.5)
                 }
 
-                if history.count >= 2 {
-                    // Total usage fill
-                    fillPath(data: history, w: w, h: h)
+                // User fill + line
+                if userHistory.count >= 2 {
+                    fillPath(data: userHistory, w: w, h: h)
                         .fill(
                             LinearGradient(
-                                colors: [.teal.opacity(0.3), .teal.opacity(0.05)],
+                                colors: [.blue.opacity(0.3), .blue.opacity(0.05)],
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
                         )
+                    smoothPath(data: userHistory, w: w, h: h)
+                        .stroke(Color.blue, lineWidth: 1.5)
+                }
 
-                    // Total usage line
-                    smoothPath(data: history, w: w, h: h)
-                        .stroke(Color.teal, lineWidth: 1.5)
-
-                    // User line
-                    if userHistory.count >= 2 {
-                        smoothPath(data: userHistory, w: w, h: h)
-                            .stroke(Color.blue, lineWidth: 1)
-                    }
-
-                    // System line
-                    if systemHistory.count >= 2 {
-                        smoothPath(data: systemHistory, w: w, h: h)
-                            .stroke(Color.orange, lineWidth: 1)
-                    }
+                // System fill + line
+                if systemHistory.count >= 2 {
+                    fillPath(data: systemHistory, w: w, h: h)
+                        .fill(
+                            LinearGradient(
+                                colors: [.orange.opacity(0.3), .orange.opacity(0.05)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                    smoothPath(data: systemHistory, w: w, h: h)
+                        .stroke(Color.orange, lineWidth: 1.5)
                 }
             }
         }
