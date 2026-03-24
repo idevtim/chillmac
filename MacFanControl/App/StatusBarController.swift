@@ -8,7 +8,7 @@ final class StatusBarController: NSObject {
     private var eventMonitor: Any?
     private var cancellable: AnyCancellable?
 
-    init(fanMonitor: FanMonitor, helper: HelperConnection) {
+    init(fanMonitor: FanMonitor, helper: HelperConnection, systemInfo: SystemInfo) {
         statusItem = NSStatusBar.system.statusItem(withLength: 130)
         popover = NSPopover()
 
@@ -18,10 +18,10 @@ final class StatusBarController: NSObject {
         popover.animates = false
 
         let hostingController = NSHostingController(
-            rootView: PopoverView(monitor: fanMonitor, settings: AppSettings.shared, helper: helper)
+            rootView: PopoverView(monitor: fanMonitor, settings: AppSettings.shared, systemInfo: systemInfo, helper: helper)
         )
-        hostingController.view.frame = NSRect(x: 0, y: 0, width: 380, height: 500)
-        popover.contentSize = NSSize(width: 380, height: 500)
+        hostingController.view.frame = NSRect(x: 0, y: 0, width: 380, height: 580)
+        popover.contentSize = NSSize(width: 380, height: 580)
         popover.contentViewController = hostingController
 
         if let button = statusItem.button {

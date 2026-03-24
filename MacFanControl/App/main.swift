@@ -4,6 +4,7 @@ import SwiftUI
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusBarController: StatusBarController?
     let fanMonitor = FanMonitor()
+    let systemInfo = SystemInfo()
     let helperConnection = HelperConnection()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -28,9 +29,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         fanMonitor.startMonitoring()
+        systemInfo.startMonitoring()
         statusBarController = StatusBarController(
             fanMonitor: fanMonitor,
-            helper: helperConnection
+            helper: helperConnection,
+            systemInfo: systemInfo
         )
     }
 
@@ -41,6 +44,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         fanMonitor.stopMonitoring()
+        systemInfo.stopMonitoring()
         helperConnection.disconnect()
 
         // Unload the helper daemon so it's not running when the app isn't

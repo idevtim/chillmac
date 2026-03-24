@@ -3,6 +3,7 @@ import SwiftUI
 struct PopoverView: View {
     @ObservedObject var monitor: FanMonitor
     @ObservedObject var settings: AppSettings
+    @ObservedObject var systemInfo: SystemInfo
     let helper: HelperConnection
 
     private let columns = [
@@ -43,7 +44,14 @@ struct PopoverView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        // Fans first
+                        // System info
+                        SectionHeader(title: "System")
+                        SystemInfoView(systemInfo: systemInfo)
+
+                        Divider()
+                            .padding(.vertical, 4)
+
+                        // Fans
                         SectionHeader(title: "Fans")
                         ForEach(monitor.fans) { fan in
                             FanRowView(fan: fan, helper: helper, monitor: monitor)
@@ -99,7 +107,7 @@ struct PopoverView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
         }
-        .frame(width: 380, height: 500)
+        .frame(width: 380, height: 580)
     }
 }
 
