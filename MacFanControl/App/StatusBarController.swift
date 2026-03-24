@@ -20,8 +20,8 @@ final class StatusBarController: NSObject {
         let hostingController = NSHostingController(
             rootView: PopoverView(monitor: fanMonitor, settings: AppSettings.shared, systemInfo: systemInfo, helper: helper)
         )
-        hostingController.view.frame = NSRect(x: 0, y: 0, width: 380, height: 580)
-        popover.contentSize = NSSize(width: 380, height: 580)
+        hostingController.view.frame = NSRect(x: 0, y: 0, width: 400, height: 620)
+        popover.contentSize = NSSize(width: 400, height: 620)
         popover.contentViewController = hostingController
 
         if let button = statusItem.button {

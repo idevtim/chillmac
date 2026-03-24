@@ -5,21 +5,26 @@ struct TemperatureRowView: View {
     @ObservedObject var settings: AppSettings
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 6) {
             Circle()
                 .fill(temperatureColor)
-                .frame(width: 5, height: 5)
+                .frame(width: 6, height: 6)
 
             Text(sensor.label)
                 .font(.system(size: 10))
+                .foregroundColor(.white.opacity(0.7))
                 .lineLimit(1)
 
             Spacer()
 
             Text(settings.formatTemperature(sensor.temperature))
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundColor(.secondary)
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .foregroundColor(temperatureColor)
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color.white.opacity(0.06))
+        .cornerRadius(8)
     }
 
     private var temperatureColor: Color {

@@ -29,7 +29,6 @@
 		DEEB1416F31C6CC8A67293A8 /* HelperConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED35E585A369C87795697088 /* HelperConnection.swift */; };
 		E608304518C6AA63B4458E31 /* TemperatureSensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D2D8F7F99D1732A7B470868 /* TemperatureSensor.swift */; };
 		EA0446A1A75540C7125EF425 /* TemperatureRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA91A035CFBF188025BA4AB8 /* TemperatureRowView.swift */; };
-		F1EA251AF512912B93F1D962 /* SystemInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8360DA584BF5EE35EAAFADD /* SystemInfoView.swift */; };
 		F2A1BE2E58AE4882B2142136 /* SMCConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10E50199B9E6E1B09F584DDB /* SMCConnection.swift */; };
 		FD47060EA70D65052C82AD06 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8505740A34F05BD6DB6F75EC /* main.swift */; };
 /* End PBXBuildFile section */
@@ -68,7 +67,6 @@
 		D6790BDD37571A7A0E8AD806 /* SMCKeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SMCKeys.swift; sourceTree = "<group>"; };
 		E1364E5B9F427B4742EF6369 /* SMCTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SMCTypes.swift; sourceTree = "<group>"; };
 		ED35E585A369C87795697088 /* HelperConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperConnection.swift; sourceTree = "<group>"; };
-		F8360DA584BF5EE35EAAFADD /* SystemInfoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemInfoView.swift; sourceTree = "<group>"; };
 		F97C70E1394D27C5E02A8E3A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		FA36A27F0D81F320C187D438 /* HelperService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -110,7 +108,6 @@
 			children = (
 				03336C4CA57BE9E0D2E34A4F /* FanRowView.swift */,
 				75E8DB23627266322E779C92 /* PopoverView.swift */,
-				F8360DA584BF5EE35EAAFADD /* SystemInfoView.swift */,
 				CA91A035CFBF188025BA4AB8 /* TemperatureRowView.swift */,
 			);
 			path = Views;
@@ -322,7 +319,6 @@
 				8F1E7479A037F2B43D1C5A58 /* SMCTypes.swift in Sources */,
 				3DB0E675519EBB5BA5FF97F9 /* StatusBarController.swift in Sources */,
 				5E82AE4D1A5F7EC28F217B00 /* SystemInfo.swift in Sources */,
-				F1EA251AF512912B93F1D962 /* SystemInfoView.swift in Sources */,
 				EA0446A1A75540C7125EF425 /* TemperatureRowView.swift in Sources */,
 				E608304518C6AA63B4458E31 /* TemperatureSensor.swift in Sources */,
 				FD47060EA70D65052C82AD06 /* main.swift in Sources */,
