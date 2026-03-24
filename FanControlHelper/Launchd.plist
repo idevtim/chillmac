@@ -3,10 +3,10 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.timothymurphy.MacFanControl.Helper</string>
+    <string>com.timothymurphy.ChillMac.Helper</string>
     <key>MachServices</key>
     <dict>
-        <key>com.timothymurphy.MacFanControl.Helper</key>
+        <key>com.timothymurphy.ChillMac.Helper</key>
         <true/>
     </dict>
 </dict>

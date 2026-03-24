@@ -19,7 +19,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if !HelperInstaller.isHelperInstalled() {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-            process.arguments = ["bootstrap", "system", "/Library/LaunchDaemons/com.timothymurphy.MacFanControl.Helper.plist"]
+            process.arguments = ["bootstrap", "system", "/Library/LaunchDaemons/com.timothymurphy.ChillMac.Helper.plist"]
             try? process.run()
             process.waitUntilExit()
         }
@@ -69,7 +69,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Unload the helper daemon so it's not running when the app isn't
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-        process.arguments = ["bootout", "system/com.timothymurphy.MacFanControl.Helper"]
+        process.arguments = ["bootout", "system/com.timothymurphy.ChillMac.Helper"]
         try? process.run()
         process.waitUntilExit()
     }

@@ -12,7 +12,7 @@ enum HelperInstaller {
 
     @available(macOS 13.0, *)
     private static func installWithSMAppService() -> Bool {
-        let service = SMAppService.daemon(plistName: "com.timothymurphy.MacFanControl.Helper.plist")
+        let service = SMAppService.daemon(plistName: "com.timothymurphy.ChillMac.Helper.plist")
         do {
             try service.register()
             return true

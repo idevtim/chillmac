@@ -3,7 +3,7 @@ import IOKit
 
 class HelperService: NSObject, HelperProtocol {
     private static var hasSetTestMode = false
-    private static let logFile = "/tmp/MacFanControlHelper.log"
+    private static let logFile = "/tmp/ChillMacHelper.log"
 
     private static func log(_ message: String) {
         // File logging disabled — uncomment to re-enable
