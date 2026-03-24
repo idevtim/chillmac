@@ -8,11 +8,13 @@ final class CpuInfo: ObservableObject {
     @Published var idlePercent: Double = 100
     @Published var totalUsage: Double = 0
     @Published var history: [Double] = []
+    @Published var userHistory: [Double] = []
+    @Published var systemHistory: [Double] = []
     @Published var topProcesses: [CpuProcess] = []
 
     private var timer: Timer?
     private var previousInfo: host_cpu_load_info?
-    private let maxHistory = 60
+    private let maxHistory = 120
 
     struct CpuProcess: Identifiable {
         let id = UUID()
@@ -58,6 +60,16 @@ final class CpuInfo: ObservableObject {
         history.append(totalUsage)
         if history.count > maxHistory {
             history.removeFirst(history.count - maxHistory)
+        }
+
+        userHistory.append(userPercent)
+        if userHistory.count > maxHistory {
+            userHistory.removeFirst(userHistory.count - maxHistory)
+        }
+
+        systemHistory.append(systemPercent)
+        if systemHistory.count > maxHistory {
+            systemHistory.removeFirst(systemHistory.count - maxHistory)
         }
 
         // Fetch top processes on background thread (spawns ps)

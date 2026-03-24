@@ -1,14 +1,16 @@
-# MacFanControl
+# ChillMac
 
-A lightweight macOS menu bar app for monitoring temperatures and controlling fan speeds. Reads sensor data directly from the System Management Controller (SMC) via IOKit and provides manual fan speed override through a privileged helper daemon.
+A macOS menu bar app for monitoring your system and controlling fan speeds. Stay cool, stay fast.
 
 ## Features
 
-- Live fan RPM display in the menu bar
-- Temperature readings for CPU, GPU, memory, battery, and more
-- Manual fan speed control with per-fan sliders
-- Toggle between automatic and manual fan modes
-- Color-coded temperature indicators (green → yellow → orange → red)
+- **Fan Control** — Live RPM display in the menu bar with per-fan manual speed sliders
+- **CPU Monitor** — Real-time usage graph, top consuming apps, temperature, and uptime
+- **Memory Monitor** — Usage breakdown with donut chart, pressure, swap, and top consumers
+- **Battery Monitor** — Charge gauge, health percentage, cycle count, and temperature
+- **Disk Monitor** — Storage breakdown by category with SSD temperature
+- **Temperature Sensors** — Color-coded readings for CPU, GPU, memory, SSD, battery, and more
+- **System Info** — Machine model, chip, RAM, macOS version at a glance
 - Apple Silicon and Intel Mac support
 
 ## Requirements
@@ -33,7 +35,7 @@ Or open `MacFanControl.xcodeproj` in Xcode and build from there.
 
 The app uses a two-process architecture with privilege separation:
 
-- **Main app** (unprivileged) — Runs as a menu bar item, reads SMC sensors every 2 seconds, and displays a SwiftUI popover with temperature and fan data.
+- **Main app** (unprivileged) — Runs as a menu bar item, reads SMC sensors every 2 seconds, and displays a SwiftUI popover with system monitoring dashboards.
 - **Helper daemon** (root) — A privileged helper tool installed via `SMAppService` that handles write operations to the SMC (setting fan speeds and modes) over XPC.
 
 On first launch, the app prompts for administrator credentials to install the helper daemon. The helper validates the caller's code signature before accepting any XPC connections.
@@ -44,9 +46,9 @@ On Apple Silicon Macs, the helper also manages SMC test mode to bypass `thermalm
 
 ```
 MacFanControl/
-  App/              Entry point and status bar controller
-  Views/            SwiftUI views (popover, fan rows, temperature rows)
-  Fan/              Data models and polling engine
+  App/              Entry point, status bar controller, detail panel controller
+  Views/            SwiftUI views (dashboard, fan controls, detail panels)
+  Fan/              Data models and monitoring engines (CPU, memory, battery, disk)
   SMC/              IOKit bridge to Apple SMC driver
   XPC/              Helper connection and installation
 FanControlHelper/   Privileged helper daemon

@@ -234,7 +234,7 @@ struct PopoverView: View {
 
             Spacer()
 
-            Text("Mac Fan Control")
+            Text("ChillMac")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(.white.opacity(0.4))
 

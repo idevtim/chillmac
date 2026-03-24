@@ -50,7 +50,7 @@ struct CpuDetailView: View {
         HStack(alignment: .top, spacing: 14) {
             // Line chart
             VStack(alignment: .leading, spacing: 4) {
-                CpuGraphView(history: cpuInfo.history)
+                CpuGraphView(history: cpuInfo.history, userHistory: cpuInfo.userHistory, systemHistory: cpuInfo.systemHistory)
                     .frame(height: 100)
             }
             .frame(maxWidth: .infinity)
@@ -260,6 +260,8 @@ private struct UsageRow: View {
 
 struct CpuGraphView: View {
     let history: [Double]
+    let userHistory: [Double]
+    let systemHistory: [Double]
 
     var body: some View {
         GeometryReader { geo in
@@ -278,46 +280,93 @@ struct CpuGraphView: View {
                 }
 
                 if history.count >= 2 {
-                    // Fill
-                    Path { path in
-                        let step = w / CGFloat(max(history.count - 1, 1))
-                        path.move(to: CGPoint(x: 0, y: h))
-                        for (i, val) in history.enumerated() {
-                            let x = step * CGFloat(i)
-                            let y = h - (CGFloat(val) / 100 * h)
-                            if i == 0 {
-                                path.addLine(to: CGPoint(x: x, y: y))
-                            } else {
-                                path.addLine(to: CGPoint(x: x, y: y))
-                            }
-                        }
-                        path.addLine(to: CGPoint(x: step * CGFloat(history.count - 1), y: h))
-                        path.closeSubpath()
-                    }
-                    .fill(
-                        LinearGradient(
-                            colors: [.teal.opacity(0.3), .teal.opacity(0.05)],
-                            startPoint: .top,
-                            endPoint: .bottom
+                    // Total usage fill
+                    fillPath(data: history, w: w, h: h)
+                        .fill(
+                            LinearGradient(
+                                colors: [.teal.opacity(0.3), .teal.opacity(0.05)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
                         )
-                    )
 
-                    // Line
-                    Path { path in
-                        let step = w / CGFloat(max(history.count - 1, 1))
-                        for (i, val) in history.enumerated() {
-                            let x = step * CGFloat(i)
-                            let y = h - (CGFloat(val) / 100 * h)
-                            if i == 0 {
-                                path.move(to: CGPoint(x: x, y: y))
-                            } else {
-                                path.addLine(to: CGPoint(x: x, y: y))
-                            }
-                        }
+                    // Total usage line
+                    smoothPath(data: history, w: w, h: h)
+                        .stroke(Color.teal, lineWidth: 1.5)
+
+                    // User line
+                    if userHistory.count >= 2 {
+                        smoothPath(data: userHistory, w: w, h: h)
+                            .stroke(Color.blue, lineWidth: 1)
                     }
-                    .stroke(Color.teal, lineWidth: 1.5)
+
+                    // System line
+                    if systemHistory.count >= 2 {
+                        smoothPath(data: systemHistory, w: w, h: h)
+                            .stroke(Color.orange, lineWidth: 1)
+                    }
                 }
             }
+        }
+    }
+
+    private func points(data: [Double], w: CGFloat, h: CGFloat) -> [CGPoint] {
+        let step = w / CGFloat(max(data.count - 1, 1))
+        return data.enumerated().map { (i, val) in
+            CGPoint(x: step * CGFloat(i), y: h - (CGFloat(val) / 100 * h))
+        }
+    }
+
+    /// Catmull-Rom spline through data points
+    private func smoothPath(data: [Double], w: CGFloat, h: CGFloat) -> Path {
+        let pts = points(data: data, w: w, h: h)
+        return Path { path in
+            guard pts.count >= 2 else { return }
+            path.move(to: pts[0])
+            for i in 0..<(pts.count - 1) {
+                let p0 = pts[max(i - 1, 0)]
+                let p1 = pts[i]
+                let p2 = pts[min(i + 1, pts.count - 1)]
+                let p3 = pts[min(i + 2, pts.count - 1)]
+
+                let cp1 = CGPoint(
+                    x: p1.x + (p2.x - p0.x) / 6,
+                    y: p1.y + (p2.y - p0.y) / 6
+                )
+                let cp2 = CGPoint(
+                    x: p2.x - (p3.x - p1.x) / 6,
+                    y: p2.y - (p3.y - p1.y) / 6
+                )
+                path.addCurve(to: p2, control1: cp1, control2: cp2)
+            }
+        }
+    }
+
+    /// Smooth filled area under the curve
+    private func fillPath(data: [Double], w: CGFloat, h: CGFloat) -> Path {
+        let pts = points(data: data, w: w, h: h)
+        return Path { path in
+            guard pts.count >= 2 else { return }
+            path.move(to: CGPoint(x: pts[0].x, y: h))
+            path.addLine(to: pts[0])
+            for i in 0..<(pts.count - 1) {
+                let p0 = pts[max(i - 1, 0)]
+                let p1 = pts[i]
+                let p2 = pts[min(i + 1, pts.count - 1)]
+                let p3 = pts[min(i + 2, pts.count - 1)]
+
+                let cp1 = CGPoint(
+                    x: p1.x + (p2.x - p0.x) / 6,
+                    y: p1.y + (p2.y - p0.y) / 6
+                )
+                let cp2 = CGPoint(
+                    x: p2.x - (p3.x - p1.x) / 6,
+                    y: p2.y - (p3.y - p1.y) / 6
+                )
+                path.addCurve(to: p2, control1: cp1, control2: cp2)
+            }
+            path.addLine(to: CGPoint(x: pts.last!.x, y: h))
+            path.closeSubpath()
         }
     }
 }

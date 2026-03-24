@@ -55,7 +55,7 @@ final class StatusBarController: NSObject {
         popover.contentViewController = hostingController
 
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "fan.fill", accessibilityDescription: "Mac Fan Control")
+            button.image = NSImage(systemSymbolName: "fan.fill", accessibilityDescription: "ChillMac")
             button.imagePosition = .imageLeading
             button.action = #selector(togglePopover(_:))
             button.target = self
