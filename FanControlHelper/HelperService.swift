@@ -111,6 +111,9 @@ class HelperService: NSObject, HelperProtocol {
     }
 
     func dumpFanKeys(reply: @escaping (String) -> Void) {
+        // Also scan for all temperature keys
+        scanTemperatureKeys()
+
         var result = ""
         do {
             let smc = try SMCConnection()
@@ -147,6 +150,46 @@ class HelperService: NSObject, HelperProtocol {
         }
         HelperService.log("dumpFanKeys:\n\(result)")
         reply(result)
+    }
+
+    private func scanTemperatureKeys() {
+        do {
+            let smc = try SMCConnection()
+            defer { smc.close() }
+
+            let keyCount = try smc.getKeyCount()
+            HelperService.log("Scanning \(keyCount) SMC keys for temperature sensors...")
+
+            var tempKeys: [(key: String, value: Double, size: UInt32, type: String)] = []
+
+            for i in 0..<keyCount {
+                guard let keyName = try? smc.getKeyAtIndex(i) else { continue }
+                guard keyName.hasPrefix("T") else { continue }
+                guard let info = try? smc.getKeyInfo(keyName) else { continue }
+                guard let output = try? smc.readKey(keyName) else { continue }
+
+                let typeStr = fourCharCodeToString(info.dataType)
+                var temp: Double = 0
+
+                if info.dataSize >= 4 {
+                    temp = decodeFloat32(output.bytes.0, output.bytes.1, output.bytes.2, output.bytes.3)
+                } else {
+                    temp = decodeSP78(output.bytes.0, output.bytes.1)
+                }
+
+                if temp > 0 && temp < 150 {
+                    tempKeys.append((keyName, temp, info.dataSize, typeStr))
+                }
+            }
+
+            var result = "Found \(tempKeys.count) temperature keys:\n"
+            for tk in tempKeys {
+                result += "  \(tk.key): \(String(format: "%.1f", tk.value))°C (size=\(tk.size) type='\(tk.type)')\n"
+            }
+            HelperService.log(result)
+        } catch {
+            HelperService.log("Temperature scan failed: \(error)")
+        }
     }
 
     #if arch(arm64)

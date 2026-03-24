@@ -1,7 +1,7 @@
 import Foundation
 
 let kHelperMachServiceName = "com.timothymurphy.MacFanControl.Helper"
-let kHelperVersion = "7.0"
+let kHelperVersion = "8.0"
 
 @objc protocol HelperProtocol {
     func setFanSpeed(fanIndex: Int, rpm: Int, reply: @escaping (Bool, String?) -> Void)

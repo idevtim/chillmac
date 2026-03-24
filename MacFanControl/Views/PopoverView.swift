@@ -5,6 +5,11 @@ struct PopoverView: View {
     @ObservedObject var settings: AppSettings
     let helper: HelperConnection
 
+    private let columns = [
+        GridItem(.flexible(), spacing: 8),
+        GridItem(.flexible(), spacing: 8)
+    ]
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header
@@ -38,17 +43,7 @@ struct PopoverView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        // Temperature sensors
-                        if !monitor.sensors.isEmpty {
-                            SectionHeader(title: "Temperatures")
-                            ForEach(monitor.sensors) { sensor in
-                                TemperatureRowView(sensor: sensor, settings: settings)
-                            }
-                            Divider()
-                                .padding(.vertical, 4)
-                        }
-
-                        // Fans
+                        // Fans first
                         SectionHeader(title: "Fans")
                         ForEach(monitor.fans) { fan in
                             FanRowView(fan: fan, helper: helper, monitor: monitor)
@@ -60,6 +55,22 @@ struct PopoverView: View {
                                 .foregroundColor(.secondary)
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 8)
+                        }
+
+                        // Temperatures in 2-column grid
+                        if !monitor.sensors.isEmpty {
+                            Divider()
+                                .padding(.vertical, 4)
+
+                            SectionHeader(title: "Temperatures")
+
+                            LazyVGrid(columns: columns, alignment: .leading, spacing: 4) {
+                                ForEach(monitor.sensors) { sensor in
+                                    TemperatureRowView(sensor: sensor, settings: settings)
+                                }
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, 8)
                         }
                     }
                 }
@@ -78,7 +89,6 @@ struct PopoverView: View {
 
                 Spacer()
 
-                // Temperature unit toggle
                 Button(settings.useFahrenheit ? "°F" : "°C") {
                     settings.useFahrenheit.toggle()
                 }
@@ -89,7 +99,7 @@ struct PopoverView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
         }
-        .frame(width: 320, height: 400)
+        .frame(width: 380, height: 500)
     }
 }
 

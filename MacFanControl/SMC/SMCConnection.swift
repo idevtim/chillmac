@@ -103,6 +103,11 @@ final class SMCConnection {
 
     func readTemperature(key: String) throws -> Double {
         let output = try readKey(key)
+        // Apple Silicon: 4-byte little-endian float; Intel: 2-byte sp78
+        if output.keyInfo.dataSize >= 4 {
+            let val = decodeFloat32(output.bytes.0, output.bytes.1, output.bytes.2, output.bytes.3)
+            if val > -40 && val < 200 { return val }
+        }
         return decodeSP78(output.bytes.0, output.bytes.1)
     }
 
@@ -188,6 +193,30 @@ final class SMCConnection {
 
     func writeTestMode(enabled: Bool) throws {
         try writeKey(SMCKey.testMode, bytes: [enabled ? 1 : 0])
+    }
+
+    // MARK: - Key Enumeration
+
+    /// Get total number of SMC keys
+    func getKeyCount() throws -> Int {
+        let output = try readKey("#KEY")
+        let count = (UInt32(output.bytes.0) << 24) | (UInt32(output.bytes.1) << 16) |
+                    (UInt32(output.bytes.2) << 8) | UInt32(output.bytes.3)
+        return Int(count)
+    }
+
+    /// Get the key at a given index
+    func getKeyAtIndex(_ index: Int) throws -> String {
+        var input = SMCParamStruct()
+        input.data32 = UInt32(index)
+        input.data8 = SMCSelector.getKeyFromIndex.rawValue
+
+        var output = SMCParamStruct()
+        let result = callSMC(&input, output: &output)
+        guard result == kIOReturnSuccess else {
+            throw SMCError.readFailed(result)
+        }
+        return fourCharCodeToString(output.key)
     }
 
     // MARK: - Internal
