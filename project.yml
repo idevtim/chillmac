@@ -1,0 +1,58 @@
+name: MacFanControl
+options:
+  bundleIdPrefix: com.timothymurphy
+  deploymentTarget:
+    macOS: "13.0"
+  xcodeVersion: "15.0"
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+
+targets:
+  MacFanControl:
+    type: application
+    platform: macOS
+    sources:
+      - path: MacFanControl
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.timothymurphy.MacFanControl
+        INFOPLIST_FILE: MacFanControl/Info.plist
+        CODE_SIGN_ENTITLEMENTS: MacFanControl/MacFanControl.entitlements
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
+        ENABLE_HARDENED_RUNTIME: YES
+    dependencies:
+      - target: com.timothymurphy.MacFanControl.Helper
+        embed: false
+        codeSign: false
+    postCompileScripts:
+      - name: "Copy Helper Tool"
+        script: |
+          mkdir -p "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchServices"
+          cp "${BUILT_PRODUCTS_DIR}/com.timothymurphy.MacFanControl.Helper" "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchServices/"
+        inputFiles: []
+        outputFiles:
+          - "$(BUILT_PRODUCTS_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchServices/com.timothymurphy.MacFanControl.Helper"
+
+  com.timothymurphy.MacFanControl.Helper:
+    type: tool
+    platform: macOS
+    sources:
+      - path: FanControlHelper
+      - path: Shared
+      - path: MacFanControl/SMC
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.timothymurphy.MacFanControl.Helper
+        PRODUCT_NAME: com.timothymurphy.MacFanControl.Helper
+        INFOPLIST_FILE: FanControlHelper/Info.plist
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        ENABLE_HARDENED_RUNTIME: YES
+        CREATE_INFOPLIST_SECTION_IN_BINARY: YES
+        INFOPLIST_OTHER_PREPROCESSOR_FLAGS: ""
