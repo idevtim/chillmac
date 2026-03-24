@@ -29,22 +29,22 @@ Main App (UI + read-only SMC) --XPC--> Helper Daemon (root, write SMC)
 
 ## Build System
 
-Uses **XcodeGen** (`project.yml`) to generate `MacFanControl.xcodeproj`.
+Uses **XcodeGen** (`project.yml`) to generate `ChillMac.xcodeproj`.
 
 ```bash
 # Regenerate Xcode project after changing project.yml
 xcodegen generate
 
 # Build from command line
-xcodebuild -project MacFanControl.xcodeproj -scheme MacFanControl build
+xcodebuild -project ChillMac.xcodeproj -scheme ChillMac build
 ```
 
 ### Targets
 
 | Target | Type | Bundle ID |
 |--------|------|-----------|
-| MacFanControl | macOS app | com.timothymurphy.MacFanControl |
-| com.timothymurphy.MacFanControl.Helper | command-line tool (daemon) | com.timothymurphy.MacFanControl.Helper |
+| ChillMac | macOS app | com.timothymurphy.ChillMac |
+| com.timothymurphy.ChillMac.Helper | command-line tool (daemon) | com.timothymurphy.ChillMac.Helper |
 
 - Deployment target: macOS 13.0+
 - Swift 5.9
@@ -54,7 +54,7 @@ xcodebuild -project MacFanControl.xcodeproj -scheme MacFanControl build
 ## Project Structure
 
 ```
-MacFanControl/
+ChillMac/
   App/              - Entry point (main.swift), StatusBarController, DetailPanelController, AppSettings
   Views/            - SwiftUI views
     PopoverView       Main dashboard with system info cards, fans, temperatures

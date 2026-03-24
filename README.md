@@ -26,10 +26,10 @@ A macOS menu bar app for monitoring your system and controlling fan speeds. Stay
 xcodegen generate
 
 # Build
-xcodebuild -project MacFanControl.xcodeproj -scheme MacFanControl build
+xcodebuild -project ChillMac.xcodeproj -scheme ChillMac build
 ```
 
-Or open `MacFanControl.xcodeproj` in Xcode and build from there.
+Or open `ChillMac.xcodeproj` in Xcode and build from there.
 
 ## How It Works
 
@@ -45,7 +45,7 @@ On Apple Silicon Macs, the helper also manages SMC test mode to bypass `thermalm
 ## Project Structure
 
 ```
-MacFanControl/
+ChillMac/
   App/              Entry point, status bar controller, detail panel controller
   Views/            SwiftUI views (dashboard, fan controls, detail panels)
   Fan/              Data models and monitoring engines (CPU, memory, battery, disk)
