@@ -110,3 +110,69 @@ func decodeSP78(_ byte0: UInt8, _ byte1: UInt8) -> Double {
     let raw = Int16(bitPattern: (UInt16(byte0) << 8) | UInt16(byte1))
     return Double(raw) / 256.0
 }
+
+/// Decode float32 from 4 big-endian bytes
+func decodeFloat32(_ b0: UInt8, _ b1: UInt8, _ b2: UInt8, _ b3: UInt8) -> Double {
+    let bits = (UInt32(b0) << 24) | (UInt32(b1) << 16) | (UInt32(b2) << 8) | UInt32(b3)
+    return Double(Float(bitPattern: bits))
+}
+
+/// Encode Double → float32 as 4 big-endian bytes
+func encodeFloat32(_ value: Double) -> [UInt8] {
+    let bits = Float(value).bitPattern
+    return [UInt8(bits >> 24), UInt8((bits >> 16) & 0xFF), UInt8((bits >> 8) & 0xFF), UInt8(bits & 0xFF)]
+}
+
+// Known SMC data type FourCharCodes
+let smcTypeFPE2 = fourCharCode("fpe2")
+let smcTypeSP78 = fourCharCode("sp78")
+let smcTypeFLT  = fourCharCode("flt ")
+let smcTypeUI8  = fourCharCode("ui8 ")
+let smcTypeUI16 = fourCharCode("ui16")
+let smcTypeUI32 = fourCharCode("ui32")
+let smcTypeFlag = fourCharCode("flag")
+
+/// Decode a numeric value from SMC output based on its reported data type
+func decodeNumericValue(_ output: SMCParamStruct, dataType: UInt32) -> Double {
+    let b = output.bytes
+    switch dataType {
+    case smcTypeFPE2:
+        return decodeFPE2(b.0, b.1)
+    case smcTypeSP78:
+        return decodeSP78(b.0, b.1)
+    case smcTypeFLT:
+        return decodeFloat32(b.0, b.1, b.2, b.3)
+    case smcTypeUI8, smcTypeFlag:
+        return Double(b.0)
+    case smcTypeUI16:
+        return Double((UInt16(b.0) << 8) | UInt16(b.1))
+    case smcTypeUI32:
+        return Double((UInt32(b.0) << 24) | (UInt32(b.1) << 16) | (UInt32(b.2) << 8) | UInt32(b.3))
+    default:
+        // Fallback: try fpe2 for 2-byte, float for 4-byte
+        let size = output.keyInfo.dataSize
+        if size == 4 {
+            return decodeFloat32(b.0, b.1, b.2, b.3)
+        }
+        return decodeFPE2(b.0, b.1)
+    }
+}
+
+/// Encode a numeric value into bytes for the given SMC data type
+func encodeNumericValue(_ value: Double, dataType: UInt32) -> [UInt8] {
+    switch dataType {
+    case smcTypeFPE2:
+        let e = encodeFPE2(value)
+        return [e.0, e.1]
+    case smcTypeFLT:
+        return encodeFloat32(value)
+    case smcTypeUI8, smcTypeFlag:
+        return [UInt8(min(max(value, 0), 255))]
+    case smcTypeUI16:
+        let v = UInt16(min(max(value, 0), Double(UInt16.max)))
+        return [UInt8(v >> 8), UInt8(v & 0xFF)]
+    default:
+        // Fallback: try float for 4-byte types
+        return encodeFloat32(value)
+    }
+}

@@ -491,6 +491,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				OTHER_LDFLAGS = "-sectcreate __TEXT __launchd_plist $(SRCROOT)/FanControlHelper/Launchd.plist";
 				PRODUCT_BUNDLE_IDENTIFIER = com.timothymurphy.MacFanControl.Helper;
 				PRODUCT_NAME = com.timothymurphy.MacFanControl.Helper;
 				SDKROOT = macosx;
@@ -511,6 +512,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				OTHER_LDFLAGS = "-sectcreate __TEXT __launchd_plist $(SRCROOT)/FanControlHelper/Launchd.plist";
 				PRODUCT_BUNDLE_IDENTIFIER = com.timothymurphy.MacFanControl.Helper;
 				PRODUCT_NAME = com.timothymurphy.MacFanControl.Helper;
 				SDKROOT = macosx;

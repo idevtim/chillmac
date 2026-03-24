@@ -41,7 +41,7 @@ struct FanRowView: View {
 
                 Spacer()
 
-                Text("\(Int(fan.currentRPM)) RPM")
+                Text("\(Int(fan.currentRPM.rounded())) RPM")
                     .font(.system(.caption, design: .monospaced))
                     .foregroundColor(.secondary)
             }

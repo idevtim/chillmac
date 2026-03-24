@@ -34,17 +34,25 @@ final class SMCConnection {
         }
     }
 
-    // MARK: - Read Operations
+    // MARK: - Low-level Read
 
     func readKey(_ key: String) throws -> SMCParamStruct {
-        let keyInfo = try getKeyInfo(key)
         var input = SMCParamStruct()
         input.key = fourCharCode(key)
-        input.keyInfo.dataSize = keyInfo.keyInfo.dataSize
-        input.data8 = SMCSelector.readKey.rawValue
+        input.data8 = SMCSelector.getKeyInfo.rawValue
 
         var output = SMCParamStruct()
-        let result = callSMC(&input, output: &output)
+        var result = callSMC(&input, output: &output)
+        guard result == kIOReturnSuccess else {
+            throw SMCError.keyNotFound(key)
+        }
+
+        // Now read the actual value using the size from keyInfo
+        input.keyInfo.dataSize = output.keyInfo.dataSize
+        input.data8 = SMCSelector.readKey.rawValue
+
+        output = SMCParamStruct()
+        result = callSMC(&input, output: &output)
         guard result == kIOReturnSuccess else {
             throw SMCError.readFailed(result)
         }
@@ -53,6 +61,8 @@ final class SMCConnection {
         }
         return output
     }
+
+    // MARK: - Fan Reads (fpe2 format)
 
     func readFanCount() throws -> Int {
         let output = try readKey(SMCKey.fanCount)
@@ -84,6 +94,8 @@ final class SMCConnection {
         return output.bytes.0 != 0
     }
 
+    // MARK: - Temperature Reads (sp78 format)
+
     func readTemperature(key: String) throws -> Double {
         let output = try readKey(key)
         return decodeSP78(output.bytes.0, output.bytes.1)
@@ -91,42 +103,45 @@ final class SMCConnection {
 
     // MARK: - Write Operations (requires root)
 
-    func writeKey(_ key: String, dataType: UInt32, dataSize: UInt32, bytes: [UInt8]) throws {
+    func writeKey(_ key: String, bytes: [UInt8]) throws {
+        // Get key info for type and size
         var input = SMCParamStruct()
         input.key = fourCharCode(key)
-        input.data8 = SMCSelector.writeKey.rawValue
-        input.keyInfo.dataSize = dataSize
-        input.keyInfo.dataType = dataType
+        input.data8 = SMCSelector.getKeyInfo.rawValue
 
-        // Copy bytes into the tuple
-        let bytesTuple = withUnsafeMutablePointer(to: &input.bytes) { ptr in
+        var infoOutput = SMCParamStruct()
+        var result = callSMC(&input, output: &infoOutput)
+        guard result == kIOReturnSuccess else {
+            throw SMCError.keyNotFound(key)
+        }
+
+        // Write the value
+        input = SMCParamStruct()
+        input.key = fourCharCode(key)
+        input.data8 = SMCSelector.writeKey.rawValue
+        input.keyInfo.dataSize = infoOutput.keyInfo.dataSize
+        input.keyInfo.dataType = infoOutput.keyInfo.dataType
+
+        withUnsafeMutablePointer(to: &input.bytes) { ptr in
             let raw = UnsafeMutableRawPointer(ptr)
             for (i, byte) in bytes.prefix(32).enumerated() {
                 raw.storeBytes(of: byte, toByteOffset: i, as: UInt8.self)
             }
         }
-        _ = bytesTuple
 
         var output = SMCParamStruct()
-        let result = callSMC(&input, output: &output)
+        result = callSMC(&input, output: &output)
         guard result == kIOReturnSuccess else {
             throw SMCError.writeFailed(result)
         }
     }
 
     func writeFanSpeed(index: Int, rpm: Double) throws {
-        let keyInfo = try getKeyInfo(SMCKey.fanTargetSpeed(index))
         let encoded = encodeFPE2(rpm)
-        try writeKey(
-            SMCKey.fanTargetSpeed(index),
-            dataType: keyInfo.keyInfo.dataType,
-            dataSize: keyInfo.keyInfo.dataSize,
-            bytes: [encoded.0, encoded.1]
-        )
+        try writeKey(SMCKey.fanTargetSpeed(index), bytes: [encoded.0, encoded.1])
     }
 
     func writeForceMode(fanIndex: Int, forced: Bool) throws {
-        let keyInfo = try getKeyInfo(SMCKey.forceMode)
         let output = try readKey(SMCKey.forceMode)
         var current = (UInt16(output.bytes.0) << 8) | UInt16(output.bytes.1)
         let bit = UInt16(1 << fanIndex)
@@ -135,41 +150,17 @@ final class SMCConnection {
         } else {
             current &= ~bit
         }
-        try writeKey(
-            SMCKey.forceMode,
-            dataType: keyInfo.keyInfo.dataType,
-            dataSize: keyInfo.keyInfo.dataSize,
-            bytes: [UInt8(current >> 8), UInt8(current & 0xFF)]
-        )
+        try writeKey(SMCKey.forceMode, bytes: [UInt8(current >> 8), UInt8(current & 0xFF)])
     }
 
     func writeTestMode(enabled: Bool) throws {
-        let keyInfo = try getKeyInfo(SMCKey.testMode)
-        try writeKey(
-            SMCKey.testMode,
-            dataType: keyInfo.keyInfo.dataType,
-            dataSize: keyInfo.keyInfo.dataSize,
-            bytes: [enabled ? 1 : 0]
-        )
+        try writeKey(SMCKey.testMode, bytes: [enabled ? 1 : 0])
     }
 
     // MARK: - Internal
 
-    private func getKeyInfo(_ key: String) throws -> SMCParamStruct {
-        var input = SMCParamStruct()
-        input.key = fourCharCode(key)
-        input.data8 = SMCSelector.getKeyInfo.rawValue
-
-        var output = SMCParamStruct()
-        let result = callSMC(&input, output: &output)
-        guard result == kIOReturnSuccess else {
-            throw SMCError.keyNotFound(key)
-        }
-        return output
-    }
-
     private func callSMC(_ input: inout SMCParamStruct, output: inout SMCParamStruct) -> kern_return_t {
-        var inputSize = MemoryLayout<SMCParamStruct>.stride
+        let inputSize = MemoryLayout<SMCParamStruct>.stride
         var outputSize = MemoryLayout<SMCParamStruct>.stride
 
         return IOConnectCallStructMethod(

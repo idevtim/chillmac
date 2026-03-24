@@ -56,3 +56,4 @@ targets:
         ENABLE_HARDENED_RUNTIME: YES
         CREATE_INFOPLIST_SECTION_IN_BINARY: YES
         INFOPLIST_OTHER_PREPROCESSOR_FLAGS: ""
+        OTHER_LDFLAGS: "-sectcreate __TEXT __launchd_plist $(SRCROOT)/FanControlHelper/Launchd.plist"

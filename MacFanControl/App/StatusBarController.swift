@@ -9,7 +9,7 @@ final class StatusBarController: NSObject {
     private var cancellable: AnyCancellable?
 
     init(fanMonitor: FanMonitor, helper: HelperConnection) {
-        statusItem = NSStatusBar.system.statusItem(withLength: 70)
+        statusItem = NSStatusBar.system.statusItem(withLength: 130)
         popover = NSPopover()
 
         super.init()
@@ -31,13 +31,13 @@ final class StatusBarController: NSObject {
             button.target = self
         }
 
-        // Update menu bar title with primary fan RPM
+        // Update menu bar title with all fan RPMs
         cancellable = fanMonitor.$fans
             .receive(on: DispatchQueue.main)
             .sink { [weak self] fans in
-                if let fan = fans.first {
-                    self?.statusItem.button?.title = " \(Int(fan.currentRPM))"
-                }
+                guard !fans.isEmpty else { return }
+                let rpms = fans.map { "\(Int($0.currentRPM))" }.joined(separator: " | ")
+                self?.statusItem.button?.title = " \(rpms)"
             }
 
         // Close popover when clicking elsewhere

@@ -41,11 +41,15 @@ final class FanMonitor: ObservableObject {
             var updatedFans: [FanInfo] = []
 
             for i in 0..<fanCount {
-                let current = (try? smc.readFanSpeed(index: i)) ?? 0
-                let minRPM = (try? smc.readFanMinSpeed(index: i)) ?? 0
-                let maxRPM = (try? smc.readFanMaxSpeed(index: i)) ?? 6500
-                let target = (try? smc.readFanTargetSpeed(index: i)) ?? 0
+                let current = clampRPM((try? smc.readFanSpeed(index: i)) ?? 0)
+                var minRPM = clampRPM((try? smc.readFanMinSpeed(index: i)) ?? 0)
+                var maxRPM = clampRPM((try? smc.readFanMaxSpeed(index: i)) ?? 6500)
+                let target = clampRPM((try? smc.readFanTargetSpeed(index: i)) ?? 0)
                 let isManual = (try? smc.readFanMode(index: i)) ?? false
+
+                // Sanity check: if min/max are nonsensical, use reasonable defaults
+                if minRPM < 100 { minRPM = 1000 }
+                if maxRPM < 200 || maxRPM <= minRPM { maxRPM = 7000 }
 
                 let name: String
                 if fanCount == 1 {
@@ -91,5 +95,11 @@ final class FanMonitor: ObservableObject {
         DispatchQueue.main.async {
             self.sensors = stableSensors
         }
+    }
+
+    /// Clamp RPM to a sane range — guards against bad float/fpe2 decoding
+    private func clampRPM(_ value: Double) -> Double {
+        guard value.isFinite else { return 0 }
+        return min(max(value, 0), 20000)
     }
 }
