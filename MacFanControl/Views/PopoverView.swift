@@ -63,7 +63,7 @@ struct PopoverView: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 8) {
-                    Text("Fan Control:")
+                    Text("System Temp:")
                         .font(.system(size: 22, weight: .bold))
                         .foregroundColor(.white)
 
