@@ -11,14 +11,16 @@ final class StatusBarController: NSObject {
     private let memoryInfo: MemoryInfo
     private let systemInfo: SystemInfo
     private let batteryInfo: BatteryInfo
+    private let cpuInfo: CpuInfo
     private let fanMonitor: FanMonitor
 
-    init(fanMonitor: FanMonitor, helper: HelperConnection, systemInfo: SystemInfo, memoryInfo: MemoryInfo, batteryInfo: BatteryInfo) {
+    init(fanMonitor: FanMonitor, helper: HelperConnection, systemInfo: SystemInfo, memoryInfo: MemoryInfo, batteryInfo: BatteryInfo, cpuInfo: CpuInfo) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         popover = NSPopover()
         self.memoryInfo = memoryInfo
         self.systemInfo = systemInfo
         self.batteryInfo = batteryInfo
+        self.cpuInfo = cpuInfo
         self.fanMonitor = fanMonitor
 
         super.init()
@@ -32,6 +34,7 @@ final class StatusBarController: NSObject {
                 settings: AppSettings.shared,
                 systemInfo: systemInfo,
                 batteryInfo: batteryInfo,
+                cpuInfo: cpuInfo,
                 helper: helper,
                 onMemoryTap: { [weak self] in
                     self?.toggleMemoryPanel()
@@ -41,6 +44,9 @@ final class StatusBarController: NSObject {
                 },
                 onBatteryTap: { [weak self] in
                     self?.toggleBatteryPanel()
+                },
+                onCpuTap: { [weak self] in
+                    self?.toggleCpuPanel()
                 }
             )
         )
@@ -115,6 +121,14 @@ final class StatusBarController: NSObject {
         detailPanel.toggle(
             id: "battery",
             content: BatteryDetailView(batteryInfo: batteryInfo, settings: AppSettings.shared),
+            relativeTo: popover
+        )
+    }
+
+    private func toggleCpuPanel() {
+        detailPanel.toggle(
+            id: "cpu",
+            content: CpuDetailView(cpuInfo: cpuInfo, systemInfo: systemInfo, monitor: fanMonitor, settings: AppSettings.shared),
             relativeTo: popover
         )
     }

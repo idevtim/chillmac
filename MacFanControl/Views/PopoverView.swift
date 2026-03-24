@@ -5,10 +5,12 @@ struct PopoverView: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var systemInfo: SystemInfo
     @ObservedObject var batteryInfo: BatteryInfo
+    @ObservedObject var cpuInfo: CpuInfo
     let helper: HelperConnection
     var onMemoryTap: (() -> Void)?
     var onDiskTap: (() -> Void)?
     var onBatteryTap: (() -> Void)?
+    var onCpuTap: (() -> Void)?
 
     var body: some View {
         ZStack {
@@ -145,10 +147,11 @@ struct PopoverView: View {
                 onTap: onBatteryTap
             )
             InfoCard(
-                icon: "clock.arrow.circlepath",
-                title: systemInfo.uptime,
-                subtitle: "Uptime",
-                accent: .mint
+                icon: "cpu",
+                title: String(format: "%.0f%%", cpuInfo.totalUsage),
+                subtitle: "CPU",
+                accent: .teal,
+                onTap: onCpuTap
             )
         }
     }
