@@ -58,20 +58,23 @@ enum HelperInstaller {
         connection.remoteObjectInterface = NSXPCInterface(with: HelperProtocol.self)
         connection.resume()
 
-        var installed = false
+        var matchesVersion = false
         let semaphore = DispatchSemaphore(value: 0)
 
         if let helper = connection.remoteObjectProxyWithErrorHandler({ _ in
             semaphore.signal()
         }) as? HelperProtocol {
             helper.getVersion { version in
-                installed = !version.isEmpty
+                matchesVersion = (version == kHelperVersion)
+                if !matchesVersion {
+                    NSLog("HelperInstaller: installed version '%@' != expected '%@', needs update", version, kHelperVersion)
+                }
                 semaphore.signal()
             }
         }
 
         _ = semaphore.wait(timeout: .now() + 2)
         connection.invalidate()
-        return installed
+        return matchesVersion
     }
 }

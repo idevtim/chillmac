@@ -31,7 +31,7 @@
     <key>SMPrivilegedExecutables</key>
     <dict>
         <key>com.timothymurphy.MacFanControl.Helper</key>
-        <string>identifier "com.timothymurphy.MacFanControl.Helper" and anchor apple generic</string>
+        <string>identifier "com.timothymurphy.MacFanControl.Helper" and anchor apple generic and certificate leaf[subject.CN] = "Developer ID Application: Tim Murphy (UA2RJP3TSL)"</string>
     </dict>
 </dict>
 </plist>

@@ -111,16 +111,16 @@ func decodeSP78(_ byte0: UInt8, _ byte1: UInt8) -> Double {
     return Double(raw) / 256.0
 }
 
-/// Decode float32 from 4 big-endian bytes
+/// Decode float32 from 4 little-endian bytes (Apple Silicon SMC byte order)
 func decodeFloat32(_ b0: UInt8, _ b1: UInt8, _ b2: UInt8, _ b3: UInt8) -> Double {
-    let bits = (UInt32(b0) << 24) | (UInt32(b1) << 16) | (UInt32(b2) << 8) | UInt32(b3)
+    let bits = UInt32(b0) | (UInt32(b1) << 8) | (UInt32(b2) << 16) | (UInt32(b3) << 24)
     return Double(Float(bitPattern: bits))
 }
 
-/// Encode Double → float32 as 4 big-endian bytes
+/// Encode Double → float32 as 4 little-endian bytes (Apple Silicon SMC byte order)
 func encodeFloat32(_ value: Double) -> [UInt8] {
     let bits = Float(value).bitPattern
-    return [UInt8(bits >> 24), UInt8((bits >> 16) & 0xFF), UInt8((bits >> 8) & 0xFF), UInt8(bits & 0xFF)]
+    return [UInt8(bits & 0xFF), UInt8((bits >> 8) & 0xFF), UInt8((bits >> 16) & 0xFF), UInt8(bits >> 24)]
 }
 
 // Known SMC data type FourCharCodes

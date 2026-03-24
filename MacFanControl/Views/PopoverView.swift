@@ -50,7 +50,7 @@ struct PopoverView: View {
                         // Fans
                         SectionHeader(title: "Fans")
                         ForEach(monitor.fans) { fan in
-                            FanRowView(fan: fan, helper: helper)
+                            FanRowView(fan: fan, helper: helper, monitor: monitor)
                         }
 
                         if monitor.fans.isEmpty {

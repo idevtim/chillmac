@@ -6,6 +6,10 @@ final class FanMonitor: ObservableObject {
     @Published var sensors: [TemperatureSensor] = []
     @Published var smcError: String?
 
+    /// User overrides that persist across poll cycles
+    @Published var manualOverrides: [Int: Bool] = [:]   // fanIndex → manual on/off
+    @Published var targetOverrides: [Int: Double] = [:]  // fanIndex → target RPM
+
     private var smc: SMCConnection?
     private var timer: Timer?
     private var discoveredSensors: [String: TemperatureSensor] = [:]
@@ -48,8 +52,9 @@ final class FanMonitor: ObservableObject {
                 let isManual = (try? smc.readFanMode(index: i)) ?? false
 
                 // Sanity check: if min/max are nonsensical, use reasonable defaults
+                // M-series MacBook Pro fans can exceed 12,000 RPM
                 if minRPM < 100 { minRPM = 1000 }
-                if maxRPM < 200 || maxRPM <= minRPM { maxRPM = 7000 }
+                if maxRPM < 1000 || maxRPM <= minRPM { maxRPM = 15000 }
 
                 let name: String
                 if fanCount == 1 {

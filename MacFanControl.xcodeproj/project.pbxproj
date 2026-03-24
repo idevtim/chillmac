@@ -219,9 +219,11 @@
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
 					23233B3F63CAD494570DD58C = {
+						DevelopmentTeam = UA2RJP3TSL;
 						ProvisioningStyle = Manual;
 					};
 					434B0864D0A577165C5C2769 = {
+						DevelopmentTeam = UA2RJP3TSL;
 						ProvisioningStyle = Manual;
 					};
 				};
@@ -331,9 +333,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = MacFanControl/MacFanControl.entitlements;
-				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_IDENTITY = "Developer ID Application: Tim Murphy (UA2RJP3TSL)";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = UA2RJP3TSL;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = MacFanControl/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
@@ -410,9 +413,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = MacFanControl/MacFanControl.entitlements;
-				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_IDENTITY = "Developer ID Application: Tim Murphy (UA2RJP3TSL)";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = UA2RJP3TSL;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = MacFanControl/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
@@ -480,10 +484,11 @@
 		BF2B8508A53C558668ED192C /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_IDENTITY = "Developer ID Application: Tim Murphy (UA2RJP3TSL)";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				DEVELOPMENT_TEAM = UA2RJP3TSL;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = FanControlHelper/Info.plist;
 				INFOPLIST_OTHER_PREPROCESSOR_FLAGS = "";
@@ -501,10 +506,11 @@
 		E5B260DAB7892F4A53F79EB7 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_IDENTITY = "Developer ID Application: Tim Murphy (UA2RJP3TSL)";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				DEVELOPMENT_TEAM = UA2RJP3TSL;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = FanControlHelper/Info.plist;
 				INFOPLIST_OTHER_PREPROCESSOR_FLAGS = "";

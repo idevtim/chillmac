@@ -11,12 +11,12 @@
     <key>CFBundleName</key>
     <string>com.timothymurphy.MacFanControl.Helper</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
+    <string>7.0</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>7</string>
     <key>SMAuthorizedClients</key>
     <array>
-        <string>identifier "com.timothymurphy.MacFanControl" and anchor apple generic</string>
+        <string>identifier "com.timothymurphy.MacFanControl" and anchor apple generic and certificate leaf[subject.CN] = "Developer ID Application: Tim Murphy (UA2RJP3TSL)"</string>
     </array>
 </dict>
 </plist>

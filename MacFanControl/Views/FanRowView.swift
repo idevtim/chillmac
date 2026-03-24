@@ -3,16 +3,27 @@ import SwiftUI
 struct FanRowView: View {
     let fan: FanInfo
     let helper: HelperConnection
-
-    @State private var targetRPM: Double
-    @State private var isManual: Bool
+    @ObservedObject var monitor: FanMonitor
     @State private var errorMessage: String?
 
-    init(fan: FanInfo, helper: HelperConnection) {
-        self.fan = fan
-        self.helper = helper
-        _targetRPM = State(initialValue: fan.targetRPM)
-        _isManual = State(initialValue: fan.isManualMode)
+    private var isManual: Binding<Bool> {
+        Binding(
+            get: { monitor.manualOverrides[fan.id] ?? fan.isManualMode },
+            set: { newValue in
+                monitor.manualOverrides[fan.id] = newValue
+                setFanMode(manual: newValue)
+            }
+        )
+    }
+
+    private var targetRPM: Binding<Double> {
+        Binding(
+            get: { monitor.targetOverrides[fan.id] ?? fan.targetRPM },
+            set: { newValue in
+                monitor.targetOverrides[fan.id] = newValue
+                setFanSpeed(rpm: Int(newValue))
+            }
+        )
     }
 
     private var sliderRange: ClosedRange<Double> {
@@ -27,13 +38,6 @@ struct FanRowView: View {
             HStack {
                 Image(systemName: "fan")
                     .foregroundColor(fan.currentRPM > 0 ? .accentColor : .secondary)
-                    .rotationEffect(.degrees(fan.currentRPM > 0 ? 360 : 0))
-                    .animation(
-                        fan.currentRPM > 0
-                            ? .linear(duration: max(0.3, 3000.0 / fan.currentRPM)).repeatForever(autoreverses: false)
-                            : .default,
-                        value: fan.currentRPM > 0
-                    )
 
                 Text(fan.name)
                     .font(.subheadline)
@@ -48,34 +52,28 @@ struct FanRowView: View {
 
             // Manual/Auto toggle
             HStack {
-                Toggle(isOn: $isManual) {
-                    Text(isManual ? "Manual" : "Auto")
+                Toggle(isOn: isManual) {
+                    Text(isManual.wrappedValue ? "Manual" : "Auto")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
                 .toggleStyle(.switch)
                 .controlSize(.mini)
-                .onChange(of: isManual) { newValue in
-                    setFanMode(manual: newValue)
-                }
             }
 
             // Speed slider (only in manual mode)
-            if isManual, sliderRange.upperBound > sliderRange.lowerBound {
+            if isManual.wrappedValue, sliderRange.upperBound > sliderRange.lowerBound {
                 VStack(spacing: 2) {
                     Slider(
-                        value: $targetRPM,
+                        value: targetRPM,
                         in: sliderRange,
                         step: 100
                     )
-                    .onChange(of: targetRPM) { newValue in
-                        setFanSpeed(rpm: Int(newValue))
-                    }
 
                     HStack {
                         Text("\(Int(fan.minRPM))")
                         Spacer()
-                        Text("Target: \(Int(targetRPM)) RPM")
+                        Text("Target: \(Int(targetRPM.wrappedValue)) RPM")
                             .fontWeight(.medium)
                         Spacer()
                         Text("\(Int(fan.maxRPM))")
@@ -96,11 +94,12 @@ struct FanRowView: View {
     }
 
     private func setFanMode(manual: Bool) {
+        NSLog("FanRowView: setFanMode fan=%d manual=%d", fan.id, manual ? 1 : 0)
         helper.setFanMode(fanIndex: fan.id, isAuto: !manual) { success, error in
             DispatchQueue.main.async {
                 if !success {
                     errorMessage = error ?? "Failed to set fan mode"
-                    isManual = !manual // revert
+                    monitor.manualOverrides[fan.id] = !manual // revert
                 } else {
                     errorMessage = nil
                 }
@@ -109,6 +108,7 @@ struct FanRowView: View {
     }
 
     private func setFanSpeed(rpm: Int) {
+        NSLog("FanRowView: setFanSpeed fan=%d rpm=%d", fan.id, rpm)
         helper.setFanSpeed(fanIndex: fan.id, rpm: rpm) { success, error in
             DispatchQueue.main.async {
                 if !success {

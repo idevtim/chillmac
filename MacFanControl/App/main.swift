@@ -7,9 +7,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let helperConnection = HelperConnection()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Install privileged helper on first launch
+        // Install or re-load the privileged helper
         if !HelperInstaller.isHelperInstalled() {
             _ = HelperInstaller.installHelper()
+        }
+        // Ensure the daemon is loaded (may have been unloaded on last quit)
+        if !HelperInstaller.isHelperInstalled() {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+            process.arguments = ["bootstrap", "system", "/Library/LaunchDaemons/com.timothymurphy.MacFanControl.Helper.plist"]
+            try? process.run()
+            process.waitUntilExit()
+        }
+
+        // Dump all fan key info for diagnostics
+        if let helper = helperConnection.connect() {
+            helper.dumpFanKeys { dump in
+                NSLog("Fan key dump:\n%@", dump)
+            }
         }
 
         fanMonitor.startMonitoring()
@@ -20,8 +35,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        // Reset any manually controlled fans back to auto
+        for (fanIndex, isManual) in fanMonitor.manualOverrides where isManual {
+            helperConnection.setFanMode(fanIndex: fanIndex, isAuto: true) { _, _ in }
+        }
+
         fanMonitor.stopMonitoring()
         helperConnection.disconnect()
+
+        // Unload the helper daemon so it's not running when the app isn't
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        process.arguments = ["bootout", "system/com.timothymurphy.MacFanControl.Helper"]
+        try? process.run()
+        process.waitUntilExit()
     }
 }
 

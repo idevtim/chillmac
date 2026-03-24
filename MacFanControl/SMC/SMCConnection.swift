@@ -47,8 +47,11 @@ final class SMCConnection {
             throw SMCError.keyNotFound(key)
         }
 
-        // Now read the actual value using the size from keyInfo
-        input.keyInfo.dataSize = output.keyInfo.dataSize
+        // Save size from getKeyInfo
+        let dataSize = output.keyInfo.dataSize
+
+        // Read the actual value
+        input.keyInfo.dataSize = dataSize
         input.data8 = SMCSelector.readKey.rawValue
 
         output = SMCParamStruct()
@@ -59,10 +62,12 @@ final class SMCConnection {
         if output.result == 132 {
             throw SMCError.keyNotFound(key)
         }
+        // Preserve the data size for callers that need it
+        output.keyInfo.dataSize = dataSize
         return output
     }
 
-    // MARK: - Fan Reads (fpe2 format)
+    // MARK: - Fan Reads
 
     func readFanCount() throws -> Int {
         let output = try readKey(SMCKey.fanCount)
@@ -71,22 +76,22 @@ final class SMCConnection {
 
     func readFanSpeed(index: Int) throws -> Double {
         let output = try readKey(SMCKey.fanActualSpeed(index))
-        return decodeFPE2(output.bytes.0, output.bytes.1)
+        return decodeFanValue(output)
     }
 
     func readFanMinSpeed(index: Int) throws -> Double {
         let output = try readKey(SMCKey.fanMinSpeed(index))
-        return decodeFPE2(output.bytes.0, output.bytes.1)
+        return decodeFanValue(output)
     }
 
     func readFanMaxSpeed(index: Int) throws -> Double {
         let output = try readKey(SMCKey.fanMaxSpeed(index))
-        return decodeFPE2(output.bytes.0, output.bytes.1)
+        return decodeFanValue(output)
     }
 
     func readFanTargetSpeed(index: Int) throws -> Double {
         let output = try readKey(SMCKey.fanTargetSpeed(index))
-        return decodeFPE2(output.bytes.0, output.bytes.1)
+        return decodeFanValue(output)
     }
 
     func readFanMode(index: Int) throws -> Bool {
@@ -94,7 +99,7 @@ final class SMCConnection {
         return output.bytes.0 != 0
     }
 
-    // MARK: - Temperature Reads (sp78 format)
+    // MARK: - Temperature Reads
 
     func readTemperature(key: String) throws -> Double {
         let output = try readKey(key)
@@ -104,7 +109,6 @@ final class SMCConnection {
     // MARK: - Write Operations (requires root)
 
     func writeKey(_ key: String, bytes: [UInt8]) throws {
-        // Get key info for type and size
         var input = SMCParamStruct()
         input.key = fourCharCode(key)
         input.data8 = SMCSelector.getKeyInfo.rawValue
@@ -115,7 +119,6 @@ final class SMCConnection {
             throw SMCError.keyNotFound(key)
         }
 
-        // Write the value
         input = SMCParamStruct()
         input.key = fourCharCode(key)
         input.data8 = SMCSelector.writeKey.rawValue
@@ -136,11 +139,41 @@ final class SMCConnection {
         }
     }
 
-    func writeFanSpeed(index: Int, rpm: Double) throws {
-        let encoded = encodeFPE2(rpm)
-        try writeKey(SMCKey.fanTargetSpeed(index), bytes: [encoded.0, encoded.1])
+    /// Get key info (dataSize, dataType) for debugging
+    func getKeyInfo(_ key: String) throws -> (dataSize: UInt32, dataType: UInt32) {
+        var input = SMCParamStruct()
+        input.key = fourCharCode(key)
+        input.data8 = SMCSelector.getKeyInfo.rawValue
+        var output = SMCParamStruct()
+        let result = callSMC(&input, output: &output)
+        guard result == kIOReturnSuccess else {
+            throw SMCError.keyNotFound(key)
+        }
+        return (output.keyInfo.dataSize, output.keyInfo.dataType)
     }
 
+    /// Write fan target speed — uses correct encoding based on key's data size
+    func writeFanSpeed(index: Int, rpm: Double) throws {
+        let key = SMCKey.fanTargetSpeed(index)
+        let info = try getKeyInfo(key)
+
+        let bytes: [UInt8]
+        if info.dataSize == 2 {
+            let encoded = encodeFPE2(rpm)
+            bytes = [encoded.0, encoded.1]
+        } else {
+            // 4-byte key: use float32
+            bytes = encodeFloat32(rpm)
+        }
+        try writeKey(key, bytes: bytes)
+    }
+
+    /// Write per-fan mode key (F{i}Md) — used on Apple Silicon
+    func writeFanModeKey(index: Int, forced: Bool) throws {
+        try writeKey(SMCKey.fanMode(index), bytes: [forced ? 1 : 0])
+    }
+
+    /// Write FS! force bitmask — used on Intel
     func writeForceMode(fanIndex: Int, forced: Bool) throws {
         let output = try readKey(SMCKey.forceMode)
         var current = (UInt16(output.bytes.0) << 8) | UInt16(output.bytes.1)
@@ -158,6 +191,26 @@ final class SMCConnection {
     }
 
     // MARK: - Internal
+
+    /// Decode a fan speed value — tries float32 for 4-byte keys, falls back to fpe2
+    private func decodeFanValue(_ output: SMCParamStruct) -> Double {
+        if output.keyInfo.dataSize >= 4 {
+            let floatValue = decodeFloat32(output.bytes.0, output.bytes.1, output.bytes.2, output.bytes.3)
+            if floatValue > 0 && floatValue < 20000 {
+                return floatValue
+            }
+        }
+        // fpe2 fallback (works for 2-byte keys and 4-byte keys with fpe2-in-first-2-bytes)
+        let fpe2Value = decodeFPE2(output.bytes.0, output.bytes.1)
+        if fpe2Value > 0 {
+            return fpe2Value
+        }
+        // Last resort: try float32 even if out of range
+        if output.keyInfo.dataSize >= 4 {
+            return decodeFloat32(output.bytes.0, output.bytes.1, output.bytes.2, output.bytes.3)
+        }
+        return fpe2Value
+    }
 
     private func callSMC(_ input: inout SMCParamStruct, output: inout SMCParamStruct) -> kern_return_t {
         let inputSize = MemoryLayout<SMCParamStruct>.stride

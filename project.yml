@@ -22,7 +22,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.timothymurphy.MacFanControl
         INFOPLIST_FILE: MacFanControl/Info.plist
         CODE_SIGN_ENTITLEMENTS: MacFanControl/MacFanControl.entitlements
-        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_IDENTITY: "Developer ID Application: Tim Murphy (UA2RJP3TSL)"
+        DEVELOPMENT_TEAM: UA2RJP3TSL
         CODE_SIGN_STYLE: Manual
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
         ENABLE_HARDENED_RUNTIME: YES
@@ -51,7 +52,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.timothymurphy.MacFanControl.Helper
         PRODUCT_NAME: com.timothymurphy.MacFanControl.Helper
         INFOPLIST_FILE: FanControlHelper/Info.plist
-        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_IDENTITY: "Developer ID Application: Tim Murphy (UA2RJP3TSL)"
+        DEVELOPMENT_TEAM: UA2RJP3TSL
         CODE_SIGN_STYLE: Manual
         ENABLE_HARDENED_RUNTIME: YES
         CREATE_INFOPLIST_SECTION_IN_BINARY: YES
