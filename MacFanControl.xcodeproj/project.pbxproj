@@ -9,12 +9,14 @@
 /* Begin PBXBuildFile section */
 		0DD4870C706C901535485F24 /* FanRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03336C4CA57BE9E0D2E34A4F /* FanRowView.swift */; };
 		190178283C807A42769096B8 /* HelperProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0308092D7A07FB744FF44C9C /* HelperProtocol.swift */; };
+		2439D2D7BDDD95253475A836 /* MemoryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F82514CB2C42F6CCEC21A4AB /* MemoryDetailView.swift */; };
 		25B8882E167F0950D9512600 /* HelperService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA36A27F0D81F320C187D438 /* HelperService.swift */; };
 		28194167FB96EA0B481A381D /* FanMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88E179E14C79DE543C0D6AC8 /* FanMonitor.swift */; };
 		3DB0E675519EBB5BA5FF97F9 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53BAA0C6C32F6477EFB91400 /* StatusBarController.swift */; };
 		47675C30F5462320B4D88D5C /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A7DA63589467B23ADBD480F /* main.swift */; };
 		48310CF51E72B033297C7EEE /* SMCTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1364E5B9F427B4742EF6369 /* SMCTypes.swift */; };
 		5E82AE4D1A5F7EC28F217B00 /* SystemInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CDCBD2E40644648C62219B3 /* SystemInfo.swift */; };
+		61C9C00EEF13957D1C2A3DC9 /* MemoryInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8F151DE71605D1668B720F3 /* MemoryInfo.swift */; };
 		632CA5E4DC982E62BBF4287A /* Launchd.plist in Resources */ = {isa = PBXBuildFile; fileRef = 7C8BCAAD9C88D81E293AD60A /* Launchd.plist */; };
 		71C11B908697F60F753854B1 /* SMCKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6790BDD37571A7A0E8AD806 /* SMCKeys.swift */; };
 		764E676710F4416207509454 /* HelperProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0308092D7A07FB744FF44C9C /* HelperProtocol.swift */; };
@@ -23,6 +25,7 @@
 		95E015C3F8C1E7AC79DB2A9D /* PopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75E8DB23627266322E779C92 /* PopoverView.swift */; };
 		A3B86E446A1DDDAC2AA5628A /* SMCKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6790BDD37571A7A0E8AD806 /* SMCKeys.swift */; };
 		ADA5BC9C2975C935F527E078 /* FanInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25974588A47A7201ACD9281E /* FanInfo.swift */; };
+		AF1EF2CFA1F0BEF728BF65D8 /* DetailPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C3E74DA14D3AE0E2229912F /* DetailPanelController.swift */; };
 		C5812C24394B58FE26A9E4A1 /* HelperInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 836F39DC0B66E048D6EA455C /* HelperInstaller.swift */; };
 		D4C4273C6D7A3B2DF8AAE230 /* HelperDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 651FE6EE4C0B906A04825054 /* HelperDelegate.swift */; };
 		D9FE57E3A0036AAB55A27708 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 775643F4CBB66E3CCE0D0320 /* AppSettings.swift */; };
@@ -54,6 +57,7 @@
 		53BAA0C6C32F6477EFB91400 /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarController.swift; sourceTree = "<group>"; };
 		651FE6EE4C0B906A04825054 /* HelperDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperDelegate.swift; sourceTree = "<group>"; };
 		66CDB64E4594F2A746E4A5F0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		6C3E74DA14D3AE0E2229912F /* DetailPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailPanelController.swift; sourceTree = "<group>"; };
 		75E8DB23627266322E779C92 /* PopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopoverView.swift; sourceTree = "<group>"; };
 		775643F4CBB66E3CCE0D0320 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		7C8BCAAD9C88D81E293AD60A /* Launchd.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Launchd.plist; sourceTree = "<group>"; };
@@ -62,11 +66,13 @@
 		88E179E14C79DE543C0D6AC8 /* FanMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FanMonitor.swift; sourceTree = "<group>"; };
 		8F554B3953C1054794D99950 /* com.timothymurphy.MacFanControl.Helper */ = {isa = PBXFileReference; includeInIndex = 0; path = com.timothymurphy.MacFanControl.Helper; sourceTree = BUILT_PRODUCTS_DIR; };
 		A2DE7D07EDD2620477BE5A84 /* MacFanControl.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MacFanControl.entitlements; sourceTree = "<group>"; };
+		A8F151DE71605D1668B720F3 /* MemoryInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryInfo.swift; sourceTree = "<group>"; };
 		CA91A035CFBF188025BA4AB8 /* TemperatureRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemperatureRowView.swift; sourceTree = "<group>"; };
 		CE97912FF28BB3CD990044E9 /* MacFanControl.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MacFanControl.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D6790BDD37571A7A0E8AD806 /* SMCKeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SMCKeys.swift; sourceTree = "<group>"; };
 		E1364E5B9F427B4742EF6369 /* SMCTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SMCTypes.swift; sourceTree = "<group>"; };
 		ED35E585A369C87795697088 /* HelperConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperConnection.swift; sourceTree = "<group>"; };
+		F82514CB2C42F6CCEC21A4AB /* MemoryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryDetailView.swift; sourceTree = "<group>"; };
 		F97C70E1394D27C5E02A8E3A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		FA36A27F0D81F320C187D438 /* HelperService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -97,6 +103,7 @@
 			children = (
 				25974588A47A7201ACD9281E /* FanInfo.swift */,
 				88E179E14C79DE543C0D6AC8 /* FanMonitor.swift */,
+				A8F151DE71605D1668B720F3 /* MemoryInfo.swift */,
 				4CDCBD2E40644648C62219B3 /* SystemInfo.swift */,
 				3D2D8F7F99D1732A7B470868 /* TemperatureSensor.swift */,
 			);
@@ -107,6 +114,7 @@
 			isa = PBXGroup;
 			children = (
 				03336C4CA57BE9E0D2E34A4F /* FanRowView.swift */,
+				F82514CB2C42F6CCEC21A4AB /* MemoryDetailView.swift */,
 				75E8DB23627266322E779C92 /* PopoverView.swift */,
 				CA91A035CFBF188025BA4AB8 /* TemperatureRowView.swift */,
 			);
@@ -169,6 +177,7 @@
 			isa = PBXGroup;
 			children = (
 				775643F4CBB66E3CCE0D0320 /* AppSettings.swift */,
+				6C3E74DA14D3AE0E2229912F /* DetailPanelController.swift */,
 				8505740A34F05BD6DB6F75EC /* main.swift */,
 				53BAA0C6C32F6477EFB91400 /* StatusBarController.swift */,
 			);
@@ -307,12 +316,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				D9FE57E3A0036AAB55A27708 /* AppSettings.swift in Sources */,
+				AF1EF2CFA1F0BEF728BF65D8 /* DetailPanelController.swift in Sources */,
 				ADA5BC9C2975C935F527E078 /* FanInfo.swift in Sources */,
 				28194167FB96EA0B481A381D /* FanMonitor.swift in Sources */,
 				0DD4870C706C901535485F24 /* FanRowView.swift in Sources */,
 				DEEB1416F31C6CC8A67293A8 /* HelperConnection.swift in Sources */,
 				C5812C24394B58FE26A9E4A1 /* HelperInstaller.swift in Sources */,
 				764E676710F4416207509454 /* HelperProtocol.swift in Sources */,
+				2439D2D7BDDD95253475A836 /* MemoryDetailView.swift in Sources */,
+				61C9C00EEF13957D1C2A3DC9 /* MemoryInfo.swift in Sources */,
 				95E015C3F8C1E7AC79DB2A9D /* PopoverView.swift in Sources */,
 				F2A1BE2E58AE4882B2142136 /* SMCConnection.swift in Sources */,
 				71C11B908697F60F753854B1 /* SMCKeys.swift in Sources */,

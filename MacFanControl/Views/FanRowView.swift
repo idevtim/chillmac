@@ -41,16 +41,16 @@ struct FanRowView: View {
     private var rpmColor: Color {
         if rpmPercent > 0.8 { return .red }
         if rpmPercent > 0.5 { return .orange }
-        return .cyan
+        return .green
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             // Top row: icon, name, RPM
             HStack {
                 Image(systemName: "fan.fill")
-                    .font(.system(size: 16))
-                    .foregroundColor(fan.currentRPM > 0 ? .cyan : .white.opacity(0.3))
+                    .font(.system(size: 20))
+                    .foregroundColor(fan.currentRPM > 0 ? .green : .white.opacity(0.3))
                     .rotationEffect(.degrees(fan.currentRPM > 0 ? 360 : 0))
                     .animation(
                         fan.currentRPM > 0
@@ -59,24 +59,24 @@ struct FanRowView: View {
                         value: fan.currentRPM > 0
                     )
 
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(fan.name)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.white)
 
                     Text(isManual.wrappedValue ? "Manual" : "Auto")
-                        .font(.system(size: 10))
-                        .foregroundColor(.white.opacity(0.4))
+                        .font(.system(size: 12))
+                        .foregroundColor(.white.opacity(0.45))
                 }
 
                 Spacer()
 
                 Text("\(Int(fan.currentRPM.rounded()))")
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundColor(rpmColor)
                 +
                 Text(" RPM")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.white.opacity(0.5))
             }
 
@@ -86,11 +86,11 @@ struct FanRowView: View {
                     EmptyView()
                 }
                 .toggleStyle(.switch)
-                .controlSize(.mini)
-                .tint(.cyan)
+                .controlSize(.small)
+                .tint(.green)
 
                 Text(isManual.wrappedValue ? "Manual Control" : "Automatic")
-                    .font(.system(size: 10))
+                    .font(.system(size: 13))
                     .foregroundColor(.white.opacity(0.5))
 
                 Spacer()
@@ -98,13 +98,13 @@ struct FanRowView: View {
 
             // Speed slider (only in manual mode)
             if isManual.wrappedValue, sliderRange.upperBound > sliderRange.lowerBound {
-                VStack(spacing: 4) {
+                VStack(spacing: 6) {
                     Slider(
                         value: targetRPM,
                         in: sliderRange,
                         step: 100
                     )
-                    .tint(.cyan)
+                    .tint(.green)
 
                     HStack {
                         Text("\(Int(fan.minRPM))")
@@ -114,20 +114,20 @@ struct FanRowView: View {
                         Spacer()
                         Text("\(Int(fan.maxRPM))")
                     }
-                    .font(.system(size: 9))
+                    .font(.system(size: 11))
                     .foregroundColor(.white.opacity(0.4))
                 }
             }
 
             if let error = errorMessage {
                 Text(error)
-                    .font(.caption2)
+                    .font(.system(size: 12))
                     .foregroundColor(.red)
             }
         }
-        .padding(12)
-        .background(Color.white.opacity(0.08))
-        .cornerRadius(10)
+        .padding(14)
+        .background(Color.white.opacity(0.07))
+        .cornerRadius(12)
     }
 
     private func setFanMode(manual: Bool) {
@@ -139,6 +139,13 @@ struct FanRowView: View {
                     monitor.manualOverrides[fan.id] = !manual
                 } else {
                     errorMessage = nil
+                    if manual {
+                        // Initialize slider to current RPM (or minRPM if fans aren't spinning)
+                        let initialRPM = fan.currentRPM > fan.minRPM ? fan.currentRPM : fan.minRPM
+                        monitor.targetOverrides[fan.id] = initialRPM
+                        // Immediately send the target so the fan actually spins
+                        setFanSpeed(rpm: Int(initialRPM))
+                    }
                 }
             }
         }

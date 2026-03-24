@@ -5,6 +5,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var statusBarController: StatusBarController?
     let fanMonitor = FanMonitor()
     let systemInfo = SystemInfo()
+    let memoryInfo = MemoryInfo()
     let helperConnection = HelperConnection()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -30,10 +31,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         fanMonitor.startMonitoring()
         systemInfo.startMonitoring()
+        memoryInfo.startMonitoring()
         statusBarController = StatusBarController(
             fanMonitor: fanMonitor,
             helper: helperConnection,
-            systemInfo: systemInfo
+            systemInfo: systemInfo,
+            memoryInfo: memoryInfo
         )
     }
 
@@ -45,6 +48,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         fanMonitor.stopMonitoring()
         systemInfo.stopMonitoring()
+        memoryInfo.stopMonitoring()
         helperConnection.disconnect()
 
         // Unload the helper daemon so it's not running when the app isn't

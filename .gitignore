@@ -1,0 +1,19 @@
+# Xcode
+build/
+DerivedData/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+
+# XcodeGen (regenerated from project.yml)
+*.xcodeproj/project.pbxproj
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
+
+# Archives
+*.xcarchive

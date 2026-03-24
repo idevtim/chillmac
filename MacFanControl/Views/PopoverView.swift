@@ -5,14 +5,15 @@ struct PopoverView: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var systemInfo: SystemInfo
     let helper: HelperConnection
+    var onMemoryTap: (() -> Void)?
 
     var body: some View {
         ZStack {
-            // Dark purple gradient background
+            // Dark blue-green gradient background
             LinearGradient(
                 colors: [
-                    Color(red: 0.15, green: 0.08, blue: 0.35),
-                    Color(red: 0.10, green: 0.05, blue: 0.25)
+                    Color(red: 0.06, green: 0.12, blue: 0.20),
+                    Color(red: 0.04, green: 0.08, blue: 0.14)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -26,7 +27,7 @@ struct PopoverView: View {
                     errorSection(error)
                 } else {
                     ScrollView(.vertical, showsIndicators: false) {
-                        VStack(spacing: 10) {
+                        VStack(spacing: 12) {
                             // System info cards
                             systemInfoCards
 
@@ -38,9 +39,9 @@ struct PopoverView: View {
                                 temperaturesSection
                             }
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.top, 10)
-                        .padding(.bottom, 14)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                        .padding(.bottom, 16)
                     }
                 }
 
@@ -48,44 +49,44 @@ struct PopoverView: View {
                 footerSection
             }
         }
-        .frame(width: 400, height: 620)
+        .frame(width: 420, height: 640)
     }
 
     // MARK: - Header
 
     private var headerSection: some View {
         HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 8) {
                     Text("Fan Control:")
-                        .font(.system(size: 18, weight: .bold))
+                        .font(.system(size: 22, weight: .bold))
                         .foregroundColor(.white)
 
                     Text(thermalStatus)
-                        .font(.system(size: 18, weight: .bold))
+                        .font(.system(size: 22, weight: .bold))
                         .foregroundColor(thermalStatusColor)
                 }
 
                 Text(systemInfo.machineModel)
-                    .font(.system(size: 12))
+                    .font(.system(size: 14))
                     .foregroundColor(.white.opacity(0.6))
             }
 
             Spacer()
 
             Image(systemName: "laptopcomputer")
-                .font(.system(size: 36))
+                .font(.system(size: 40))
                 .foregroundStyle(
                     LinearGradient(
-                        colors: [.cyan, .blue.opacity(0.7)],
+                        colors: [.green, .teal],
                         startPoint: .top,
                         endPoint: .bottom
                     )
                 )
         }
-        .padding(.horizontal, 18)
-        .padding(.top, 16)
-        .padding(.bottom, 10)
+        .padding(.horizontal, 20)
+        .padding(.top, 18)
+        .padding(.bottom, 12)
     }
 
     private var thermalStatus: String {
@@ -108,23 +109,25 @@ struct PopoverView: View {
 
     private var systemInfoCards: some View {
         let columns = [
-            GridItem(.flexible(), spacing: 10),
-            GridItem(.flexible(), spacing: 10)
+            GridItem(.flexible(), spacing: 12),
+            GridItem(.flexible(), spacing: 12)
         ]
 
-        return LazyVGrid(columns: columns, spacing: 10) {
+        return LazyVGrid(columns: columns, spacing: 12) {
             InfoCard(
                 icon: "cpu",
                 title: systemInfo.chipName,
                 subtitle: "Processor",
-                accent: .cyan
+                accent: .teal
             )
             InfoCard(
                 icon: "memorychip",
                 title: systemInfo.ramAmount,
                 subtitle: "Memory",
-                accent: .purple
+                accent: .green,
+                isClickable: true
             )
+            .onTapGesture { onMemoryTap?() }
             InfoCard(
                 icon: "internaldrive",
                 title: systemInfo.diskUsage,
@@ -135,7 +138,7 @@ struct PopoverView: View {
                 icon: "clock.arrow.circlepath",
                 title: systemInfo.uptime,
                 subtitle: "Uptime",
-                accent: .teal
+                accent: .mint
             )
         }
     }
@@ -143,7 +146,7 @@ struct PopoverView: View {
     // MARK: - Fans
 
     private var fansSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             CardSectionHeader(title: "Fans")
 
             ForEach(monitor.fans) { fan in
@@ -153,15 +156,16 @@ struct PopoverView: View {
             if monitor.fans.isEmpty {
                 HStack {
                     Image(systemName: "fan.slash")
+                        .font(.system(size: 16))
                         .foregroundColor(.white.opacity(0.4))
                     Text("No fans detected")
-                        .font(.caption)
+                        .font(.system(size: 14))
                         .foregroundColor(.white.opacity(0.4))
                 }
-                .padding(12)
+                .padding(14)
                 .frame(maxWidth: .infinity, alignment: .center)
                 .background(Color.white.opacity(0.06))
-                .cornerRadius(10)
+                .cornerRadius(12)
             }
         }
     }
@@ -170,14 +174,14 @@ struct PopoverView: View {
 
     private var temperaturesSection: some View {
         let columns = [
-            GridItem(.flexible(), spacing: 8),
-            GridItem(.flexible(), spacing: 8)
+            GridItem(.flexible(), spacing: 10),
+            GridItem(.flexible(), spacing: 10)
         ]
 
-        return VStack(alignment: .leading, spacing: 6) {
+        return VStack(alignment: .leading, spacing: 8) {
             CardSectionHeader(title: "Temperatures")
 
-            LazyVGrid(columns: columns, spacing: 6) {
+            LazyVGrid(columns: columns, spacing: 8) {
                 ForEach(monitor.sensors) { sensor in
                     TemperatureRowView(sensor: sensor, settings: settings)
                 }
@@ -188,20 +192,20 @@ struct PopoverView: View {
     // MARK: - Error
 
     private func errorSection(_ error: String) -> some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 36))
+                .font(.system(size: 40))
                 .foregroundColor(.orange)
             Text("SMC Error")
-                .font(.headline)
+                .font(.system(size: 18, weight: .bold))
                 .foregroundColor(.white)
             Text(error)
-                .font(.caption)
+                .font(.system(size: 14))
                 .foregroundColor(.white.opacity(0.6))
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(20)
+        .padding(24)
     }
 
     // MARK: - Footer
@@ -210,7 +214,7 @@ struct PopoverView: View {
         HStack {
             Button(action: { NSApp.terminate(nil) }) {
                 Image(systemName: "power")
-                    .font(.system(size: 14))
+                    .font(.system(size: 16))
                     .foregroundColor(.white.opacity(0.5))
             }
             .buttonStyle(.plain)
@@ -218,24 +222,24 @@ struct PopoverView: View {
             Spacer()
 
             Text("Mac Fan Control")
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundColor(.white.opacity(0.4))
 
             Spacer()
 
             Button(action: { settings.useFahrenheit.toggle() }) {
                 Image(systemName: "thermometer.medium")
-                    .font(.system(size: 14))
+                    .font(.system(size: 16))
                     .foregroundColor(.white.opacity(0.5))
                 Text(settings.useFahrenheit ? "°F" : "°C")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.white.opacity(0.5))
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 10)
-        .background(Color.black.opacity(0.2))
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(Color.black.opacity(0.25))
     }
 }
 
@@ -246,9 +250,9 @@ struct CardSectionHeader: View {
 
     var body: some View {
         Text(title.uppercased())
-            .font(.system(size: 11, weight: .semibold))
+            .font(.system(size: 13, weight: .semibold))
             .foregroundColor(.white.opacity(0.5))
-            .tracking(1)
+            .tracking(1.2)
             .padding(.leading, 4)
             .padding(.top, 4)
     }
@@ -259,34 +263,44 @@ struct InfoCard: View {
     let title: String
     let subtitle: String
     var accent: Color = .blue
+    var isClickable: Bool = false
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 18))
+                .font(.system(size: 22))
                 .foregroundColor(accent)
-                .frame(width: 24)
+                .frame(width: 28)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)
 
                 Text(subtitle)
-                    .font(.system(size: 10))
+                    .font(.system(size: 12))
                     .foregroundColor(.white.opacity(0.5))
             }
 
             Spacer()
+
+            if isClickable {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.3))
+            }
         }
-        .padding(12)
-        .background(Color.white.opacity(0.08))
-        .cornerRadius(10)
+        .padding(14)
+        .background(Color.white.opacity(isClickable ? 0.10 : 0.07))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(isClickable ? accent.opacity(0.4) : Color.clear, lineWidth: 1)
+        )
     }
 }
 
-// Keep SectionHeader for backward compatibility if referenced elsewhere
 struct SectionHeader: View {
     let title: String
 
