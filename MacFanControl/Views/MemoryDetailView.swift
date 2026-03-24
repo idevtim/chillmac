@@ -34,7 +34,7 @@ struct MemoryDetailView: View {
                         // Top consumers with app icons
                         topConsumersSection
                     }
-                    .padding(.horizontal, 6)
+                    .padding(.horizontal, 16)
                     .padding(.bottom, 16)
                 }
             }
@@ -49,37 +49,38 @@ struct MemoryDetailView: View {
     }
 
     private var donutSection: some View {
-        HStack(spacing: 16) {
-            // Donut chart
+        HStack(spacing: 14) {
+            // Donut chart — pad by half the stroke width so it doesn't clip
             ZStack {
                 Circle()
-                    .stroke(Color.white.opacity(0.1), lineWidth: 22)
+                    .stroke(Color.white.opacity(0.1), lineWidth: 20)
 
                 Circle()
                     .trim(from: 0, to: arcEnd(for: .compressed))
-                    .stroke(Color.teal, style: StrokeStyle(lineWidth: 22, lineCap: .butt))
+                    .stroke(Color.teal, style: StrokeStyle(lineWidth: 20, lineCap: .butt))
                     .rotationEffect(.degrees(-90))
 
                 Circle()
                     .trim(from: 0, to: arcEnd(for: .wired))
-                    .stroke(Color.blue, style: StrokeStyle(lineWidth: 22, lineCap: .butt))
+                    .stroke(Color.blue, style: StrokeStyle(lineWidth: 20, lineCap: .butt))
                     .rotationEffect(.degrees(-90))
 
                 Circle()
                     .trim(from: 0, to: arcEnd(for: .active))
-                    .stroke(Color.green, style: StrokeStyle(lineWidth: 22, lineCap: .butt))
+                    .stroke(Color.green, style: StrokeStyle(lineWidth: 20, lineCap: .butt))
                     .rotationEffect(.degrees(-90))
 
                 VStack(spacing: 2) {
                     Text(MemoryInfo.formatBytes(memoryInfo.availableMemory))
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                     Text("of \(Int(memoryInfo.totalMemory / 1_073_741_824)) GB available")
-                        .font(.system(size: 10))
+                        .font(.system(size: 9))
                         .foregroundColor(.white.opacity(0.5))
                 }
             }
-            .frame(width: 150, height: 150)
+            .padding(12)
+            .frame(width: 160, height: 160)
 
             VStack(alignment: .leading, spacing: 14) {
                 LegendRow(color: .green, label: "Active", value: MemoryInfo.formatBytes(memoryInfo.activeMemory))
@@ -87,7 +88,7 @@ struct MemoryDetailView: View {
                 LegendRow(color: .teal, label: "Compressed", value: MemoryInfo.formatBytes(memoryInfo.compressedMemory))
             }
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 4)
     }
 
     private enum MemoryType { case active, wired, compressed }

@@ -88,6 +88,7 @@ struct FanRowView: View {
                 .toggleStyle(.switch)
                 .controlSize(.small)
                 .tint(.green)
+                .animation(monitor.manualOverrides[fan.id] != nil ? .default : nil, value: isManual.wrappedValue)
 
                 Text(isManual.wrappedValue ? "Manual Control" : "Automatic")
                     .font(.system(size: 13))

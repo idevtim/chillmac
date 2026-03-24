@@ -85,58 +85,36 @@ final class MemoryInfo: ObservableObject {
     }
 
     private func fetchTopProcesses(limit: Int = 5) -> [ProcessMemory] {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/ps")
-        process.arguments = ["-A", "-o", "pid=,comm=,rss=", "-r"]
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-
-        guard (try? process.run()) != nil else { return [] }
-        process.waitUntilExit()
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        guard let output = String(data: data, encoding: .utf8) else { return [] }
-
-        // Build a map of running app PIDs to their bundle icons
-        var appIconsByPid: [pid_t: NSImage] = [:]
-        for app in NSWorkspace.shared.runningApplications {
-            if let icon = app.icon {
-                appIconsByPid[app.processIdentifier] = icon
-            }
+        // Only show real GUI apps from NSWorkspace
+        let apps = NSWorkspace.shared.runningApplications.filter {
+            $0.activationPolicy == .regular
         }
 
         var results: [ProcessMemory] = []
-        var seenNames: Set<String> = []
 
-        for line in output.split(separator: "\n") {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            // Format: "  PID /path/to/comm   RSS"
-            guard let lastSpace = trimmed.lastIndex(of: " ") else { continue }
-            let rssStr = String(trimmed[trimmed.index(after: lastSpace)...]).trimmingCharacters(in: .whitespaces)
-            guard let kb = UInt64(rssStr), kb > 0 else { continue }
+        for app in apps {
+            let pid = app.processIdentifier
+            let name = app.localizedName ?? (app.bundleURL?.deletingPathExtension().lastPathComponent ?? "Unknown")
+            let icon = app.icon
 
-            let remaining = trimmed[trimmed.startIndex..<lastSpace].trimmingCharacters(in: .whitespaces)
-            guard let firstSpace = remaining.firstIndex(of: " ") else { continue }
-            let pidStr = String(remaining[remaining.startIndex..<firstSpace]).trimmingCharacters(in: .whitespaces)
-            let commPath = String(remaining[remaining.index(after: firstSpace)...]).trimmingCharacters(in: .whitespaces)
+            // Get memory usage via proc_pid_rusage
+            var info = rusage_info_v0()
+            let ret = withUnsafeMutablePointer(to: &info) {
+                $0.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { ptr in
+                    proc_pid_rusage(pid, RUSAGE_INFO_V0, ptr)
+                }
+            }
+            guard ret == 0 else { continue }
+            let memBytes = UInt64(info.ri_phys_footprint)
+            guard memBytes > 0 else { continue }
 
-            let shortName = (commPath as NSString).lastPathComponent
-
-            // Skip duplicates and system processes
-            guard !seenNames.contains(shortName) else { continue }
-            seenNames.insert(shortName)
-
-            let pid = pid_t(pidStr) ?? 0
-            let icon = appIconsByPid[pid]
-
-            results.append(ProcessMemory(name: shortName, memoryBytes: kb * 1024, icon: icon))
-
-            if results.count >= limit { break }
+            results.append(ProcessMemory(name: name, memoryBytes: memBytes, icon: icon))
         }
 
-        return results.sorted { $0.memoryBytes > $1.memoryBytes }
+        return results
+            .sorted { $0.memoryBytes > $1.memoryBytes }
+            .prefix(limit)
+            .map { $0 }
     }
 
     // MARK: - Formatting

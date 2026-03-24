@@ -1,4 +1,4 @@
-import Foundation
+import Cocoa
 import Combine
 
 final class SystemInfo: ObservableObject {
@@ -8,6 +8,18 @@ final class SystemInfo: ObservableObject {
     @Published var macOSVersion: String
     @Published var diskUsage: String = "..."
     @Published var uptime: String = "..."
+
+    // Disk detail data (raw bytes)
+    @Published var diskTotalBytes: Int64 = 0
+    @Published var diskAvailableBytes: Int64 = 0
+    @Published var diskCategories: [DiskCategory] = []
+
+    struct DiskCategory: Identifiable {
+        let id = UUID()
+        let name: String
+        let bytes: Int64
+        let color: NSColor
+    }
 
     private var timer: Timer?
 
@@ -46,15 +58,29 @@ final class SystemInfo: ObservableObject {
     // MARK: - Private
 
     private func refreshDynamic() {
-        // Disk usage
-        if let attrs = try? FileManager.default.attributesOfFileSystem(forPath: "/"),
-           let totalBytes = attrs[.systemSize] as? Int64,
-           let freeBytes = attrs[.systemFreeSize] as? Int64 {
-            let totalGB = Double(totalBytes) / 1_000_000_000
-            let usedGB = Double(totalBytes - freeBytes) / 1_000_000_000
-            DispatchQueue.main.async {
-                self.diskUsage = String(format: "%.0f / %.0f GB", usedGB, totalGB)
+        // Disk usage — use volumeAvailableCapacityForImportantUsage to include purgeable space
+        let fileURL = URL(fileURLWithPath: "/")
+        if let values = try? fileURL.resourceValues(forKeys: [
+            .volumeTotalCapacityKey,
+            .volumeAvailableCapacityForImportantUsageKey
+        ]),
+           let totalBytes = values.volumeTotalCapacity.map({ Int64($0) }),
+           let availableBytes = values.volumeAvailableCapacityForImportantUsage {
+            let freeTB = Double(availableBytes) / 1_000_000_000_000
+            let formatted: String
+            if freeTB >= 1.0 {
+                formatted = String(format: "%.2f TB", freeTB)
+            } else {
+                let freeGB = Double(availableBytes) / 1_000_000_000
+                formatted = String(format: "%.0f GB", freeGB)
             }
+            DispatchQueue.main.async {
+                self.diskUsage = formatted
+                self.diskTotalBytes = totalBytes
+                self.diskAvailableBytes = availableBytes
+            }
+            // Gather category breakdown on background thread
+            self.fetchDiskCategories(totalBytes: totalBytes, availableBytes: availableBytes)
         }
 
         // Uptime
@@ -100,6 +126,57 @@ final class SystemInfo: ObservableObject {
                 self?.machineModel = model
                 self?.chipName = chip
             }
+        }
+    }
+
+    private func fetchDiskCategories(totalBytes: Int64, availableBytes: Int64) {
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let fm = FileManager.default
+            let home = fm.homeDirectoryForCurrentUser
+
+            func directorySize(_ url: URL) -> Int64 {
+                guard let enumerator = fm.enumerator(at: url, includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey], options: [.skipsHiddenFiles]) else { return 0 }
+                var total: Int64 = 0
+                for case let fileURL as URL in enumerator {
+                    guard let values = try? fileURL.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey]),
+                          values.isRegularFile == true,
+                          let size = values.totalFileAllocatedSize else { continue }
+                    total += Int64(size)
+                }
+                return total
+            }
+
+            let appsSize = directorySize(URL(fileURLWithPath: "/Applications"))
+            let downloadsSize = directorySize(home.appendingPathComponent("Downloads"))
+            let documentsSize = directorySize(home.appendingPathComponent("Documents"))
+            let desktopSize = directorySize(home.appendingPathComponent("Desktop"))
+
+            let usedBytes = totalBytes - availableBytes
+            let categorized = appsSize + downloadsSize + documentsSize + desktopSize
+            let otherSize = max(0, usedBytes - categorized)
+
+            let categories: [DiskCategory] = [
+                DiskCategory(name: "Applications", bytes: appsSize, color: .systemRed),
+                DiskCategory(name: "Downloads", bytes: downloadsSize, color: .systemPink),
+                DiskCategory(name: "Documents", bytes: documentsSize, color: .systemBlue),
+                DiskCategory(name: "Desktop", bytes: desktopSize, color: .systemGreen),
+                DiskCategory(name: "Other", bytes: otherSize, color: .systemGray),
+            ]
+
+            DispatchQueue.main.async {
+                self?.diskCategories = categories
+            }
+        }
+    }
+
+    static func formatDiskBytes(_ bytes: Int64) -> String {
+        let absBytes = Double(abs(bytes))
+        if absBytes >= 1_000_000_000_000 {
+            return String(format: "%.2f TB", absBytes / 1_000_000_000_000)
+        } else if absBytes >= 1_000_000_000 {
+            return String(format: "%.1f GB", absBytes / 1_000_000_000)
+        } else {
+            return String(format: "%.0f MB", absBytes / 1_000_000)
         }
     }
 }

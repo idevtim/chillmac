@@ -6,6 +6,7 @@ struct PopoverView: View {
     @ObservedObject var systemInfo: SystemInfo
     let helper: HelperConnection
     var onMemoryTap: (() -> Void)?
+    var onDiskTap: (() -> Void)?
 
     var body: some View {
         ZStack {
@@ -125,14 +126,14 @@ struct PopoverView: View {
                 title: systemInfo.ramAmount,
                 subtitle: "Memory",
                 accent: .green,
-                isClickable: true
+                onTap: onMemoryTap
             )
-            .onTapGesture { onMemoryTap?() }
             InfoCard(
                 icon: "internaldrive",
                 title: systemInfo.diskUsage,
-                subtitle: "Disk Usage",
-                accent: .blue
+                subtitle: "Disk Available",
+                accent: .blue,
+                onTap: onDiskTap
             )
             InfoCard(
                 icon: "clock.arrow.circlepath",
@@ -263,9 +264,25 @@ struct InfoCard: View {
     let title: String
     let subtitle: String
     var accent: Color = .blue
-    var isClickable: Bool = false
+    var onTap: (() -> Void)? = nil
+
+    @State private var isHovered = false
+
+    private var isClickable: Bool { onTap != nil }
 
     var body: some View {
+        Group {
+            if let onTap {
+                Button(action: onTap) { cardContent }
+                    .buttonStyle(.plain)
+                    .onHover { isHovered = $0 }
+            } else {
+                cardContent
+            }
+        }
+    }
+
+    private var cardContent: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 22))
@@ -288,15 +305,15 @@ struct InfoCard: View {
             if isClickable {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.3))
+                    .foregroundColor(.white.opacity(isHovered ? 0.6 : 0.3))
             }
         }
         .padding(14)
-        .background(Color.white.opacity(isClickable ? 0.10 : 0.07))
+        .background(Color.white.opacity(isClickable ? (isHovered ? 0.14 : 0.10) : 0.07))
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(isClickable ? accent.opacity(0.4) : Color.clear, lineWidth: 1)
+                .stroke(isClickable ? accent.opacity(isHovered ? 0.6 : 0.4) : Color.clear, lineWidth: 1)
         )
     }
 }

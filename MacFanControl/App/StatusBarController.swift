@@ -9,15 +9,17 @@ final class StatusBarController: NSObject {
     private var cancellable: AnyCancellable?
     private let detailPanel = DetailPanelController()
     private let memoryInfo: MemoryInfo
+    private let systemInfo: SystemInfo
 
     init(fanMonitor: FanMonitor, helper: HelperConnection, systemInfo: SystemInfo, memoryInfo: MemoryInfo) {
         statusItem = NSStatusBar.system.statusItem(withLength: 130)
         popover = NSPopover()
         self.memoryInfo = memoryInfo
+        self.systemInfo = systemInfo
 
         super.init()
 
-        popover.behavior = .transient
+        popover.behavior = .applicationDefined
         popover.animates = false
 
         let hostingController = NSHostingController(
@@ -28,6 +30,9 @@ final class StatusBarController: NSObject {
                 helper: helper,
                 onMemoryTap: { [weak self] in
                     self?.toggleMemoryPanel()
+                },
+                onDiskTap: { [weak self] in
+                    self?.toggleDiskPanel()
                 }
             )
         )
@@ -51,13 +56,17 @@ final class StatusBarController: NSObject {
                 self?.statusItem.button?.title = " \(rpms)"
             }
 
-        // Close popover when clicking elsewhere
+        // Close popover when clicking outside both the popover and detail panel
         eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            guard let self else { return }
-            if self.popover.isShown {
-                self.detailPanel.close()
-                self.popover.performClose(nil)
+            guard let self, self.popover.isShown else { return }
+
+            // Don't close if clicking inside the detail panel
+            if self.detailPanel.isShown, self.detailPanel.containsMouse {
+                return
             }
+
+            self.detailPanel.close()
+            self.popover.performClose(nil)
         }
     }
 
@@ -79,7 +88,16 @@ final class StatusBarController: NSObject {
 
     private func toggleMemoryPanel() {
         detailPanel.toggle(
+            id: "memory",
             content: MemoryDetailView(memoryInfo: memoryInfo),
+            relativeTo: popover
+        )
+    }
+
+    private func toggleDiskPanel() {
+        detailPanel.toggle(
+            id: "disk",
+            content: DiskDetailView(systemInfo: systemInfo),
             relativeTo: popover
         )
     }

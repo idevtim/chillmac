@@ -4,14 +4,23 @@ import SwiftUI
 final class DetailPanelController {
     private var panel: NSPanel?
     private var eventMonitor: Any?
+    private var currentPanelID: String?
 
     var isShown: Bool { panel?.isVisible ?? false }
 
-    func toggle<Content: View>(content: Content, relativeTo mainPopover: NSPopover) {
+    var containsMouse: Bool {
+        guard let panel else { return false }
+        return panel.frame.contains(NSEvent.mouseLocation)
+    }
+
+    func toggle<Content: View>(id: String = "", content: Content, relativeTo mainPopover: NSPopover) {
         if isShown {
+            let wasShowingSamePanel = currentPanelID == id
             close()
-            return
+            if wasShowingSamePanel { return }
         }
+
+        currentPanelID = id
 
         // Get the main popover window frame to position adjacent
         guard let mainWindow = mainPopover.contentViewController?.view.window else { return }
@@ -20,9 +29,10 @@ final class DetailPanelController {
         let panelWidth: CGFloat = 370
         let panelHeight: CGFloat = 560
 
-        // Position to the left of the main popover, top-aligned
+        // Position to the left of the main popover, top-aligned with content (below the arrow)
+        let arrowHeight: CGFloat = 13
         let panelX = mainFrame.minX - panelWidth - 6
-        let panelY = mainFrame.maxY - panelHeight
+        let panelY = mainFrame.maxY - panelHeight - arrowHeight
 
         let panel = NSPanel(
             contentRect: NSRect(x: panelX, y: panelY, width: panelWidth, height: panelHeight),

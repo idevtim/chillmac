@@ -26,6 +26,7 @@
 		A3B86E446A1DDDAC2AA5628A /* SMCKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6790BDD37571A7A0E8AD806 /* SMCKeys.swift */; };
 		ADA5BC9C2975C935F527E078 /* FanInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25974588A47A7201ACD9281E /* FanInfo.swift */; };
 		AF1EF2CFA1F0BEF728BF65D8 /* DetailPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C3E74DA14D3AE0E2229912F /* DetailPanelController.swift */; };
+		BB409A24E667559EFE4FA291 /* DiskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E60904D229E0D4FE1FB4C957 /* DiskDetailView.swift */; };
 		C5812C24394B58FE26A9E4A1 /* HelperInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 836F39DC0B66E048D6EA455C /* HelperInstaller.swift */; };
 		D4C4273C6D7A3B2DF8AAE230 /* HelperDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 651FE6EE4C0B906A04825054 /* HelperDelegate.swift */; };
 		D9FE57E3A0036AAB55A27708 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 775643F4CBB66E3CCE0D0320 /* AppSettings.swift */; };
@@ -71,6 +72,7 @@
 		CE97912FF28BB3CD990044E9 /* MacFanControl.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MacFanControl.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D6790BDD37571A7A0E8AD806 /* SMCKeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SMCKeys.swift; sourceTree = "<group>"; };
 		E1364E5B9F427B4742EF6369 /* SMCTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SMCTypes.swift; sourceTree = "<group>"; };
+		E60904D229E0D4FE1FB4C957 /* DiskDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiskDetailView.swift; sourceTree = "<group>"; };
 		ED35E585A369C87795697088 /* HelperConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperConnection.swift; sourceTree = "<group>"; };
 		F82514CB2C42F6CCEC21A4AB /* MemoryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryDetailView.swift; sourceTree = "<group>"; };
 		F97C70E1394D27C5E02A8E3A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -113,6 +115,7 @@
 		750125A072F63961A89D18C7 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				E60904D229E0D4FE1FB4C957 /* DiskDetailView.swift */,
 				03336C4CA57BE9E0D2E34A4F /* FanRowView.swift */,
 				F82514CB2C42F6CCEC21A4AB /* MemoryDetailView.swift */,
 				75E8DB23627266322E779C92 /* PopoverView.swift */,
@@ -317,6 +320,7 @@
 			files = (
 				D9FE57E3A0036AAB55A27708 /* AppSettings.swift in Sources */,
 				AF1EF2CFA1F0BEF728BF65D8 /* DetailPanelController.swift in Sources */,
+				BB409A24E667559EFE4FA291 /* DiskDetailView.swift in Sources */,
 				ADA5BC9C2975C935F527E078 /* FanInfo.swift in Sources */,
 				28194167FB96EA0B481A381D /* FanMonitor.swift in Sources */,
 				0DD4870C706C901535485F24 /* FanRowView.swift in Sources */,

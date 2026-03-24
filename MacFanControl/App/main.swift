@@ -22,13 +22,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             process.waitUntilExit()
         }
 
-        // Dump all fan key info for diagnostics
-        if let helper = helperConnection.connect() {
-            helper.dumpFanKeys { dump in
-                NSLog("Fan key dump:\n%@", dump)
-            }
-        }
-
         fanMonitor.startMonitoring()
         systemInfo.startMonitoring()
         memoryInfo.startMonitoring()
