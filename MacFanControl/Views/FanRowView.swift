@@ -71,13 +71,15 @@ struct FanRowView: View {
 
                 Spacer()
 
-                Text("\(Int(fan.currentRPM.rounded()))")
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .foregroundColor(rpmColor)
-                +
-                Text(" RPM")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.5))
+                HStack(alignment: .firstTextBaseline, spacing: 2) {
+                    Text("\(Int(fan.currentRPM.rounded()))")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(rpmColor)
+                    Text("RPM")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.white.opacity(0.5))
+                }
+                .frame(width: 110, alignment: .trailing)
             }
 
             // Manual/Auto toggle
