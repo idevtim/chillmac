@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PopoverView: View {
     @ObservedObject var monitor: FanMonitor
+    @ObservedObject var settings: AppSettings
     let helper: HelperConnection
 
     var body: some View {
@@ -41,7 +42,7 @@ struct PopoverView: View {
                         if !monitor.sensors.isEmpty {
                             SectionHeader(title: "Temperatures")
                             ForEach(monitor.sensors) { sensor in
-                                TemperatureRowView(sensor: sensor)
+                                TemperatureRowView(sensor: sensor, settings: settings)
                             }
                             Divider()
                                 .padding(.vertical, 4)
@@ -74,7 +75,16 @@ struct PopoverView: View {
                 .buttonStyle(.plain)
                 .foregroundColor(.secondary)
                 .font(.caption)
+
                 Spacer()
+
+                // Temperature unit toggle
+                Button(settings.useFahrenheit ? "°F" : "°C") {
+                    settings.useFahrenheit.toggle()
+                }
+                .buttonStyle(.plain)
+                .font(.caption)
+                .foregroundColor(.accentColor)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)

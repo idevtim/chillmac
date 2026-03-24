@@ -18,7 +18,7 @@ final class StatusBarController: NSObject {
         popover.animates = false
 
         let hostingController = NSHostingController(
-            rootView: PopoverView(monitor: fanMonitor, helper: helper)
+            rootView: PopoverView(monitor: fanMonitor, settings: AppSettings.shared, helper: helper)
         )
         hostingController.view.frame = NSRect(x: 0, y: 0, width: 320, height: 400)
         popover.contentSize = NSSize(width: 320, height: 400)

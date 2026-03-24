@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TemperatureRowView: View {
     let sensor: TemperatureSensor
+    @ObservedObject var settings: AppSettings
 
     var body: some View {
         HStack {
@@ -14,7 +15,7 @@ struct TemperatureRowView: View {
 
             Spacer()
 
-            Text(String(format: "%.1f°C", sensor.temperature))
+            Text(settings.formatTemperature(sensor.temperature))
                 .font(.system(.caption, design: .monospaced))
                 .foregroundColor(.secondary)
         }

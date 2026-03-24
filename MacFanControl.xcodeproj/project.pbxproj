@@ -24,6 +24,7 @@
 		ADA5BC9C2975C935F527E078 /* FanInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25974588A47A7201ACD9281E /* FanInfo.swift */; };
 		C5812C24394B58FE26A9E4A1 /* HelperInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 836F39DC0B66E048D6EA455C /* HelperInstaller.swift */; };
 		D4C4273C6D7A3B2DF8AAE230 /* HelperDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 651FE6EE4C0B906A04825054 /* HelperDelegate.swift */; };
+		D9FE57E3A0036AAB55A27708 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 775643F4CBB66E3CCE0D0320 /* AppSettings.swift */; };
 		DEEB1416F31C6CC8A67293A8 /* HelperConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED35E585A369C87795697088 /* HelperConnection.swift */; };
 		E608304518C6AA63B4458E31 /* TemperatureSensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D2D8F7F99D1732A7B470868 /* TemperatureSensor.swift */; };
 		EA0446A1A75540C7125EF425 /* TemperatureRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA91A035CFBF188025BA4AB8 /* TemperatureRowView.swift */; };
@@ -52,6 +53,7 @@
 		651FE6EE4C0B906A04825054 /* HelperDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperDelegate.swift; sourceTree = "<group>"; };
 		66CDB64E4594F2A746E4A5F0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		75E8DB23627266322E779C92 /* PopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopoverView.swift; sourceTree = "<group>"; };
+		775643F4CBB66E3CCE0D0320 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		7C8BCAAD9C88D81E293AD60A /* Launchd.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Launchd.plist; sourceTree = "<group>"; };
 		836F39DC0B66E048D6EA455C /* HelperInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperInstaller.swift; sourceTree = "<group>"; };
 		8505740A34F05BD6DB6F75EC /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
@@ -163,6 +165,7 @@
 		D06672821BA8C0D05C592474 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				775643F4CBB66E3CCE0D0320 /* AppSettings.swift */,
 				8505740A34F05BD6DB6F75EC /* main.swift */,
 				53BAA0C6C32F6477EFB91400 /* StatusBarController.swift */,
 			);
@@ -300,6 +303,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D9FE57E3A0036AAB55A27708 /* AppSettings.swift in Sources */,
 				ADA5BC9C2975C935F527E078 /* FanInfo.swift in Sources */,
 				28194167FB96EA0B481A381D /* FanMonitor.swift in Sources */,
 				0DD4870C706C901535485F24 /* FanRowView.swift in Sources */,
