@@ -6,6 +6,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let fanMonitor = FanMonitor()
     let systemInfo = SystemInfo()
     let memoryInfo = MemoryInfo()
+    let batteryInfo = BatteryInfo()
     let helperConnection = HelperConnection()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -22,15 +23,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             process.waitUntilExit()
         }
 
+        // Reset all fans to auto on startup in case a previous session left them in manual mode
+        resetFansToAuto()
+
         fanMonitor.startMonitoring()
         systemInfo.startMonitoring()
         memoryInfo.startMonitoring()
+        batteryInfo.startMonitoring()
         statusBarController = StatusBarController(
             fanMonitor: fanMonitor,
             helper: helperConnection,
             systemInfo: systemInfo,
-            memoryInfo: memoryInfo
+            memoryInfo: memoryInfo,
+            batteryInfo: batteryInfo
         )
+    }
+
+    private func resetFansToAuto() {
+        // Use SMC directly to read fan count, then ask helper to set each to auto
+        if let smc = try? SMCConnection() {
+            let fanCount = (try? smc.readFanCount()) ?? 0
+            smc.close()
+            for i in 0..<fanCount {
+                helperConnection.setFanMode(fanIndex: i, isAuto: true) { _, _ in }
+            }
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -42,6 +59,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         fanMonitor.stopMonitoring()
         systemInfo.stopMonitoring()
         memoryInfo.stopMonitoring()
+        batteryInfo.stopMonitoring()
         helperConnection.disconnect()
 
         // Unload the helper daemon so it's not running when the app isn't

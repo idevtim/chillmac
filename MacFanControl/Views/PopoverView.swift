@@ -4,9 +4,11 @@ struct PopoverView: View {
     @ObservedObject var monitor: FanMonitor
     @ObservedObject var settings: AppSettings
     @ObservedObject var systemInfo: SystemInfo
+    @ObservedObject var batteryInfo: BatteryInfo
     let helper: HelperConnection
     var onMemoryTap: (() -> Void)?
     var onDiskTap: (() -> Void)?
+    var onBatteryTap: (() -> Void)?
 
     var body: some View {
         ZStack {
@@ -134,6 +136,13 @@ struct PopoverView: View {
                 subtitle: "Disk Available",
                 accent: .blue,
                 onTap: onDiskTap
+            )
+            InfoCard(
+                icon: "battery.100",
+                title: "\(batteryInfo.currentCharge)%",
+                subtitle: batteryInfo.isCharging ? "Charging" : "Battery",
+                accent: .yellow,
+                onTap: onBatteryTap
             )
             InfoCard(
                 icon: "clock.arrow.circlepath",

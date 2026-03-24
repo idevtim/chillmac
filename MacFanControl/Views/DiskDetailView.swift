@@ -2,6 +2,8 @@ import SwiftUI
 
 struct DiskDetailView: View {
     @ObservedObject var systemInfo: SystemInfo
+    @ObservedObject var monitor: FanMonitor
+    @ObservedObject var settings: AppSettings
 
     var body: some View {
         ZStack {
@@ -133,16 +135,16 @@ struct DiskDetailView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text("Capacity")
+                    Text("SSD Temp")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.white)
                     Spacer()
-                    Text(SystemInfo.formatDiskBytes(systemInfo.diskTotalBytes))
-                        .font(.system(size: 14, weight: .bold, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.8))
+                    Text(settings.formatTemperature(avgDiskTemp))
+                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        .foregroundColor(diskTempColor)
                 }
 
-                Text("Total disk capacity")
+                Text(diskTempDescription)
                     .font(.system(size: 11))
                     .foregroundColor(.white.opacity(0.45))
                     .lineLimit(2)
@@ -178,6 +180,32 @@ struct DiskDetailView: View {
         if pct >= 90 { return "Disk space is critically low." }
         if pct >= 75 { return "Consider freeing up some space." }
         return "Plenty of storage available."
+    }
+
+    // MARK: - Disk Temperature
+
+    private var diskTempSensors: [TemperatureSensor] {
+        // SSD sensor keys: TH0x (max), TH0a, TH0b
+        monitor.sensors.filter { ["TH0x", "TH0a", "TH0b"].contains($0.id) }
+    }
+
+    private var avgDiskTemp: Double {
+        let sensors = diskTempSensors
+        guard !sensors.isEmpty else { return 0 }
+        return sensors.map(\.temperature).reduce(0, +) / Double(sensors.count)
+    }
+
+    private var diskTempColor: Color {
+        if avgDiskTemp >= 55 { return .red }
+        if avgDiskTemp >= 45 { return .orange }
+        return .green
+    }
+
+    private var diskTempDescription: String {
+        guard avgDiskTemp > 0 else { return "No temperature data." }
+        if avgDiskTemp >= 55 { return "SSD is running hot." }
+        if avgDiskTemp >= 45 { return "SSD temperature is warm." }
+        return "SSD temperature is normal."
     }
 }
 

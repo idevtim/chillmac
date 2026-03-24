@@ -10,12 +10,16 @@ final class StatusBarController: NSObject {
     private let detailPanel = DetailPanelController()
     private let memoryInfo: MemoryInfo
     private let systemInfo: SystemInfo
+    private let batteryInfo: BatteryInfo
+    private let fanMonitor: FanMonitor
 
-    init(fanMonitor: FanMonitor, helper: HelperConnection, systemInfo: SystemInfo, memoryInfo: MemoryInfo) {
-        statusItem = NSStatusBar.system.statusItem(withLength: 130)
+    init(fanMonitor: FanMonitor, helper: HelperConnection, systemInfo: SystemInfo, memoryInfo: MemoryInfo, batteryInfo: BatteryInfo) {
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         popover = NSPopover()
         self.memoryInfo = memoryInfo
         self.systemInfo = systemInfo
+        self.batteryInfo = batteryInfo
+        self.fanMonitor = fanMonitor
 
         super.init()
 
@@ -27,12 +31,16 @@ final class StatusBarController: NSObject {
                 monitor: fanMonitor,
                 settings: AppSettings.shared,
                 systemInfo: systemInfo,
+                batteryInfo: batteryInfo,
                 helper: helper,
                 onMemoryTap: { [weak self] in
                     self?.toggleMemoryPanel()
                 },
                 onDiskTap: { [weak self] in
                     self?.toggleDiskPanel()
+                },
+                onBatteryTap: { [weak self] in
+                    self?.toggleBatteryPanel()
                 }
             )
         )
@@ -83,6 +91,7 @@ final class StatusBarController: NSObject {
         } else if let button = statusItem.button {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             NSApp.activate(ignoringOtherApps: true)
+            popover.contentViewController?.view.window?.makeKeyAndOrderFront(nil)
         }
     }
 
@@ -97,7 +106,15 @@ final class StatusBarController: NSObject {
     private func toggleDiskPanel() {
         detailPanel.toggle(
             id: "disk",
-            content: DiskDetailView(systemInfo: systemInfo),
+            content: DiskDetailView(systemInfo: systemInfo, monitor: fanMonitor, settings: AppSettings.shared),
+            relativeTo: popover
+        )
+    }
+
+    private func toggleBatteryPanel() {
+        detailPanel.toggle(
+            id: "battery",
+            content: BatteryDetailView(batteryInfo: batteryInfo, settings: AppSettings.shared),
             relativeTo: popover
         )
     }

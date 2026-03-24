@@ -8,7 +8,7 @@ struct FanRowView: View {
 
     private var isManual: Binding<Bool> {
         Binding(
-            get: { monitor.manualOverrides[fan.id] ?? fan.isManualMode },
+            get: { monitor.manualOverrides[fan.id] ?? false },
             set: { newValue in
                 monitor.manualOverrides[fan.id] = newValue
                 setFanMode(manual: newValue)
