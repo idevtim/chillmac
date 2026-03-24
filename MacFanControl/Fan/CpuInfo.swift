@@ -107,7 +107,7 @@ final class CpuInfo: ObservableObject {
     private func fetchTopProcesses(appIcons: [pid_t: (NSImage, String)], limit: Int = 5) -> [CpuProcess] {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/ps")
-        process.arguments = ["-A", "-o", "pid=,%cpu=,comm=", "-r"]
+        process.arguments = ["-A", "-o", "pid=", "-o", "%cpu=", "-o", "comm="]
 
         let pipe = Pipe()
         process.standardOutput = pipe
@@ -119,25 +119,38 @@ final class CpuInfo: ObservableObject {
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         guard let output = String(data: data, encoding: .utf8) else { return [] }
 
-        var results: [CpuProcess] = []
-        var seenPids: Set<pid_t> = []
+        // Build a map of app bundle paths to their info for matching subprocesses
+        // e.g. "/Applications/Google Chrome.app" -> (icon, name)
+        var appsByBundlePath: [(path: String, icon: NSImage, name: String, pid: pid_t)] = []
+        for app in NSWorkspace.shared.runningApplications where app.activationPolicy == .regular {
+            if let bundleURL = app.bundleURL, let icon = app.icon, let name = app.localizedName {
+                appsByBundlePath.append((bundleURL.path, icon, name, app.processIdentifier))
+            }
+        }
+
+        // Aggregate CPU % by app bundle (matching subprocess paths to parent app bundles)
+        var cpuByApp: [String: (cpu: Double, icon: NSImage, name: String)] = [:]
 
         for line in output.split(separator: "\n") {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
-            let parts = trimmed.split(separator: " ", maxSplits: 2).map { String($0) }
-            guard parts.count == 3 else { continue }
+            let tokens = trimmed.split(separator: " ", maxSplits: 2, omittingEmptySubsequences: true)
+            guard tokens.count >= 3 else { continue }
 
-            guard let pid = pid_t(parts[0]), let cpu = Double(parts[1]) else { continue }
-            guard cpu > 0, !seenPids.contains(pid) else { continue }
-            seenPids.insert(pid)
+            guard let cpu = Double(tokens[1]), cpu > 0 else { continue }
+            let comm = String(tokens[2])
 
-            if let (icon, name) = appIcons[pid] {
-                results.append(CpuProcess(name: name, cpuPercent: cpu, icon: icon))
+            // Find which app bundle this process belongs to
+            for app in appsByBundlePath {
+                if comm.hasPrefix(app.path) {
+                    cpuByApp[app.name, default: (0, app.icon, app.name)].cpu += cpu
+                    break
+                }
             }
-
-            if results.count >= limit { break }
         }
 
-        return results.sorted { $0.cpuPercent > $1.cpuPercent }
+        return cpuByApp.values
+            .sorted { $0.cpu > $1.cpu }
+            .prefix(limit)
+            .map { CpuProcess(name: $0.name, cpuPercent: $0.cpu, icon: $0.icon) }
     }
 }

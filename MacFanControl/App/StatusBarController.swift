@@ -1,12 +1,11 @@
 import Cocoa
 import SwiftUI
-import Combine
 
 final class StatusBarController: NSObject {
     private let statusItem: NSStatusItem
     private let popover: NSPopover
     private var eventMonitor: Any?
-    private var cancellable: AnyCancellable?
+
     private let detailPanel = DetailPanelController()
     private let memoryInfo: MemoryInfo
     private let systemInfo: SystemInfo
@@ -47,6 +46,9 @@ final class StatusBarController: NSObject {
                 },
                 onCpuTap: { [weak self] in
                     self?.toggleCpuPanel()
+                },
+                onTemperatureTap: { [weak self] in
+                    self?.toggleTemperaturePanel()
                 }
             )
         )
@@ -56,19 +58,9 @@ final class StatusBarController: NSObject {
 
         if let button = statusItem.button {
             button.image = NSImage(systemSymbolName: "fan.fill", accessibilityDescription: "ChillMac")
-            button.imagePosition = .imageLeading
             button.action = #selector(togglePopover(_:))
             button.target = self
         }
-
-        // Update menu bar title with all fan RPMs
-        cancellable = fanMonitor.$fans
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] fans in
-                guard !fans.isEmpty else { return }
-                let rpms = fans.map { "\(Int($0.currentRPM))" }.joined(separator: " | ")
-                self?.statusItem.button?.title = " \(rpms)"
-            }
 
         // Close popover when clicking outside both the popover and detail panel
         eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
@@ -129,6 +121,14 @@ final class StatusBarController: NSObject {
         detailPanel.toggle(
             id: "cpu",
             content: CpuDetailView(cpuInfo: cpuInfo, systemInfo: systemInfo, monitor: fanMonitor, settings: AppSettings.shared),
+            relativeTo: popover
+        )
+    }
+
+    private func toggleTemperaturePanel() {
+        detailPanel.toggle(
+            id: "temperature",
+            content: TemperatureDetailView(monitor: fanMonitor, settings: AppSettings.shared),
             relativeTo: popover
         )
     }

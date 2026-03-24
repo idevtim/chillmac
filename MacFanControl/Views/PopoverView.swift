@@ -11,6 +11,7 @@ struct PopoverView: View {
     var onDiskTap: (() -> Void)?
     var onBatteryTap: (() -> Void)?
     var onCpuTap: (() -> Void)?
+    var onTemperatureTap: (() -> Void)?
 
     var body: some View {
         ZStack {
@@ -38,11 +39,6 @@ struct PopoverView: View {
 
                             // Fan cards
                             fansSection
-
-                            // Temperature cards
-                            if !monitor.sensors.isEmpty {
-                                temperaturesSection
-                            }
                         }
                         .padding(.horizontal, 16)
                         .padding(.top, 12)
@@ -110,6 +106,14 @@ struct PopoverView: View {
         return .green
     }
 
+    private var maxTempDisplay: String {
+        guard !monitor.sensors.isEmpty,
+              let maxTemp = monitor.sensors.map(\.temperature).max() else {
+            return "--"
+        }
+        return settings.formatTemperature(maxTemp)
+    }
+
     // MARK: - System Info Cards
 
     private var systemInfoCards: some View {
@@ -153,6 +157,13 @@ struct PopoverView: View {
                 accent: .teal,
                 onTap: onCpuTap
             )
+            InfoCard(
+                icon: "thermometer.medium",
+                title: maxTempDisplay,
+                subtitle: "Temperatures",
+                accent: thermalStatusColor,
+                onTap: onTemperatureTap
+            )
         }
     }
 
@@ -179,25 +190,6 @@ struct PopoverView: View {
                 .frame(maxWidth: .infinity, alignment: .center)
                 .background(Color.white.opacity(0.06))
                 .cornerRadius(12)
-            }
-        }
-    }
-
-    // MARK: - Temperatures
-
-    private var temperaturesSection: some View {
-        let columns = [
-            GridItem(.flexible(), spacing: 10),
-            GridItem(.flexible(), spacing: 10)
-        ]
-
-        return VStack(alignment: .leading, spacing: 8) {
-            CardSectionHeader(title: "Temperatures")
-
-            LazyVGrid(columns: columns, spacing: 8) {
-                ForEach(monitor.sensors) { sensor in
-                    TemperatureRowView(sensor: sensor, settings: settings)
-                }
             }
         }
     }
