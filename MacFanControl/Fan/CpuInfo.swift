@@ -72,17 +72,16 @@ final class CpuInfo: ObservableObject {
             systemHistory.removeFirst(systemHistory.count - maxHistory)
         }
 
-        // Fetch top processes on background thread (spawns ps)
-        // Snapshot app icons on main thread first
-        var appIcons: [pid_t: (NSImage, String)] = [:]
+        // Snapshot app bundle info on main thread before dispatching to background
+        var appBundles: [(path: String, icon: NSImage, name: String)] = []
         for app in NSWorkspace.shared.runningApplications where app.activationPolicy == .regular {
-            if let icon = app.icon, let name = app.localizedName {
-                appIcons[app.processIdentifier] = (icon, name)
+            if let bundleURL = app.bundleURL, let icon = app.icon, let name = app.localizedName {
+                appBundles.append((bundleURL.path, icon, name))
             }
         }
 
         DispatchQueue.global(qos: .utility).async { [weak self] in
-            let procs = self?.fetchTopProcesses(appIcons: appIcons) ?? []
+            let procs = self?.fetchTopProcesses(appBundles: appBundles) ?? []
             DispatchQueue.main.async {
                 self?.topProcesses = procs
             }
@@ -99,12 +98,13 @@ final class CpuInfo: ObservableObject {
             $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
                 host_statistics(mach_host_self(), HOST_CPU_LOAD_INFO, $0, &count)
             }
+
         }
 
         return result == KERN_SUCCESS ? info : nil
     }
 
-    private func fetchTopProcesses(appIcons: [pid_t: (NSImage, String)], limit: Int = 5) -> [CpuProcess] {
+    private func fetchTopProcesses(appBundles: [(path: String, icon: NSImage, name: String)], limit: Int = 5) -> [CpuProcess] {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/ps")
         process.arguments = ["-A", "-o", "pid=", "-o", "%cpu=", "-o", "comm="]
@@ -114,19 +114,11 @@ final class CpuInfo: ObservableObject {
         process.standardError = FileHandle.nullDevice
 
         guard (try? process.run()) != nil else { return [] }
-        process.waitUntilExit()
 
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        guard let output = String(data: data, encoding: .utf8) else { return [] }
+        process.waitUntilExit()
 
-        // Build a map of app bundle paths to their info for matching subprocesses
-        // e.g. "/Applications/Google Chrome.app" -> (icon, name)
-        var appsByBundlePath: [(path: String, icon: NSImage, name: String, pid: pid_t)] = []
-        for app in NSWorkspace.shared.runningApplications where app.activationPolicy == .regular {
-            if let bundleURL = app.bundleURL, let icon = app.icon, let name = app.localizedName {
-                appsByBundlePath.append((bundleURL.path, icon, name, app.processIdentifier))
-            }
-        }
+        guard let output = String(data: data, encoding: .utf8) else { return [] }
 
         // Aggregate CPU % by app bundle (matching subprocess paths to parent app bundles)
         var cpuByApp: [String: (cpu: Double, icon: NSImage, name: String)] = [:]
@@ -140,7 +132,7 @@ final class CpuInfo: ObservableObject {
             let comm = String(tokens[2])
 
             // Find which app bundle this process belongs to
-            for app in appsByBundlePath {
+            for app in appBundles {
                 if comm.hasPrefix(app.path) {
                     cpuByApp[app.name, default: (0, app.icon, app.name)].cpu += cpu
                     break
