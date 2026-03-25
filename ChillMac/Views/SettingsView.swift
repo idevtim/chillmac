@@ -36,6 +36,16 @@ struct SettingsView: View {
             }
 
             Spacer()
+
+            // Version
+            HStack {
+                Spacer()
+                Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"))")
+                    .font(.system(size: 11))
+                    .foregroundColor(theme.textQuaternary)
+                Spacer()
+            }
+            .padding(.bottom, 12)
         }
     }
 
