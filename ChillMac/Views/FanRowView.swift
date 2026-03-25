@@ -4,6 +4,7 @@ struct FanRowView: View {
     let fan: FanInfo
     let helper: HelperConnection
     @ObservedObject var monitor: FanMonitor
+    @ObservedObject private var settings = AppSettings.shared
     @State private var errorMessage: String?
     @Environment(\.theme) private var theme
 
@@ -65,9 +66,9 @@ struct FanRowView: View {
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(theme.textPrimary)
 
-                    Text(isManual.wrappedValue ? "Manual" : "Auto")
+                    Text(settings.performanceMode ? "Performance" : (isManual.wrappedValue ? "Manual" : "Auto"))
                         .font(.system(size: 12))
-                        .foregroundColor(theme.textQuaternary)
+                        .foregroundColor(settings.performanceMode ? .orange : theme.textQuaternary)
                 }
 
                 Spacer()
@@ -84,7 +85,17 @@ struct FanRowView: View {
             }
 
             // Manual/Auto toggle
-            if monitor.helperReady {
+            if settings.performanceMode {
+                HStack(spacing: 6) {
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(.orange)
+                    Text("Controlled by Performance Mode")
+                        .font(.system(size: 13))
+                        .foregroundColor(theme.textQuaternary)
+                    Spacer()
+                }
+            } else if monitor.helperReady {
                 HStack {
                     Toggle(isOn: isManual) {
                         EmptyView()
@@ -111,8 +122,8 @@ struct FanRowView: View {
                 }
             }
 
-            // Speed slider (only in manual mode)
-            if monitor.helperReady, isManual.wrappedValue, sliderRange.upperBound > sliderRange.lowerBound {
+            // Speed slider (only in manual mode, not during performance mode)
+            if !settings.performanceMode, monitor.helperReady, isManual.wrappedValue, sliderRange.upperBound > sliderRange.lowerBound {
                 VStack(spacing: 6) {
                     Slider(
                         value: targetRPM,

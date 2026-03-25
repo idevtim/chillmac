@@ -7,9 +7,17 @@ final class FanMonitor: ObservableObject {
     @Published var smcError: String?
     @Published var helperReady = false
 
+    /// The hottest sensor temperature from the last poll (used by performance mode UI)
+    @Published var peakTemperature: Double = 0
+    /// The target RPM % that performance mode is currently requesting (0–100)
+    @Published var performanceCurvePercent: Double = 0
+
     /// User overrides that persist across poll cycles
     @Published var manualOverrides: [Int: Bool] = [:]   // fanIndex → manual on/off
     @Published var targetOverrides: [Int: Double] = [:]  // fanIndex → target RPM
+
+    /// Set by AppDelegate after helper is ready
+    var helper: HelperConnection?
 
     private var smc: SMCConnection?
     private var timer: Timer?
@@ -17,6 +25,8 @@ final class FanMonitor: ObservableObject {
     /// After initial discovery, only poll keys that have been found at least once
     private var activeSensorKeys: Set<String>?
     private var discoveryPollCount: Int = 0
+    /// Track whether performance mode was active last poll so we can reset fans on toggle-off
+    private var wasPerformanceModeActive = false
 
     func startMonitoring() {
         do {
@@ -114,8 +124,101 @@ final class FanMonitor: ObservableObject {
         let stableSensors = SMCKey.temperatureKeys.compactMap { key, _ in
             discoveredSensors[key]
         }
+        let peak = stableSensors.map(\.temperature).max() ?? 0
+
         DispatchQueue.main.async {
             self.sensors = stableSensors
+            self.peakTemperature = peak
+        }
+
+        // Performance mode: apply aggressive fan curve based on peak temperature
+        applyPerformanceCurve(peak: peak)
+    }
+
+    // MARK: - Performance Mode Fan Curve
+
+    /// Aggressive fan curve for power users. Maps peak sensor temperature to fan speed.
+    ///
+    /// Curve:
+    ///   ≤ 40°C  →  0% (auto / idle)
+    ///   40–55°C →  30%–50%  (early ramp — stay ahead of heat)
+    ///   55–70°C →  50%–75%
+    ///   70–85°C →  75%–95%
+    ///   > 85°C  →  100% (full blast)
+    private func fanSpeedPercent(forTemperature temp: Double) -> Double {
+        switch temp {
+        case ...40:
+            return 0
+        case 40..<55:
+            return 0.30 + (temp - 40) / 15.0 * 0.20   // 30%→50%
+        case 55..<70:
+            return 0.50 + (temp - 55) / 15.0 * 0.25   // 50%→75%
+        case 70..<85:
+            return 0.75 + (temp - 70) / 15.0 * 0.20   // 75%→95%
+        default:
+            return 1.0
+        }
+    }
+
+    private func applyPerformanceCurve(peak: Double) {
+        let isActive = AppSettings.shared.performanceMode && helperReady
+        guard let helper = helper else {
+            if isActive { NSLog("FanMonitor: performance mode active but no helper reference") }
+            return
+        }
+
+        // If performance mode was just turned off, reset fans to auto
+        if wasPerformanceModeActive && !isActive {
+            wasPerformanceModeActive = false
+            for fan in fans {
+                helper.setFanMode(fanIndex: fan.id, isAuto: true) { _, _ in }
+            }
+            DispatchQueue.main.async {
+                self.manualOverrides.removeAll()
+                self.targetOverrides.removeAll()
+                self.performanceCurvePercent = 0
+            }
+            return
+        }
+
+        guard isActive else { return }
+        wasPerformanceModeActive = true
+
+        let pct = fanSpeedPercent(forTemperature: peak)
+        DispatchQueue.main.async {
+            self.performanceCurvePercent = pct * 100
+        }
+
+        // Below threshold — let macOS auto-manage
+        if pct <= 0 {
+            // If we previously set manual, return to auto
+            for fan in fans where manualOverrides[fan.id] == true {
+                helper.setFanMode(fanIndex: fan.id, isAuto: true) { _, _ in }
+                DispatchQueue.main.async {
+                    self.manualOverrides[fan.id] = nil
+                    self.targetOverrides[fan.id] = nil
+                }
+            }
+            return
+        }
+
+        // Set each fan to the calculated RPM
+        for fan in fans {
+            let targetRPM = fan.minRPM + pct * (fan.maxRPM - fan.minRPM)
+            let rounded = (targetRPM / 100).rounded() * 100  // snap to 100 RPM increments
+
+            // Only send commands if target changed meaningfully (avoid XPC spam)
+            let currentTarget = targetOverrides[fan.id] ?? 0
+            guard abs(rounded - currentTarget) >= 100 else { continue }
+
+            helper.setFanSpeed(fanIndex: fan.id, rpm: Int(rounded)) { [weak self] success, _ in
+                if success {
+                    DispatchQueue.main.async {
+                        self?.manualOverrides[fan.id] = true
+                        self?.targetOverrides[fan.id] = rounded
+                    }
+                }
+            }
         }
     }
 

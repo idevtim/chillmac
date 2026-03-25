@@ -43,6 +43,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self.resetFansToAuto()
 
             DispatchQueue.main.async {
+                self.fanMonitor.helper = self.helperConnection
                 self.fanMonitor.helperReady = true
             }
         }
@@ -60,6 +61,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        // Disable performance mode so fans return to auto
+        AppSettings.shared.performanceMode = false
+
         // Reset any manually controlled fans back to auto
         for (fanIndex, isManual) in fanMonitor.manualOverrides where isManual {
             helperConnection.setFanMode(fanIndex: fanIndex, isAuto: true) { _, _ in }

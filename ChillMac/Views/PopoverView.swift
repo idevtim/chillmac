@@ -180,6 +180,14 @@ struct PopoverView: View {
                 .opacity(appeared ? 1 : 0)
                 .animation(.easeOut(duration: 0.3).delay(0.35), value: appeared)
 
+            // Performance Mode toggle
+            if monitor.helperReady {
+                performanceModeCard
+                    .opacity(appeared ? 1 : 0)
+                    .offset(y: appeared ? 0 : 12)
+                    .animation(.easeOut(duration: 0.3).delay(0.37), value: appeared)
+            }
+
             ForEach(Array(monitor.fans.enumerated()), id: \.element.id) { index, fan in
                 FanRowView(fan: fan, helper: helper, monitor: monitor)
                     .opacity(appeared ? 1 : 0)
@@ -204,6 +212,101 @@ struct PopoverView: View {
                 .animation(.easeOut(duration: 0.3).delay(0.4), value: appeared)
             }
         }
+    }
+
+    // MARK: - Performance Mode
+
+    private var performanceModeCard: some View {
+        VStack(spacing: 10) {
+            HStack {
+                Image(systemName: settings.performanceMode ? "bolt.fill" : "bolt")
+                    .font(.system(size: 18))
+                    .foregroundColor(settings.performanceMode ? .orange : theme.textQuaternary)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Performance Mode")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(theme.textPrimary)
+                    Text("Aggressive fan curve to keep temps low")
+                        .font(.system(size: 11))
+                        .foregroundColor(theme.textQuaternary)
+                }
+
+                Spacer()
+
+                Toggle(isOn: $settings.performanceMode) {
+                    EmptyView()
+                }
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .tint(.orange)
+            }
+
+            if settings.performanceMode {
+                HStack(spacing: 12) {
+                    // Peak temp indicator
+                    HStack(spacing: 4) {
+                        Image(systemName: "thermometer.medium")
+                            .font(.system(size: 11))
+                            .foregroundColor(perfTempColor)
+                        Text(settings.formatTemperature(monitor.peakTemperature))
+                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                            .foregroundColor(perfTempColor)
+                    }
+
+                    // Fan curve percentage
+                    HStack(spacing: 4) {
+                        Image(systemName: "fan.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(.orange)
+                        Text(monitor.performanceCurvePercent > 0
+                             ? String(format: "%.0f%%", monitor.performanceCurvePercent)
+                             : "Auto")
+                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                            .foregroundColor(.orange)
+                    }
+
+                    Spacer()
+
+                    // Curve bar
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(theme.ringTrack)
+                            Capsule()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.green, .yellow, .orange, .red],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .frame(width: geo.size.width * max(0.02, monitor.performanceCurvePercent / 100))
+                                .animation(.easeInOut(duration: 0.5), value: monitor.performanceCurvePercent)
+                        }
+                    }
+                    .frame(height: 6)
+                    .frame(maxWidth: 100)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .padding(14)
+        .background(theme.cardBg.overlay(Color.orange.opacity(settings.performanceMode ? 0.08 : 0)))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(settings.performanceMode ? Color.orange.opacity(0.4) : Color.clear, lineWidth: 1)
+        )
+        .animation(.easeInOut(duration: 0.2), value: settings.performanceMode)
+    }
+
+    private var perfTempColor: Color {
+        let t = monitor.peakTemperature
+        if t >= 85 { return .red }
+        if t >= 70 { return .orange }
+        if t >= 55 { return .yellow }
+        return .green
     }
 
     // MARK: - Error

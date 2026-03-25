@@ -27,6 +27,7 @@ final class AppSettings: ObservableObject {
 
     @AppStorage("useFahrenheit") var useFahrenheit = false
     @AppStorage("appearanceMode") var appearanceMode: AppearanceMode = .dark
+    @AppStorage("performanceMode") var performanceMode = false
 
     var preferredColorScheme: ColorScheme? {
         switch appearanceMode {
