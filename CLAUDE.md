@@ -37,7 +37,26 @@ xcodegen generate
 
 # Build from command line
 xcodebuild -project ChillMac.xcodeproj -scheme ChillMac build
+
+# Build signed DMG for distribution (requires .env with Apple credentials)
+./scripts/build-dmg.sh
 ```
+
+### Distribution (`scripts/build-dmg.sh`)
+
+Full release pipeline that builds, signs, creates DMG, notarizes, and staples in one step.
+
+Requires a `.env` file with `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID` (see `.env.example`). Also requires `create-dmg` (`brew install create-dmg`) and a Developer ID Application certificate.
+
+Steps performed:
+1. Clean build via `xcodebuild` (Release config)
+2. Deep code sign inside-out (helper → frameworks → app) with hardened runtime
+3. Create DMG with `create-dmg` (app icon, drag-to-Applications layout)
+4. Sign the DMG
+5. Notarize via `notarytool` and staple the ticket
+6. Gatekeeper verification
+
+Output: `build/ChillMac.dmg`
 
 ### Targets
 
@@ -80,6 +99,8 @@ FanControlHelper/
   HelperService.swift  - Privileged fan control operations
 Shared/
   HelperProtocol.swift - XPC protocol shared between app and helper
+scripts/
+  build-dmg.sh      - Release pipeline: build, sign, DMG, notarize, staple
 ```
 
 ## Key Patterns

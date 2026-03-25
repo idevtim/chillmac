@@ -31,6 +31,24 @@ xcodebuild -project ChillMac.xcodeproj -scheme ChillMac build
 
 Or open `ChillMac.xcodeproj` in Xcode and build from there.
 
+### Building a signed DMG for distribution
+
+The `scripts/build-dmg.sh` script handles the full release pipeline: build, code sign (inside-out), create DMG, notarize with Apple, and staple the ticket.
+
+**Prerequisites:**
+- A **Developer ID Application** certificate installed in Keychain
+- [create-dmg](https://github.com/create-dmg/create-dmg) (`brew install create-dmg`)
+- A `.env` file in the project root (see `.env.example`):
+  - `APPLE_ID` — Your Apple ID email
+  - `APPLE_APP_SPECIFIC_PASSWORD` — App-specific password from appleid.apple.com
+  - `APPLE_TEAM_ID` — Your 10-character team ID
+
+```bash
+./scripts/build-dmg.sh
+```
+
+The signed and notarized DMG will be at `build/ChillMac.dmg`.
+
 ## How It Works
 
 The app uses a two-process architecture with privilege separation:
