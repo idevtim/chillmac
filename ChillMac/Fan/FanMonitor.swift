@@ -45,6 +45,8 @@ final class FanMonitor: ObservableObject {
 
     /// Track whether system is asleep so we skip fan commands
     private var systemAsleep = false
+    /// Track whether performance curve is suspended (screen sleep/lock)
+    private var performanceSuspended = false
 
     // MARK: - System Event Observers
 
@@ -56,6 +58,11 @@ final class FanMonitor: ObservableObject {
         ws.addObserver(self, selector: #selector(handleWake), name: NSWorkspace.didWakeNotification, object: nil)
         ws.addObserver(self, selector: #selector(handleScreenSleep), name: NSWorkspace.screensDidSleepNotification, object: nil)
         ws.addObserver(self, selector: #selector(handleScreenWake), name: NSWorkspace.screensDidWakeNotification, object: nil)
+
+        // Screen lock/unlock (Ctrl+Cmd+Q, fast user switch, etc.)
+        let dnc = DistributedNotificationCenter.default()
+        dnc.addObserver(self, selector: #selector(handleScreenLocked), name: NSNotification.Name("com.apple.screenIsLocked"), object: nil)
+        dnc.addObserver(self, selector: #selector(handleScreenUnlocked), name: NSNotification.Name("com.apple.screenIsUnlocked"), object: nil)
     }
 
     @objc private func handleSleep() {
@@ -75,28 +82,59 @@ final class FanMonitor: ObservableObject {
             NSLog("FanMonitor: screen sleep — keeping fans active (user preference)")
             return
         }
-        NSLog("FanMonitor: screen sleep (lid closed) — resetting fans to auto")
+        NSLog("FanMonitor: screen sleep (lid closed) — suspending performance, resetting fans")
+        performanceSuspended = true
         resetAllFansToAuto()
     }
 
     @objc private func handleScreenWake() {
         NSLog("FanMonitor: screen woke (lid opened)")
+        performanceSuspended = false
         // Performance curve will reapply on next poll cycle automatically
     }
 
-    /// Reset all fans that we've set to manual back to auto mode
+    @objc private func handleScreenLocked() {
+        if AppSettings.shared.keepFansOnScreenSleep {
+            NSLog("FanMonitor: screen locked — keeping fans active (user preference)")
+            return
+        }
+        NSLog("FanMonitor: screen locked — suspending performance, resetting fans")
+        performanceSuspended = true
+        resetAllFansToAuto()
+    }
+
+    @objc private func handleScreenUnlocked() {
+        NSLog("FanMonitor: screen unlocked")
+        performanceSuspended = false
+        // Performance curve will reapply on next poll cycle automatically
+    }
+
+    /// Reset all fans back to auto mode.
+    /// Uses SMC fan count directly so this works even if `fans` array is empty or stale.
     func resetAllFansToAuto() {
         guard let helper = helper else { return }
-        for fan in fans {
-            helper.setFanMode(fanIndex: fan.id, isAuto: true) { _, _ in }
+
+        // Read fan count from SMC directly — fans array may be empty on sleep
+        let fanCount: Int
+        if let smc = try? SMCConnection() {
+            fanCount = max((try? smc.readFanCount()) ?? 0, fans.count)
+            smc.close()
+        } else {
+            fanCount = fans.count
         }
+
+        for i in 0..<fanCount {
+            helper.setFanMode(fanIndex: i, isAuto: true) { _, _ in }
+        }
+
+        wasPerformanceModeActive = false
+        smoothedPeakTemp = nil
+        lastSentRPM.removeAll()
         DispatchQueue.main.async {
             self.manualOverrides.removeAll()
             self.targetOverrides.removeAll()
             self.performanceCurvePercent = 0
         }
-        smoothedPeakTemp = nil
-        lastSentRPM.removeAll()
     }
 
     // MARK: - Battery State (lightweight check for battery saver)
@@ -238,40 +276,40 @@ final class FanMonitor: ObservableObject {
         case .low:
             // Gentle: fans stay off longer, ramp slowly, cap at ~70%
             switch temp {
-            case ...60:
+            case ...70:
                 return 0
-            case 60..<75:
-                return 0.20 + (temp - 60) / 15.0 * 0.20   // 20%→40%
-            case 75..<90:
-                return 0.40 + (temp - 75) / 15.0 * 0.30   // 40%→70%
+            case 70..<85:
+                return 0.20 + (temp - 70) / 15.0 * 0.20   // 20%→40%
+            case 85..<95:
+                return 0.40 + (temp - 85) / 10.0 * 0.30   // 40%→70%
             default:
                 return 0.70
             }
         case .medium:
             // Balanced: moderate thresholds, moderate speeds
             switch temp {
-            case ...50:
+            case ...60:
                 return 0
-            case 50..<65:
-                return 0.25 + (temp - 50) / 15.0 * 0.20   // 25%→45%
-            case 65..<80:
-                return 0.45 + (temp - 65) / 15.0 * 0.30   // 45%→75%
-            case 80..<90:
-                return 0.75 + (temp - 80) / 10.0 * 0.20   // 75%→95%
+            case 60..<75:
+                return 0.25 + (temp - 60) / 15.0 * 0.20   // 25%→45%
+            case 75..<88:
+                return 0.45 + (temp - 75) / 13.0 * 0.30   // 45%→75%
+            case 88..<97:
+                return 0.75 + (temp - 88) / 9.0 * 0.20    // 75%→95%
             default:
                 return 0.95
             }
         case .high:
-            // Aggressive: original curve — early ramp, high ceiling
+            // Aggressive: early ramp, high ceiling
             switch temp {
-            case ...40:
+            case ...50:
                 return 0
-            case 40..<55:
-                return 0.30 + (temp - 40) / 15.0 * 0.20   // 30%→50%
-            case 55..<70:
-                return 0.50 + (temp - 55) / 15.0 * 0.25   // 50%→75%
-            case 70..<85:
-                return 0.75 + (temp - 70) / 15.0 * 0.20   // 75%→95%
+            case 50..<65:
+                return 0.30 + (temp - 50) / 15.0 * 0.20   // 30%→50%
+            case 65..<80:
+                return 0.50 + (temp - 65) / 15.0 * 0.25   // 50%→75%
+            case 80..<92:
+                return 0.75 + (temp - 80) / 12.0 * 0.20   // 75%→95%
             default:
                 return 1.0
             }
@@ -281,8 +319,8 @@ final class FanMonitor: ObservableObject {
     }
 
     private func applyPerformanceCurve(peak: Double) {
-        // Skip fan commands while system is asleep
-        guard !systemAsleep else { return }
+        // Skip fan commands while system is asleep or performance is suspended (screen lock/sleep)
+        guard !systemAsleep, !performanceSuspended else { return }
 
         let performanceEnabled = AppSettings.shared.performanceMode && helperReady
 
