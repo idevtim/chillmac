@@ -4,6 +4,7 @@ struct TemperatureDetailView: View {
     @ObservedObject var monitor: FanMonitor
     @ObservedObject var settings: AppSettings
     @Environment(\.theme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
     @State private var panelHeight: CGFloat = CGFloat(AppSettings.shared.detailPanelHeight)
 
     var body: some View {
@@ -218,10 +219,11 @@ struct TemperatureDetailView: View {
     }
 
     private func colorForTemp(_ temp: Double) -> Color {
+        let isLight = (settings.preferredColorScheme ?? colorScheme) == .light
         switch temp {
         case ..<50: return .green
-        case 50..<75: return .yellow
-        case 75..<90: return .orange
+        case 50..<75: return isLight ? Color(red: 0.75, green: 0.55, blue: 0.0) : .yellow
+        case 75..<90: return isLight ? Color(red: 0.80, green: 0.45, blue: 0.0) : .orange
         default: return .red
         }
     }

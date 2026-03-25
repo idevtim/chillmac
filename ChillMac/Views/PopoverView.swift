@@ -127,9 +127,10 @@ struct PopoverView: View {
 
     private var thermalStatusColor: Color {
         guard !monitor.sensors.isEmpty else { return .green }
+        let isLight = (settings.preferredColorScheme ?? colorScheme) == .light
         let maxTemp = monitor.sensors.map(\.temperature).max() ?? 0
         if maxTemp >= 90 { return .red }
-        if maxTemp >= 75 { return .orange }
+        if maxTemp >= 75 { return isLight ? Color(red: 0.80, green: 0.45, blue: 0.0) : .orange }
         return .green
     }
 
