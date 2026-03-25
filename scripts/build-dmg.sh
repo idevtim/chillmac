@@ -16,12 +16,12 @@ else
 fi
 
 APP_NAME="ChillMac"
-BUNDLE_ID="com.timothymurphy.ChillMac"
 HELPER_BUNDLE_ID="com.timothymurphy.ChillMac.Helper"
 SIGNING_IDENTITY="Developer ID Application: Tim Murphy ($APPLE_TEAM_ID)"
 TEAM_ID="$APPLE_TEAM_ID"
+
 BUILD_DIR="$PROJECT_DIR/build"
-ARCHIVE_PATH="$BUILD_DIR/$APP_NAME.xcarchive"
+DERIVED_DIR="$BUILD_DIR/DerivedData"
 APP_PATH="$BUILD_DIR/$APP_NAME.app"
 DMG_PATH="$BUILD_DIR/$APP_NAME.dmg"
 
@@ -36,42 +36,23 @@ xcodebuild \
   -project "$PROJECT_DIR/$APP_NAME.xcodeproj" \
   -scheme "$APP_NAME" \
   -configuration Release \
-  -archivePath "$ARCHIVE_PATH" \
-  archive \
+  -derivedDataPath "$DERIVED_DIR" \
   CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
   DEVELOPMENT_TEAM="$TEAM_ID" \
   OTHER_CODE_SIGN_FLAGS="--timestamp --options runtime" \
-  2>&1 | tail -20
+  DSTROOT="$BUILD_DIR/dst" \
+  2>&1 | tail -5
 
-# ─── Export ──────────────────────────────────────────────────────────────────
-echo "📦 Exporting archive..."
-cat > "$BUILD_DIR/export-options.plist" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>method</key>
-    <string>developer-id</string>
-    <key>teamID</key>
-    <string>$TEAM_ID</string>
-    <key>signingStyle</key>
-    <string>manual</string>
-    <key>signingCertificate</key>
-    <string>Developer ID Application</string>
-</dict>
-</plist>
-PLIST
+# Find the built .app
+BUILT_APP=$(find "$DERIVED_DIR" -name "$APP_NAME.app" -type d | head -1)
+if [ -z "$BUILT_APP" ]; then
+  echo "❌ Build failed — .app not found"
+  exit 1
+fi
+cp -R "$BUILT_APP" "$APP_PATH"
+echo "   ✓ Built: $APP_PATH"
 
-xcodebuild \
-  -exportArchive \
-  -archivePath "$ARCHIVE_PATH" \
-  -exportPath "$BUILD_DIR/export" \
-  -exportOptionsPlist "$BUILD_DIR/export-options.plist" \
-  2>&1 | tail -10
-
-cp -R "$BUILD_DIR/export/$APP_NAME.app" "$APP_PATH"
-
-# ─── Deep sign (Electron-style: sign inside-out) ────────────────────────────
+# ─── Deep sign (inside-out) ─────────────────────────────────────────────────
 echo "🔏 Deep code signing (inside-out)..."
 
 # 1. Sign the helper first (innermost)
@@ -83,13 +64,15 @@ if [ -f "$HELPER_PATH" ]; then
   echo "   ✓ Helper signed"
 fi
 
-# 2. Sign any frameworks/dylibs (if added later)
-find "$APP_PATH/Contents/Frameworks" -name "*.framework" -o -name "*.dylib" 2>/dev/null | while read -r lib; do
-  codesign --force --timestamp --options runtime \
-    --sign "$SIGNING_IDENTITY" \
-    "$lib"
-  echo "   ✓ Signed: $(basename "$lib")"
-done
+# 2. Sign any frameworks/dylibs
+if [ -d "$APP_PATH/Contents/Frameworks" ]; then
+  find "$APP_PATH/Contents/Frameworks" \( -name "*.framework" -o -name "*.dylib" \) | while read -r lib; do
+    codesign --force --timestamp --options runtime \
+      --sign "$SIGNING_IDENTITY" \
+      "$lib"
+    echo "   ✓ Signed: $(basename "$lib")"
+  done
+fi
 
 # 3. Sign the main app (outermost)
 codesign --force --timestamp --options runtime \
@@ -101,7 +84,6 @@ echo "   ✓ App signed"
 # ─── Verify ─────────────────────────────────────────────────────────────────
 echo "🔍 Verifying code signature..."
 codesign --verify --deep --strict --verbose=2 "$APP_PATH" 2>&1
-spctl --assess --type execute --verbose "$APP_PATH" 2>&1 || echo "   ⚠ spctl check failed (expected before notarization)"
 
 # ─── Create DMG ──────────────────────────────────────────────────────────────
 echo "💿 Creating DMG..."
@@ -118,7 +100,6 @@ create-dmg \
   "$DMG_PATH" \
   "$APP_PATH" \
   2>&1 || {
-    # Fallback if no icon file exists yet
     echo "   ⚠ Retrying without volicon..."
     rm -f "$DMG_PATH"
     create-dmg \
