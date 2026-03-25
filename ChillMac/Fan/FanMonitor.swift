@@ -28,6 +28,18 @@ final class FanMonitor: ObservableObject {
     /// Track whether performance mode was active last poll so we can reset fans on toggle-off
     private var wasPerformanceModeActive = false
 
+    // MARK: - Fan Speed Smoothing
+    /// Exponential moving average of peak temperature to dampen sensor noise
+    private var smoothedPeakTemp: Double?
+    /// EMA factor: 0.3 = 30% new reading, 70% history (smooths out 2-3°C fluctuations)
+    private let tempSmoothingFactor: Double = 0.3
+    /// Track the last RPM we actually sent to each fan for gradual ramping
+    private var lastSentRPM: [Int: Double] = [:]
+    /// Max RPM increase per poll cycle (ramp up moderately fast — ~500 RPM/sec)
+    private let maxRampUpPerCycle: Double = 1000
+    /// Max RPM decrease per poll cycle (ramp down slowly — ~150 RPM/sec)
+    private let maxRampDownPerCycle: Double = 300
+
     func startMonitoring() {
         do {
             smc = try SMCConnection()
@@ -208,13 +220,23 @@ final class FanMonitor: ObservableObject {
                 self.targetOverrides.removeAll()
                 self.performanceCurvePercent = 0
             }
+            smoothedPeakTemp = nil
+            lastSentRPM.removeAll()
             return
         }
 
         guard isActive else { return }
         wasPerformanceModeActive = true
 
-        let pct = fanSpeedPercent(forTemperature: peak)
+        // Smooth the peak temperature to avoid chasing sensor noise
+        if let prev = smoothedPeakTemp {
+            smoothedPeakTemp = prev + tempSmoothingFactor * (peak - prev)
+        } else {
+            smoothedPeakTemp = peak
+        }
+        let smoothedPeak = smoothedPeakTemp!
+
+        let pct = fanSpeedPercent(forTemperature: smoothedPeak)
         DispatchQueue.main.async {
             self.performanceCurvePercent = pct * 100
         }
@@ -229,13 +251,28 @@ final class FanMonitor: ObservableObject {
                     self.targetOverrides[fan.id] = nil
                 }
             }
+            lastSentRPM.removeAll()
             return
         }
 
-        // Set each fan to the calculated RPM
+        // Set each fan to the calculated RPM with gradual ramping
         for fan in fans {
-            let targetRPM = fan.minRPM + pct * (fan.maxRPM - fan.minRPM)
-            let rounded = (targetRPM / 100).rounded() * 100  // snap to 100 RPM increments
+            let desiredRPM = fan.minRPM + pct * (fan.maxRPM - fan.minRPM)
+
+            // Apply rate limiting: ramp up faster than ramp down
+            var rampedRPM = desiredRPM
+            if let lastRPM = lastSentRPM[fan.id] {
+                let delta = desiredRPM - lastRPM
+                if delta > 0 {
+                    // Ramping up — allow up to maxRampUpPerCycle per poll
+                    rampedRPM = min(desiredRPM, lastRPM + maxRampUpPerCycle)
+                } else {
+                    // Ramping down — limit decrease for smooth wind-down
+                    rampedRPM = max(desiredRPM, lastRPM - maxRampDownPerCycle)
+                }
+            }
+
+            let rounded = (rampedRPM / 100).rounded() * 100  // snap to 100 RPM increments
 
             // Only send commands if target changed meaningfully (avoid XPC spam)
             let currentTarget = targetOverrides[fan.id] ?? 0
@@ -246,6 +283,7 @@ final class FanMonitor: ObservableObject {
                     DispatchQueue.main.async {
                         self?.manualOverrides[fan.id] = true
                         self?.targetOverrides[fan.id] = rounded
+                        self?.lastSentRPM[fan.id] = rounded
                     }
                 }
             }
