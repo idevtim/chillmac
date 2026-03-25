@@ -84,24 +84,35 @@ struct FanRowView: View {
             }
 
             // Manual/Auto toggle
-            HStack {
-                Toggle(isOn: isManual) {
-                    EmptyView()
+            if monitor.helperReady {
+                HStack {
+                    Toggle(isOn: isManual) {
+                        EmptyView()
+                    }
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .tint(.green)
+                    .animation(monitor.manualOverrides[fan.id] != nil ? .default : nil, value: isManual.wrappedValue)
+
+                    Text(isManual.wrappedValue ? "Manual Control" : "Automatic")
+                        .font(.system(size: 13))
+                        .foregroundColor(theme.textTertiary)
+
+                    Spacer()
                 }
-                .toggleStyle(.switch)
-                .controlSize(.small)
-                .tint(.green)
-                .animation(monitor.manualOverrides[fan.id] != nil ? .default : nil, value: isManual.wrappedValue)
-
-                Text(isManual.wrappedValue ? "Manual Control" : "Automatic")
-                    .font(.system(size: 13))
-                    .foregroundColor(theme.textTertiary)
-
-                Spacer()
+            } else {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Connecting to helper…")
+                        .font(.system(size: 13))
+                        .foregroundColor(theme.textQuaternary)
+                    Spacer()
+                }
             }
 
             // Speed slider (only in manual mode)
-            if isManual.wrappedValue, sliderRange.upperBound > sliderRange.lowerBound {
+            if monitor.helperReady, isManual.wrappedValue, sliderRange.upperBound > sliderRange.lowerBound {
                 VStack(spacing: 6) {
                     Slider(
                         value: targetRPM,

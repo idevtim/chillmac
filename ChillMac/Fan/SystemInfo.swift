@@ -13,12 +13,14 @@ final class SystemInfo: ObservableObject {
     @Published var diskTotalBytes: Int64 = 0
     @Published var diskAvailableBytes: Int64 = 0
     @Published var diskCategories: [DiskCategory] = []
+    @Published var deniedFolders: Set<String> = []
 
     struct DiskCategory: Identifiable {
         let id = UUID()
         let name: String
         let bytes: Int64
         let color: NSColor
+        var denied: Bool = false
     }
 
     private var timer: Timer?
@@ -136,8 +138,12 @@ final class SystemInfo: ObservableObject {
             let fm = FileManager.default
             let home = fm.homeDirectoryForCurrentUser
 
-            func directorySize(_ url: URL) -> Int64 {
-                guard let enumerator = fm.enumerator(at: url, includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey], options: [.skipsHiddenFiles]) else { return 0 }
+            /// Returns (size, denied). A folder is "denied" when we cannot enumerate it at all.
+            func directorySize(_ url: URL) -> (Int64, Bool) {
+                guard fm.isReadableFile(atPath: url.path),
+                      let enumerator = fm.enumerator(at: url, includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey], options: [.skipsHiddenFiles]) else {
+                    return (0, true)
+                }
                 var total: Int64 = 0
                 for case let fileURL as URL in enumerator {
                     guard let values = try? fileURL.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey]),
@@ -145,28 +151,35 @@ final class SystemInfo: ObservableObject {
                           let size = values.totalFileAllocatedSize else { continue }
                     total += Int64(size)
                 }
-                return total
+                return (total, false)
             }
 
-            let appsSize = directorySize(URL(fileURLWithPath: "/Applications"))
-            let downloadsSize = directorySize(home.appendingPathComponent("Downloads"))
-            let documentsSize = directorySize(home.appendingPathComponent("Documents"))
-            let desktopSize = directorySize(home.appendingPathComponent("Desktop"))
+            let (appsSize, appsDenied) = directorySize(URL(fileURLWithPath: "/Applications"))
+            let (downloadsSize, downloadsDenied) = directorySize(home.appendingPathComponent("Downloads"))
+            let (documentsSize, documentsDenied) = directorySize(home.appendingPathComponent("Documents"))
+            let (desktopSize, desktopDenied) = directorySize(home.appendingPathComponent("Desktop"))
 
             let usedBytes = totalBytes - availableBytes
             let categorized = appsSize + downloadsSize + documentsSize + desktopSize
             let otherSize = max(0, usedBytes - categorized)
 
+            var denied = Set<String>()
+            if appsDenied { denied.insert("Applications") }
+            if downloadsDenied { denied.insert("Downloads") }
+            if documentsDenied { denied.insert("Documents") }
+            if desktopDenied { denied.insert("Desktop") }
+
             let categories: [DiskCategory] = [
-                DiskCategory(name: "Applications", bytes: appsSize, color: .systemRed),
-                DiskCategory(name: "Downloads", bytes: downloadsSize, color: .systemPink),
-                DiskCategory(name: "Documents", bytes: documentsSize, color: .systemBlue),
-                DiskCategory(name: "Desktop", bytes: desktopSize, color: .systemGreen),
+                DiskCategory(name: "Applications", bytes: appsSize, color: .systemRed, denied: appsDenied),
+                DiskCategory(name: "Downloads", bytes: downloadsSize, color: .systemPink, denied: downloadsDenied),
+                DiskCategory(name: "Documents", bytes: documentsSize, color: .systemBlue, denied: documentsDenied),
+                DiskCategory(name: "Desktop", bytes: desktopSize, color: .systemGreen, denied: desktopDenied),
                 DiskCategory(name: "Other", bytes: otherSize, color: .systemGray),
             ]
 
             DispatchQueue.main.async {
                 self?.diskCategories = categories
+                self?.deniedFolders = denied
             }
         }
     }

@@ -37,43 +37,112 @@ struct DiskDetailView: View {
         systemInfo.diskTotalBytes - systemInfo.diskAvailableBytes
     }
 
+    private var categoriesLoaded: Bool {
+        !systemInfo.diskCategories.isEmpty
+    }
+
     private var donutSection: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .stroke(theme.ringTrack, lineWidth: 20)
-
-                // Draw category arcs
-                ForEach(Array(arcSegments.enumerated()), id: \.offset) { _, segment in
+        VStack(spacing: 12) {
+            HStack(spacing: 14) {
+                ZStack {
                     Circle()
-                        .trim(from: segment.start, to: segment.end)
-                        .stroke(segment.color, style: StrokeStyle(lineWidth: 20, lineCap: .butt))
-                        .rotationEffect(.degrees(-90))
-                }
+                        .stroke(theme.ringTrack, lineWidth: 20)
 
-                VStack(spacing: 2) {
-                    Text(SystemInfo.formatDiskBytes(systemInfo.diskAvailableBytes))
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
-                        .foregroundColor(theme.textPrimary)
-                    Text("of \(SystemInfo.formatDiskBytes(systemInfo.diskTotalBytes)) available")
-                        .font(.system(size: 9))
-                        .foregroundColor(theme.textTertiary)
+                    if categoriesLoaded {
+                        // Draw category arcs
+                        ForEach(Array(arcSegments.enumerated()), id: \.offset) { _, segment in
+                            Circle()
+                                .trim(from: segment.start, to: segment.end)
+                                .stroke(segment.color, style: StrokeStyle(lineWidth: 20, lineCap: .butt))
+                                .rotationEffect(.degrees(-90))
+                        }
+                    }
+
+                    VStack(spacing: 2) {
+                        if categoriesLoaded {
+                            Text(SystemInfo.formatDiskBytes(systemInfo.diskAvailableBytes))
+                                .font(.system(size: 18, weight: .bold, design: .rounded))
+                                .foregroundColor(theme.textPrimary)
+                            Text("of \(SystemInfo.formatDiskBytes(systemInfo.diskTotalBytes)) available")
+                                .font(.system(size: 9))
+                                .foregroundColor(theme.textTertiary)
+                        } else {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                    }
+                }
+                .padding(12)
+                .frame(width: 160, height: 160)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    if categoriesLoaded {
+                        ForEach(systemInfo.diskCategories) { cat in
+                            DiskLegendRow(
+                                color: Color(nsColor: cat.color),
+                                label: cat.name,
+                                value: cat.denied ? "No Access" : SystemInfo.formatDiskBytes(cat.bytes),
+                                denied: cat.denied
+                            )
+                        }
+                    } else {
+                        VStack(spacing: 6) {
+                            Text("Calculating disk usage…")
+                                .font(.system(size: 12))
+                                .foregroundColor(theme.textQuaternary)
+                        }
+                        .frame(maxHeight: .infinity)
+                    }
                 }
             }
-            .padding(12)
-            .frame(width: 160, height: 160)
+            .padding(.vertical, 4)
 
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(systemInfo.diskCategories) { cat in
-                    DiskLegendRow(
-                        color: Color(nsColor: cat.color),
-                        label: cat.name,
-                        value: SystemInfo.formatDiskBytes(cat.bytes)
-                    )
-                }
+            if categoriesLoaded && !systemInfo.deniedFolders.isEmpty {
+                permissionBanner
             }
         }
-        .padding(.vertical, 4)
+    }
+
+    // MARK: - Permission Banner
+
+    private var permissionBanner: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "lock.shield")
+                .font(.system(size: 16))
+                .foregroundColor(.orange)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Limited access")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(theme.textPrimary)
+                Text("\(systemInfo.deniedFolders.sorted().joined(separator: ", ")) need permission.")
+                    .font(.system(size: 11))
+                    .foregroundColor(theme.textQuaternary)
+                    .lineLimit(2)
+            }
+
+            Spacer()
+
+            Button(action: openPrivacySettings) {
+                Text("Grant Access")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.orange)
+                    .cornerRadius(6)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(12)
+        .background(theme.cardBg)
+        .cornerRadius(12)
+    }
+
+    private func openPrivacySettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     private struct ArcSegment {
@@ -217,20 +286,28 @@ private struct DiskLegendRow: View {
     let color: Color
     let label: String
     let value: String
+    var denied: Bool = false
     @Environment(\.theme) private var theme
 
     var body: some View {
         HStack(spacing: 8) {
             Circle()
-                .fill(color)
+                .fill(denied ? Color.gray.opacity(0.4) : color)
                 .frame(width: 10, height: 10)
             VStack(alignment: .leading, spacing: 1) {
                 Text(label)
                     .font(.system(size: 12))
-                    .foregroundColor(theme.textSecondary)
-                Text(value)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(theme.textPrimary)
+                    .foregroundColor(denied ? theme.textQuaternary : theme.textSecondary)
+                HStack(spacing: 4) {
+                    if denied {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(.orange)
+                    }
+                    Text(value)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(denied ? .orange : theme.textPrimary)
+                }
             }
         }
     }

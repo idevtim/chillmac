@@ -5,6 +5,7 @@ final class FanMonitor: ObservableObject {
     @Published var fans: [FanInfo] = []
     @Published var sensors: [TemperatureSensor] = []
     @Published var smcError: String?
+    @Published var helperReady = false
 
     /// User overrides that persist across poll cycles
     @Published var manualOverrides: [Int: Bool] = [:]   // fanIndex → manual on/off

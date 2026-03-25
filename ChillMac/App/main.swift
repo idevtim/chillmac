@@ -11,22 +11,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let helperConnection = HelperConnection()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Install or re-load the privileged helper
-        if !HelperInstaller.isHelperInstalled() {
-            _ = HelperInstaller.installHelper()
-        }
-        // Ensure the daemon is loaded (may have been unloaded on last quit)
-        if !HelperInstaller.isHelperInstalled() {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-            process.arguments = ["bootstrap", "system", "/Library/LaunchDaemons/com.timothymurphy.ChillMac.Helper.plist"]
-            try? process.run()
-            process.waitUntilExit()
-        }
-
-        // Reset all fans to auto on startup in case a previous session left them in manual mode
-        resetFansToAuto()
-
         fanMonitor.startMonitoring()
         systemInfo.startMonitoring()
         memoryInfo.startMonitoring()
@@ -40,6 +24,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             batteryInfo: batteryInfo,
             cpuInfo: cpuInfo
         )
+
+        // Install/load the privileged helper in the background so the UI appears immediately
+        DispatchQueue.global(qos: .userInitiated).async { [self] in
+            if !HelperInstaller.isHelperInstalled() {
+                _ = HelperInstaller.installHelper()
+            }
+            // Ensure the daemon is loaded (may have been unloaded on last quit)
+            if !HelperInstaller.isHelperInstalled() {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+                process.arguments = ["bootstrap", "system", "/Library/LaunchDaemons/com.timothymurphy.ChillMac.Helper.plist"]
+                try? process.run()
+                process.waitUntilExit()
+            }
+
+            // Reset all fans to auto on startup
+            self.resetFansToAuto()
+
+            DispatchQueue.main.async {
+                self.fanMonitor.helperReady = true
+            }
+        }
     }
 
     private func resetFansToAuto() {
