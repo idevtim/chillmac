@@ -41,7 +41,7 @@ struct SettingsView: View {
             // Version
             HStack {
                 Spacer()
-                Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"))")
+                Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?")")
                     .font(.system(size: 11))
                     .foregroundColor(theme.textQuaternary)
                 Spacer()
