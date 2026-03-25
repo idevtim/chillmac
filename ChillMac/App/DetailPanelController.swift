@@ -27,7 +27,7 @@ final class DetailPanelController {
         let mainFrame = mainWindow.frame
 
         let panelWidth: CGFloat = 370
-        let panelHeight: CGFloat = 560
+        let panelHeight = CGFloat(AppSettings.shared.detailPanelHeight)
 
         // Position to the left of the main popover, top-aligned with content (below the arrow)
         let arrowHeight: CGFloat = 13

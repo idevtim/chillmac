@@ -1,5 +1,39 @@
 import SwiftUI
 
+enum PerformanceLevel: String, CaseIterable {
+    case low
+    case medium
+    case high
+    case max
+
+    var label: String {
+        switch self {
+        case .low: return "Low"
+        case .medium: return "Medium"
+        case .high: return "High"
+        case .max: return "Max"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .low: return "Gentle cooling, minimal noise"
+        case .medium: return "Balanced cooling and noise"
+        case .high: return "Aggressive cooling, louder"
+        case .max: return "Maximum fans at all times"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .low: return "wind"
+        case .medium: return "fan"
+        case .high: return "fan.fill"
+        case .max: return "flame.fill"
+        }
+    }
+}
+
 enum AppearanceMode: String, CaseIterable {
     case system
     case light
@@ -28,6 +62,18 @@ final class AppSettings: ObservableObject {
     @AppStorage("useFahrenheit") var useFahrenheit = false
     @AppStorage("appearanceMode") var appearanceMode: AppearanceMode = .dark
     @AppStorage("performanceMode") var performanceMode = false
+    @AppStorage("performanceLevel") var performanceLevel: PerformanceLevel = .high
+    @AppStorage("popoverHeight") var popoverHeight: Double = 640
+    @AppStorage("showScrollIndicators") var showScrollIndicators = true
+
+    @AppStorage("detailPanelHeight") var detailPanelHeight: Double = 560
+
+    static let popoverMinHeight: CGFloat = 400
+    static let popoverMaxHeight: CGFloat = 900
+    static let popoverDefaultHeight: CGFloat = 640
+    static let detailPanelMinHeight: CGFloat = 350
+    static let detailPanelMaxHeight: CGFloat = 800
+    static let detailPanelDefaultHeight: CGFloat = 560
 
     var preferredColorScheme: ColorScheme? {
         switch appearanceMode {

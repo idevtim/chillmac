@@ -6,7 +6,9 @@ final class StatusBarController: NSObject {
     private let statusItem: NSStatusItem
     private let popover: NSPopover
     private var eventMonitor: Any?
-    private var appearanceSub: AnyCancellable?
+    private var settingsSub: AnyCancellable?
+    private var heightObserver: Any?
+    private var lastPopoverHeight: CGFloat = 0
 
     private let detailPanel = DetailPanelController()
     private let memoryInfo: MemoryInfo
@@ -61,8 +63,9 @@ final class StatusBarController: NSObject {
                 }
             )
         )
-        hostingController.view.frame = NSRect(x: 0, y: 0, width: 420, height: 640)
-        popover.contentSize = NSSize(width: 420, height: 640)
+        let initialHeight = CGFloat(AppSettings.shared.popoverHeight)
+        hostingController.view.frame = NSRect(x: 0, y: 0, width: 420, height: initialHeight)
+        popover.contentSize = NSSize(width: 420, height: initialHeight)
         popover.contentViewController = hostingController
 
         if let button = statusItem.button {
@@ -89,17 +92,37 @@ final class StatusBarController: NSObject {
             self.systemInfo.stopMonitoring()
         }
 
-        // Update popover appearance when settings change
-        appearanceSub = AppSettings.shared.objectWillChange.sink { [weak self] _ in
+        // Update popover appearance and size when settings change
+        lastPopoverHeight = CGFloat(AppSettings.shared.popoverHeight)
+        settingsSub = AppSettings.shared.objectWillChange.sink { [weak self] _ in
             DispatchQueue.main.async {
-                self?.popover.appearance = AppSettings.shared.nsAppearance
+                guard let self else { return }
+                self.popover.appearance = AppSettings.shared.nsAppearance
+
+                // Handle height changes from settings (e.g. Reset button), not during live drag
+                let newHeight = CGFloat(AppSettings.shared.popoverHeight)
+                if self.popover.isShown && abs(newHeight - self.lastPopoverHeight) >= 1 {
+                    let clamped = min(max(newHeight, AppSettings.popoverMinHeight), AppSettings.popoverMaxHeight)
+                    self.popover.contentSize = NSSize(width: 420, height: clamped)
+                    self.lastPopoverHeight = clamped
+                }
             }
+        }
+
+        // Live resize during drag — bypasses AppSettings for smooth performance
+        heightObserver = NotificationCenter.default.addObserver(forName: .popoverHeightChanged, object: nil, queue: .main) { [weak self] notification in
+            guard let self, let height = notification.userInfo?["height"] as? CGFloat else { return }
+            self.popover.contentSize = NSSize(width: 420, height: height)
+            self.lastPopoverHeight = height
         }
     }
 
     deinit {
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
+        }
+        if let observer = heightObserver {
+            NotificationCenter.default.removeObserver(observer)
         }
     }
 

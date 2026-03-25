@@ -15,6 +15,8 @@ struct PopoverView: View {
 
     @State private var appeared = false
     @State private var showingSettings = false
+    @State private var liveHeight: CGFloat = 0
+    @State private var dragStartHeight: CGFloat = 0
     @Environment(\.colorScheme) private var colorScheme
 
     private var theme: AppTheme {
@@ -37,7 +39,7 @@ struct PopoverView: View {
                     .transition(.move(edge: .leading).combined(with: .opacity))
             }
         }
-        .frame(width: 420, height: 640)
+        .frame(width: 420, height: liveHeight > 0 ? liveHeight : CGFloat(settings.popoverHeight))
         .environment(\.theme, theme)
         .preferredColorScheme(settings.preferredColorScheme)
         .onAppear {
@@ -56,7 +58,7 @@ struct PopoverView: View {
             if let error = monitor.smcError {
                 errorSection(error)
             } else {
-                ScrollView(.vertical, showsIndicators: false) {
+                ScrollView(.vertical, showsIndicators: settings.showScrollIndicators) {
                     VStack(spacing: 12) {
                         // System info cards
                         systemInfoCards
@@ -227,7 +229,7 @@ struct PopoverView: View {
                     Text("Performance Mode")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(theme.textPrimary)
-                    Text("Aggressive fan curve to keep temps low")
+                    Text(settings.performanceMode ? settings.performanceLevel.description : "Fan curve to keep temps low")
                         .font(.system(size: 11))
                         .foregroundColor(theme.textQuaternary)
                 }
@@ -243,50 +245,60 @@ struct PopoverView: View {
             }
 
             if settings.performanceMode {
-                HStack(spacing: 12) {
-                    // Peak temp indicator
-                    HStack(spacing: 4) {
-                        Image(systemName: "thermometer.medium")
-                            .font(.system(size: 11))
-                            .foregroundColor(perfTempColor)
-                        Text(settings.formatTemperature(monitor.peakTemperature))
-                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                            .foregroundColor(perfTempColor)
-                    }
-
-                    // Fan curve percentage
-                    HStack(spacing: 4) {
-                        Image(systemName: "fan.fill")
-                            .font(.system(size: 11))
-                            .foregroundColor(.orange)
-                        Text(monitor.performanceCurvePercent > 0
-                             ? String(format: "%.0f%%", monitor.performanceCurvePercent)
-                             : "Auto")
-                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                            .foregroundColor(.orange)
-                    }
-
-                    Spacer()
-
-                    // Curve bar
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Capsule()
-                                .fill(theme.ringTrack)
-                            Capsule()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [.green, .yellow, .orange, .red],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                                .frame(width: geo.size.width * max(0.02, monitor.performanceCurvePercent / 100))
-                                .animation(.easeInOut(duration: 0.5), value: monitor.performanceCurvePercent)
+                VStack(spacing: 10) {
+                    // Level picker
+                    Picker("Level", selection: $settings.performanceLevel) {
+                        ForEach(PerformanceLevel.allCases, id: \.self) { level in
+                            Text(level.label).tag(level)
                         }
                     }
-                    .frame(height: 6)
-                    .frame(maxWidth: 100)
+                    .pickerStyle(.segmented)
+
+                    HStack(spacing: 12) {
+                        // Peak temp indicator
+                        HStack(spacing: 4) {
+                            Image(systemName: "thermometer.medium")
+                                .font(.system(size: 11))
+                                .foregroundColor(perfTempColor)
+                            Text(settings.formatTemperature(monitor.peakTemperature))
+                                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                                .foregroundColor(perfTempColor)
+                        }
+
+                        // Fan curve percentage
+                        HStack(spacing: 4) {
+                            Image(systemName: "fan.fill")
+                                .font(.system(size: 11))
+                                .foregroundColor(.orange)
+                            Text(monitor.performanceCurvePercent > 0
+                                 ? String(format: "%.0f%%", monitor.performanceCurvePercent)
+                                 : "Auto")
+                                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                                .foregroundColor(.orange)
+                        }
+
+                        Spacer()
+
+                        // Curve bar
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Capsule()
+                                    .fill(theme.ringTrack)
+                                Capsule()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [.green, .yellow, .orange, .red],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .frame(width: geo.size.width * max(0.02, monitor.performanceCurvePercent / 100))
+                                    .animation(.easeInOut(duration: 0.5), value: monitor.performanceCurvePercent)
+                            }
+                        }
+                        .frame(height: 6)
+                        .frame(maxWidth: 100)
+                    }
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
@@ -331,38 +343,75 @@ struct PopoverView: View {
     // MARK: - Footer
 
     private var footerSection: some View {
-        HStack {
-            Button(action: { NSApp.terminate(nil) }) {
-                Image(systemName: "power")
-                    .font(.system(size: 16))
-                    .foregroundColor(theme.textTertiary)
-            }
-            .buttonStyle(.plain)
+        VStack(spacing: 0) {
+            // Drag handle to resize popover
+            resizeHandle
 
-            Spacer()
-
-            Text("ChillMac")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(theme.textQuaternary)
-
-            Spacer()
-
-            Button(action: {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    showingSettings = true
+            HStack {
+                Button(action: { NSApp.terminate(nil) }) {
+                    Image(systemName: "power")
+                        .font(.system(size: 16))
+                        .foregroundColor(theme.textTertiary)
                 }
-            }) {
-                Image(systemName: "gearshape.fill")
-                    .font(.system(size: 16))
-                    .foregroundColor(theme.textTertiary)
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Text("ChillMac")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(theme.textQuaternary)
+
+                Spacer()
+
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showingSettings = true
+                    }
+                }) {
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(theme.textTertiary)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
         .background(theme.footerBg)
         .opacity(appeared ? 1 : 0)
         .animation(.easeOut(duration: 0.3).delay(0.15), value: appeared)
+    }
+
+    private var resizeHandle: some View {
+        Capsule()
+            .fill(theme.textQuaternary.opacity(0.5))
+            .frame(width: 36, height: 4)
+            .padding(.top, 6)
+            .padding(.bottom, 4)
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(coordinateSpace: .global)
+                    .onChanged { value in
+                        if liveHeight == 0 {
+                            liveHeight = CGFloat(settings.popoverHeight)
+                            dragStartHeight = liveHeight
+                        }
+                        let delta = value.location.y - value.startLocation.y
+                        let newHeight = min(max(dragStartHeight + delta, AppSettings.popoverMinHeight), AppSettings.popoverMaxHeight)
+                        liveHeight = newHeight
+                        NotificationCenter.default.post(name: .popoverHeightChanged, object: nil, userInfo: ["height": newHeight])
+                    }
+                    .onEnded { _ in
+                        settings.popoverHeight = Double(liveHeight)
+                        liveHeight = 0
+                        dragStartHeight = 0
+                    }
+            )
+            .onHover { hovering in
+                if hovering { NSCursor.resizeUpDown.push() }
+                else { NSCursor.pop() }
+            }
     }
 }
 

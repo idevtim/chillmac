@@ -5,6 +5,7 @@ struct DiskDetailView: View {
     @ObservedObject var monitor: FanMonitor
     @ObservedObject var settings: AppSettings
     @Environment(\.theme) private var theme
+    @State private var panelHeight: CGFloat = CGFloat(AppSettings.shared.detailPanelHeight)
 
     var body: some View {
         ZStack {
@@ -18,7 +19,7 @@ struct DiskDetailView: View {
                     .padding(.top, 18)
                     .padding(.bottom, 14)
 
-                ScrollView(.vertical, showsIndicators: false) {
+                ScrollView(.vertical, showsIndicators: settings.showScrollIndicators) {
                     VStack(spacing: 16) {
                         donutSection
                         healthCards
@@ -26,9 +27,13 @@ struct DiskDetailView: View {
                     .padding(.horizontal, 16)
                     .padding(.bottom, 16)
                 }
+
+                PanelResizeHandle(panelHeight: $panelHeight) {
+                    AppSettings.shared.detailPanelHeight = Double(panelHeight)
+                }
             }
         }
-        .frame(width: 370, height: 560)
+        .frame(width: 370, height: panelHeight)
     }
 
     // MARK: - Donut Chart

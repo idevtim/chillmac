@@ -3,6 +3,7 @@ import SwiftUI
 struct MemoryDetailView: View {
     @ObservedObject var memoryInfo: MemoryInfo
     @Environment(\.theme) private var theme
+    @State private var panelHeight: CGFloat = CGFloat(AppSettings.shared.detailPanelHeight)
 
     var body: some View {
         ZStack {
@@ -17,23 +18,22 @@ struct MemoryDetailView: View {
                     .padding(.top, 18)
                     .padding(.bottom, 14)
 
-                ScrollView(.vertical, showsIndicators: false) {
+                ScrollView(.vertical, showsIndicators: AppSettings.shared.showScrollIndicators) {
                     VStack(spacing: 16) {
-                        // Donut chart + breakdown — no card background, edge-to-edge
                         donutSection
-
-                        // Pressure & Swap cards — equal height
                         pressureSwapCards
-
-                        // Top consumers with app icons
                         topConsumersSection
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 16)
                 }
+
+                PanelResizeHandle(panelHeight: $panelHeight) {
+                    AppSettings.shared.detailPanelHeight = Double(panelHeight)
+                }
             }
         }
-        .frame(width: 370, height: 560)
+        .frame(width: 370, height: panelHeight)
     }
 
     // MARK: - Donut Chart

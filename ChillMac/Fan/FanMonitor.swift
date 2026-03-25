@@ -137,26 +137,56 @@ final class FanMonitor: ObservableObject {
 
     // MARK: - Performance Mode Fan Curve
 
-    /// Aggressive fan curve for power users. Maps peak sensor temperature to fan speed.
-    ///
-    /// Curve:
-    ///   ≤ 40°C  →  0% (auto / idle)
-    ///   40–55°C →  30%–50%  (early ramp — stay ahead of heat)
-    ///   55–70°C →  50%–75%
-    ///   70–85°C →  75%–95%
-    ///   > 85°C  →  100% (full blast)
+    /// Maps peak sensor temperature to fan speed % based on the selected performance level.
     private func fanSpeedPercent(forTemperature temp: Double) -> Double {
-        switch temp {
-        case ...40:
-            return 0
-        case 40..<55:
-            return 0.30 + (temp - 40) / 15.0 * 0.20   // 30%→50%
-        case 55..<70:
-            return 0.50 + (temp - 55) / 15.0 * 0.25   // 50%→75%
-        case 70..<85:
-            return 0.75 + (temp - 70) / 15.0 * 0.20   // 75%→95%
-        default:
-            return 1.0
+        let level = AppSettings.shared.performanceLevel
+
+        // Max: always full blast
+        if level == .max { return 1.0 }
+
+        switch level {
+        case .low:
+            // Gentle: fans stay off longer, ramp slowly, cap at ~70%
+            switch temp {
+            case ...60:
+                return 0
+            case 60..<75:
+                return 0.20 + (temp - 60) / 15.0 * 0.20   // 20%→40%
+            case 75..<90:
+                return 0.40 + (temp - 75) / 15.0 * 0.30   // 40%→70%
+            default:
+                return 0.70
+            }
+        case .medium:
+            // Balanced: moderate thresholds, moderate speeds
+            switch temp {
+            case ...50:
+                return 0
+            case 50..<65:
+                return 0.25 + (temp - 50) / 15.0 * 0.20   // 25%→45%
+            case 65..<80:
+                return 0.45 + (temp - 65) / 15.0 * 0.30   // 45%→75%
+            case 80..<90:
+                return 0.75 + (temp - 80) / 10.0 * 0.20   // 75%→95%
+            default:
+                return 0.95
+            }
+        case .high:
+            // Aggressive: original curve — early ramp, high ceiling
+            switch temp {
+            case ...40:
+                return 0
+            case 40..<55:
+                return 0.30 + (temp - 40) / 15.0 * 0.20   // 30%→50%
+            case 55..<70:
+                return 0.50 + (temp - 55) / 15.0 * 0.25   // 50%→75%
+            case 70..<85:
+                return 0.75 + (temp - 70) / 15.0 * 0.20   // 75%→95%
+            default:
+                return 1.0
+            }
+        case .max:
+            return 1.0  // handled above, but Swift requires exhaustive switch
         }
     }
 

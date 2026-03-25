@@ -26,10 +26,11 @@ struct SettingsView: View {
             .padding(.top, 18)
             .padding(.bottom, 14)
 
-            ScrollView(.vertical, showsIndicators: false) {
+            ScrollView(.vertical, showsIndicators: settings.showScrollIndicators) {
                 VStack(spacing: 16) {
                     appearanceSection
                     temperatureSection
+                    displaySection
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
@@ -91,6 +92,74 @@ struct SettingsView: View {
         case .system: return .teal
         case .light: return .orange
         case .dark: return .blue
+        }
+    }
+
+    // MARK: - Display
+
+    private var displaySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("DISPLAY")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(theme.textTertiary)
+                .tracking(1.2)
+                .padding(.leading, 4)
+
+            VStack(spacing: 0) {
+                // Scrollbar toggle
+                HStack {
+                    Image(systemName: "scroll")
+                        .font(.system(size: 16))
+                        .foregroundColor(theme.textTertiary)
+                        .frame(width: 24)
+                    Text("Show Scrollbars")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(theme.textPrimary)
+                    Spacer()
+                    Toggle(isOn: $settings.showScrollIndicators) {
+                        EmptyView()
+                    }
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .tint(.teal)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+
+                Divider()
+                    .background(theme.dividerSubtle)
+
+                // Reset popover height
+                HStack {
+                    Image(systemName: "arrow.up.and.down.square")
+                        .font(.system(size: 16))
+                        .foregroundColor(theme.textTertiary)
+                        .frame(width: 24)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Window Height")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(theme.textPrimary)
+                        Text("Drag the handle at the bottom to resize")
+                            .font(.system(size: 11))
+                            .foregroundColor(theme.textQuaternary)
+                    }
+                    Spacer()
+                    if abs(settings.popoverHeight - Double(AppSettings.popoverDefaultHeight)) > 10 {
+                        Button("Reset") {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                settings.popoverHeight = Double(AppSettings.popoverDefaultHeight)
+                            }
+                        }
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.teal)
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+            }
+            .background(theme.cardBg)
+            .cornerRadius(12)
         }
     }
 
