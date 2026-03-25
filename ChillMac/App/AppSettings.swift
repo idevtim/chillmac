@@ -91,6 +91,17 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    // Manually notify SwiftUI observers after appearance changes.
+    // @AppStorage sends objectWillChange *before* the value is written,
+    // so SwiftUI can read the stale value. This ensures a second update fires
+    // after UserDefaults has committed the new value.
+    func setAppearanceMode(_ mode: AppearanceMode) {
+        appearanceMode = mode
+        DispatchQueue.main.async {
+            self.objectWillChange.send()
+        }
+    }
+
     func formatTemperature(_ celsius: Double) -> String {
         if useFahrenheit {
             let f = celsius * 9.0 / 5.0 + 32.0

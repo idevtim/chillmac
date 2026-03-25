@@ -6,8 +6,10 @@ final class StatusBarController: NSObject {
     private let statusItem: NSStatusItem
     private let popover: NSPopover
     private var eventMonitor: Any?
+    private var localEventMonitor: Any?
     private var settingsSub: AnyCancellable?
     private var heightObserver: Any?
+    private var detailResetObserver: Any?
     private var lastPopoverHeight: CGFloat = 0
 
     private let detailPanel = DetailPanelController()
@@ -92,12 +94,22 @@ final class StatusBarController: NSObject {
             self.systemInfo.stopMonitoring()
         }
 
+        // Close detail panel when clicking inside the main popover
+        localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self, self.detailPanel.isShown,
+                  let popoverWindow = self.popover.contentViewController?.view.window,
+                  event.window === popoverWindow else { return event }
+            self.detailPanel.close()
+            return event
+        }
+
         // Update popover appearance and size when settings change
         lastPopoverHeight = CGFloat(AppSettings.shared.popoverHeight)
         settingsSub = AppSettings.shared.objectWillChange.sink { [weak self] _ in
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.popover.appearance = AppSettings.shared.nsAppearance
+                self.popover.contentViewController?.view.appearance = AppSettings.shared.nsAppearance
 
                 // Handle height changes from settings (e.g. Reset button), not during live drag
                 let newHeight = CGFloat(AppSettings.shared.popoverHeight)
@@ -115,13 +127,24 @@ final class StatusBarController: NSObject {
             self.popover.contentSize = NSSize(width: 420, height: height)
             self.lastPopoverHeight = height
         }
+
+        // Close detail panel when height is reset from settings
+        detailResetObserver = NotificationCenter.default.addObserver(forName: .detailPanelHeightReset, object: nil, queue: .main) { [weak self] _ in
+            self?.detailPanel.close()
+        }
     }
 
     deinit {
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
         }
+        if let monitor = localEventMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
         if let observer = heightObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        if let observer = detailResetObserver {
             NotificationCenter.default.removeObserver(observer)
         }
     }

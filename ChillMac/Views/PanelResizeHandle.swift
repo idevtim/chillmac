@@ -2,6 +2,7 @@ import SwiftUI
 
 extension Notification.Name {
     static let popoverHeightChanged = Notification.Name("ChillMac.popoverHeightChanged")
+    static let detailPanelHeightReset = Notification.Name("ChillMac.detailPanelHeightReset")
 }
 
 /// Drag handle for resizing detail panels. Finds and resizes the hosting NSPanel directly for smooth performance.

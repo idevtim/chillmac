@@ -62,7 +62,7 @@ struct SettingsView: View {
 
             HStack(spacing: 8) {
                 ForEach(AppearanceMode.allCases, id: \.self) { mode in
-                    Button(action: { settings.appearanceMode = mode }) {
+                    Button(action: { settings.setAppearanceMode(mode) }) {
                         VStack(spacing: 8) {
                             Image(systemName: mode.icon)
                                 .font(.system(size: 20))
@@ -144,11 +144,14 @@ struct SettingsView: View {
                             .foregroundColor(theme.textQuaternary)
                     }
                     Spacer()
-                    if abs(settings.popoverHeight - Double(AppSettings.popoverDefaultHeight)) > 10 {
+                    if abs(settings.popoverHeight - Double(AppSettings.popoverDefaultHeight)) > 10
+                        || abs(settings.detailPanelHeight - Double(AppSettings.detailPanelDefaultHeight)) > 10 {
                         Button("Reset") {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 settings.popoverHeight = Double(AppSettings.popoverDefaultHeight)
+                                settings.detailPanelHeight = Double(AppSettings.detailPanelDefaultHeight)
                             }
+                            NotificationCenter.default.post(name: .detailPanelHeightReset, object: nil)
                         }
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.teal)

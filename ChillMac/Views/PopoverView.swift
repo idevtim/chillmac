@@ -269,12 +269,12 @@ struct PopoverView: View {
                         HStack(spacing: 4) {
                             Image(systemName: "fan.fill")
                                 .font(.system(size: 11))
-                                .foregroundColor(.orange)
+                                .foregroundColor(perfAccentColor)
                             Text(monitor.performanceCurvePercent > 0
                                  ? String(format: "%.0f%%", monitor.performanceCurvePercent)
                                  : "Auto")
                                 .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                                .foregroundColor(.orange)
+                                .foregroundColor(perfAccentColor)
                         }
 
                         Spacer()
@@ -313,11 +313,17 @@ struct PopoverView: View {
         .animation(.easeInOut(duration: 0.2), value: settings.performanceMode)
     }
 
+    private var perfAccentColor: Color {
+        let isLight = (settings.preferredColorScheme ?? colorScheme) == .light
+        return isLight ? Color(red: 0.80, green: 0.45, blue: 0.0) : .orange
+    }
+
     private var perfTempColor: Color {
         let t = monitor.peakTemperature
+        let isLight = (settings.preferredColorScheme ?? colorScheme) == .light
         if t >= 85 { return .red }
-        if t >= 70 { return .orange }
-        if t >= 55 { return .yellow }
+        if t >= 70 { return isLight ? Color(red: 0.80, green: 0.45, blue: 0.0) : .orange }
+        if t >= 55 { return isLight ? Color(red: 0.75, green: 0.55, blue: 0.0) : .yellow }
         return .green
     }
 
