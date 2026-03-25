@@ -1,10 +1,12 @@
 import Cocoa
+import Combine
 import SwiftUI
 
 final class StatusBarController: NSObject {
     private let statusItem: NSStatusItem
     private let popover: NSPopover
     private var eventMonitor: Any?
+    private var appearanceSub: AnyCancellable?
 
     private let detailPanel = DetailPanelController()
     private let memoryInfo: MemoryInfo
@@ -32,7 +34,7 @@ final class StatusBarController: NSObject {
 
         popover.behavior = .applicationDefined
         popover.animates = false
-        popover.appearance = NSAppearance(named: .darkAqua)
+        popover.appearance = AppSettings.shared.nsAppearance
 
         let hostingController = NSHostingController(
             rootView: PopoverView(
@@ -86,6 +88,13 @@ final class StatusBarController: NSObject {
             self.batteryInfo.stopMonitoring()
             self.systemInfo.stopMonitoring()
         }
+
+        // Update popover appearance when settings change
+        appearanceSub = AppSettings.shared.objectWillChange.sink { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.popover.appearance = AppSettings.shared.nsAppearance
+            }
+        }
     }
 
     deinit {
@@ -118,7 +127,7 @@ final class StatusBarController: NSObject {
     private func toggleMemoryPanel() {
         detailPanel.toggle(
             id: "memory",
-            content: MemoryDetailView(memoryInfo: memoryInfo),
+            content: ThemedView(content: MemoryDetailView(memoryInfo: memoryInfo)),
             relativeTo: popover
         )
     }
@@ -126,7 +135,7 @@ final class StatusBarController: NSObject {
     private func toggleDiskPanel() {
         detailPanel.toggle(
             id: "disk",
-            content: DiskDetailView(systemInfo: systemInfo, monitor: fanMonitor, settings: AppSettings.shared),
+            content: ThemedView(content: DiskDetailView(systemInfo: systemInfo, monitor: fanMonitor, settings: AppSettings.shared)),
             relativeTo: popover
         )
     }
@@ -134,7 +143,7 @@ final class StatusBarController: NSObject {
     private func toggleBatteryPanel() {
         detailPanel.toggle(
             id: "battery",
-            content: BatteryDetailView(batteryInfo: batteryInfo, settings: AppSettings.shared),
+            content: ThemedView(content: BatteryDetailView(batteryInfo: batteryInfo, settings: AppSettings.shared)),
             relativeTo: popover
         )
     }
@@ -142,7 +151,7 @@ final class StatusBarController: NSObject {
     private func toggleCpuPanel() {
         detailPanel.toggle(
             id: "cpu",
-            content: CpuDetailView(cpuInfo: cpuInfo, systemInfo: systemInfo, monitor: fanMonitor, settings: AppSettings.shared),
+            content: ThemedView(content: CpuDetailView(cpuInfo: cpuInfo, systemInfo: systemInfo, monitor: fanMonitor, settings: AppSettings.shared)),
             relativeTo: popover
         )
     }
@@ -150,7 +159,7 @@ final class StatusBarController: NSObject {
     private func toggleTemperaturePanel() {
         detailPanel.toggle(
             id: "temperature",
-            content: TemperatureDetailView(monitor: fanMonitor, settings: AppSettings.shared),
+            content: ThemedView(content: TemperatureDetailView(monitor: fanMonitor, settings: AppSettings.shared)),
             relativeTo: popover
         )
     }

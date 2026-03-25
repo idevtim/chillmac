@@ -5,6 +5,7 @@ struct FanRowView: View {
     let helper: HelperConnection
     @ObservedObject var monitor: FanMonitor
     @State private var errorMessage: String?
+    @Environment(\.theme) private var theme
 
     private var isManual: Binding<Bool> {
         Binding(
@@ -50,7 +51,7 @@ struct FanRowView: View {
             HStack {
                 Image(systemName: "fan.fill")
                     .font(.system(size: 20))
-                    .foregroundColor(fan.currentRPM > 0 ? .green : .white.opacity(0.3))
+                    .foregroundColor(fan.currentRPM > 0 ? .green : theme.textSubtle)
                     .rotationEffect(.degrees(fan.currentRPM > 0 ? 360 : 0))
                     .animation(
                         fan.currentRPM > 0
@@ -62,11 +63,11 @@ struct FanRowView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(fan.name)
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(theme.textPrimary)
 
                     Text(isManual.wrappedValue ? "Manual" : "Auto")
                         .font(.system(size: 12))
-                        .foregroundColor(.white.opacity(0.45))
+                        .foregroundColor(theme.textQuaternary)
                 }
 
                 Spacer()
@@ -77,7 +78,7 @@ struct FanRowView: View {
                         .foregroundColor(rpmColor)
                     Text("RPM")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.white.opacity(0.5))
+                        .foregroundColor(theme.textTertiary)
                 }
                 .frame(width: 110, alignment: .trailing)
             }
@@ -94,7 +95,7 @@ struct FanRowView: View {
 
                 Text(isManual.wrappedValue ? "Manual Control" : "Automatic")
                     .font(.system(size: 13))
-                    .foregroundColor(.white.opacity(0.5))
+                    .foregroundColor(theme.textTertiary)
 
                 Spacer()
             }
@@ -118,7 +119,7 @@ struct FanRowView: View {
                         Text("\(Int(fan.maxRPM))")
                     }
                     .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.4))
+                    .foregroundColor(theme.textQuaternary)
                 }
             }
 
@@ -129,7 +130,7 @@ struct FanRowView: View {
             }
         }
         .padding(14)
-        .background(Color.white.opacity(0.07))
+        .background(theme.cardBg)
         .cornerRadius(12)
     }
 

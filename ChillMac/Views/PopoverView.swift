@@ -14,50 +14,64 @@ struct PopoverView: View {
     var onTemperatureTap: (() -> Void)?
 
     @State private var appeared = false
+    @State private var showingSettings = false
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var theme: AppTheme {
+        AppTheme.forScheme(settings.preferredColorScheme ?? colorScheme)
+    }
 
     var body: some View {
         ZStack {
-            // Dark blue-green gradient background
-            LinearGradient(
-                colors: [
-                    Color(red: 0.06, green: 0.12, blue: 0.20),
-                    Color(red: 0.04, green: 0.08, blue: 0.14)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+            theme.backgroundGradient
 
-            VStack(spacing: 0) {
-                // Header
-                headerSection
-
-                if let error = monitor.smcError {
-                    errorSection(error)
-                } else {
-                    ScrollView(.vertical, showsIndicators: false) {
-                        VStack(spacing: 12) {
-                            // System info cards
-                            systemInfoCards
-
-                            // Fan cards
-                            fansSection
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
-                        .padding(.bottom, 16)
+            if showingSettings {
+                SettingsView(settings: settings) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showingSettings = false
                     }
                 }
-
-                // Footer
-                footerSection
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+            } else {
+                mainContent
+                    .transition(.move(edge: .leading).combined(with: .opacity))
             }
         }
         .frame(width: 420, height: 640)
+        .environment(\.theme, theme)
+        .preferredColorScheme(settings.preferredColorScheme)
         .onAppear {
             appeared = true
         }
         .onDisappear {
             appeared = false
+        }
+    }
+
+    private var mainContent: some View {
+        VStack(spacing: 0) {
+            // Header
+            headerSection
+
+            if let error = monitor.smcError {
+                errorSection(error)
+            } else {
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 12) {
+                        // System info cards
+                        systemInfoCards
+
+                        // Fan cards
+                        fansSection
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .padding(.bottom, 16)
+                }
+            }
+
+            // Footer
+            footerSection
         }
     }
 
@@ -69,7 +83,7 @@ struct PopoverView: View {
                 HStack(spacing: 8) {
                     Text("System Temp:")
                         .font(.system(size: 22, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(theme.textPrimary)
 
                     Text(thermalStatus)
                         .font(.system(size: 22, weight: .bold))
@@ -78,7 +92,7 @@ struct PopoverView: View {
 
                 Text(systemInfo.machineModel)
                     .font(.system(size: 14))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(theme.textSecondary)
             }
 
             Spacer()
@@ -177,14 +191,14 @@ struct PopoverView: View {
                 HStack {
                     Image(systemName: "fan.slash")
                         .font(.system(size: 16))
-                        .foregroundColor(.white.opacity(0.4))
+                        .foregroundColor(theme.textQuaternary)
                     Text("No fans detected")
                         .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.4))
+                        .foregroundColor(theme.textQuaternary)
                 }
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .center)
-                .background(Color.white.opacity(0.06))
+                .background(theme.cardBgSecondary)
                 .cornerRadius(12)
                 .opacity(appeared ? 1 : 0)
                 .animation(.easeOut(duration: 0.3).delay(0.4), value: appeared)
@@ -201,10 +215,10 @@ struct PopoverView: View {
                 .foregroundColor(.orange)
             Text("SMC Error")
                 .font(.system(size: 18, weight: .bold))
-                .foregroundColor(.white)
+                .foregroundColor(theme.textPrimary)
             Text(error)
                 .font(.system(size: 14))
-                .foregroundColor(.white.opacity(0.6))
+                .foregroundColor(theme.textSecondary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -218,7 +232,7 @@ struct PopoverView: View {
             Button(action: { NSApp.terminate(nil) }) {
                 Image(systemName: "power")
                     .font(.system(size: 16))
-                    .foregroundColor(.white.opacity(0.5))
+                    .foregroundColor(theme.textTertiary)
             }
             .buttonStyle(.plain)
 
@@ -226,23 +240,24 @@ struct PopoverView: View {
 
             Text("ChillMac")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.white.opacity(0.4))
+                .foregroundColor(theme.textQuaternary)
 
             Spacer()
 
-            Button(action: { settings.useFahrenheit.toggle() }) {
-                Image(systemName: "thermometer.medium")
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showingSettings = true
+                }
+            }) {
+                Image(systemName: "gearshape.fill")
                     .font(.system(size: 16))
-                    .foregroundColor(.white.opacity(0.5))
-                Text(settings.useFahrenheit ? "°F" : "°C")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.5))
+                    .foregroundColor(theme.textTertiary)
             }
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
-        .background(Color.black.opacity(0.25))
+        .background(theme.footerBg)
         .opacity(appeared ? 1 : 0)
         .animation(.easeOut(duration: 0.3).delay(0.15), value: appeared)
     }
@@ -252,11 +267,12 @@ struct PopoverView: View {
 
 struct CardSectionHeader: View {
     let title: String
+    @Environment(\.theme) private var theme
 
     var body: some View {
         Text(title.uppercased())
             .font(.system(size: 13, weight: .semibold))
-            .foregroundColor(.white.opacity(0.5))
+            .foregroundColor(theme.textTertiary)
             .tracking(1.2)
             .padding(.leading, 4)
             .padding(.top, 4)
@@ -271,6 +287,7 @@ struct InfoCard: View {
     var onTap: (() -> Void)? = nil
 
     @State private var isHovered = false
+    @Environment(\.theme) private var theme
 
     private var isClickable: Bool { onTap != nil }
 
@@ -296,12 +313,12 @@ struct InfoCard: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(theme.textPrimary)
                     .lineLimit(1)
 
                 Text(subtitle)
                     .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.5))
+                    .foregroundColor(theme.textTertiary)
             }
 
             Spacer()
@@ -309,11 +326,11 @@ struct InfoCard: View {
             if isClickable {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.white.opacity(isHovered ? 0.6 : 0.3))
+                    .foregroundColor(isHovered ? theme.textSecondary : theme.textSubtle)
             }
         }
         .padding(14)
-        .background(Color.white.opacity(isClickable ? (isHovered ? 0.14 : 0.10) : 0.07))
+        .background(isClickable ? (isHovered ? theme.cardBgHover : theme.cardBgClickable) : theme.cardBg)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)

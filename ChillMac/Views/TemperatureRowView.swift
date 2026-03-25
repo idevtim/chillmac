@@ -3,6 +3,7 @@ import SwiftUI
 struct TemperatureRowView: View {
     let sensor: TemperatureSensor
     @ObservedObject var settings: AppSettings
+    @Environment(\.theme) private var theme
 
     var body: some View {
         HStack(spacing: 8) {
@@ -12,7 +13,7 @@ struct TemperatureRowView: View {
 
             Text(sensor.label)
                 .font(.system(size: 12))
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(theme.textSecondary)
                 .lineLimit(1)
 
             Spacer()
@@ -23,7 +24,7 @@ struct TemperatureRowView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Color.white.opacity(0.06))
+        .background(theme.cardBgSecondary)
         .cornerRadius(8)
     }
 

@@ -3,22 +3,16 @@ import SwiftUI
 struct TemperatureDetailView: View {
     @ObservedObject var monitor: FanMonitor
     @ObservedObject var settings: AppSettings
+    @Environment(\.theme) private var theme
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.06, green: 0.12, blue: 0.20),
-                    Color(red: 0.04, green: 0.08, blue: 0.14)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+            theme.backgroundGradient
 
             VStack(alignment: .leading, spacing: 0) {
                 Text("Temperatures")
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(theme.textPrimary)
                     .padding(.horizontal, 20)
                     .padding(.top, 18)
                     .padding(.bottom, 14)
@@ -61,60 +55,60 @@ struct TemperatureDetailView: View {
             VStack(spacing: 4) {
                 Text("Hottest")
                     .font(.system(size: 10))
-                    .foregroundColor(.white.opacity(0.5))
+                    .foregroundColor(theme.textTertiary)
                 if let hottest = monitor.sensors.max(by: { $0.temperature < $1.temperature }) {
                     Text(settings.formatTemperature(hottest.temperature))
                         .font(.system(size: 18, weight: .bold, design: .monospaced))
                         .foregroundColor(colorForTemp(hottest.temperature))
                     Text(hottest.label)
                         .font(.system(size: 10))
-                        .foregroundColor(.white.opacity(0.5))
+                        .foregroundColor(theme.textTertiary)
                         .lineLimit(1)
                 }
             }
             .frame(maxWidth: .infinity)
 
             Divider()
-                .background(Color.white.opacity(0.15))
+                .background(theme.divider)
                 .frame(height: 50)
 
             // Average temp
             VStack(spacing: 4) {
                 Text("Average")
                     .font(.system(size: 10))
-                    .foregroundColor(.white.opacity(0.5))
+                    .foregroundColor(theme.textTertiary)
                 Text(settings.formatTemperature(averageTemp))
                     .font(.system(size: 18, weight: .bold, design: .monospaced))
                     .foregroundColor(colorForTemp(averageTemp))
                 Text("\(monitor.sensors.count) sensors")
                     .font(.system(size: 10))
-                    .foregroundColor(.white.opacity(0.5))
+                    .foregroundColor(theme.textTertiary)
             }
             .frame(maxWidth: .infinity)
 
             Divider()
-                .background(Color.white.opacity(0.15))
+                .background(theme.divider)
                 .frame(height: 50)
 
             // Coolest temp
             VStack(spacing: 4) {
                 Text("Coolest")
                     .font(.system(size: 10))
-                    .foregroundColor(.white.opacity(0.5))
+                    .foregroundColor(theme.textTertiary)
                 if let coolest = monitor.sensors.min(by: { $0.temperature < $1.temperature }) {
                     Text(settings.formatTemperature(coolest.temperature))
                         .font(.system(size: 18, weight: .bold, design: .monospaced))
                         .foregroundColor(colorForTemp(coolest.temperature))
                     Text(coolest.label)
                         .font(.system(size: 10))
-                        .foregroundColor(.white.opacity(0.5))
+                        .foregroundColor(theme.textTertiary)
                         .lineLimit(1)
                 }
             }
             .frame(maxWidth: .infinity)
         }
         .padding(16)
-        .background(Color.white.opacity(0.07))
+        .background(theme.cardBg)
         .cornerRadius(14)
     }
 
@@ -124,7 +118,7 @@ struct TemperatureDetailView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title.uppercased())
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(.white.opacity(0.5))
+                .foregroundColor(theme.textTertiary)
                 .tracking(1.2)
                 .padding(.leading, 4)
 
@@ -137,7 +131,7 @@ struct TemperatureDetailView: View {
 
                         Text(sensor.label)
                             .font(.system(size: 12))
-                            .foregroundColor(.white.opacity(0.8))
+                            .foregroundColor(theme.textSecondary)
                             .lineLimit(1)
 
                         Spacer()
@@ -166,12 +160,12 @@ struct TemperatureDetailView: View {
 
                     if index < sensors.count - 1 {
                         Divider()
-                            .background(Color.white.opacity(0.06))
+                            .background(theme.dividerSubtle)
                             .padding(.horizontal, 14)
                     }
                 }
             }
-            .background(Color.white.opacity(0.06))
+            .background(theme.cardBgSecondary)
             .cornerRadius(12)
         }
     }

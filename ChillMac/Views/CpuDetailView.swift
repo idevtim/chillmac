@@ -5,22 +5,16 @@ struct CpuDetailView: View {
     @ObservedObject var systemInfo: SystemInfo
     @ObservedObject var monitor: FanMonitor
     @ObservedObject var settings: AppSettings
+    @Environment(\.theme) private var theme
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.06, green: 0.12, blue: 0.20),
-                    Color(red: 0.04, green: 0.08, blue: 0.14)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+            theme.backgroundGradient
 
             VStack(alignment: .leading, spacing: 0) {
                 Text(systemInfo.chipName)
                     .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(theme.textPrimary)
                     .padding(.horizontal, 20)
                     .padding(.top, 18)
                     .padding(.bottom, 14)
@@ -76,7 +70,7 @@ struct CpuDetailView: View {
             .frame(width: 100)
         }
         .padding(16)
-        .background(Color.white.opacity(0.07))
+        .background(theme.cardBg)
         .cornerRadius(14)
     }
 
@@ -92,7 +86,7 @@ struct CpuDetailView: View {
                         .foregroundColor(.mint)
                     Text("Uptime")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(theme.textPrimary)
                     Spacer()
                 }
 
@@ -102,7 +96,7 @@ struct CpuDetailView: View {
 
                 Text(uptimeDescription)
                     .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.45))
+                    .foregroundColor(theme.textQuaternary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -110,7 +104,7 @@ struct CpuDetailView: View {
             }
             .padding(14)
             .frame(maxHeight: .infinity)
-            .background(Color.white.opacity(0.07))
+            .background(theme.cardBg)
             .cornerRadius(12)
 
             // CPU Temperature
@@ -121,7 +115,7 @@ struct CpuDetailView: View {
                         .foregroundColor(cpuTempColor)
                     Text("CPU Temp")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(theme.textPrimary)
                     Spacer()
                 }
 
@@ -131,7 +125,7 @@ struct CpuDetailView: View {
 
                 Text(cpuTempDescription)
                     .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.45))
+                    .foregroundColor(theme.textQuaternary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -139,7 +133,7 @@ struct CpuDetailView: View {
             }
             .padding(14)
             .frame(maxHeight: .infinity)
-            .background(Color.white.opacity(0.07))
+            .background(theme.cardBg)
             .cornerRadius(12)
         }
         .fixedSize(horizontal: false, vertical: true)
@@ -182,7 +176,7 @@ struct CpuDetailView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("TOP CONSUMERS")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white.opacity(0.5))
+                .foregroundColor(theme.textTertiary)
                 .tracking(1.2)
                 .padding(.leading, 4)
                 .padding(.top, 4)
@@ -191,11 +185,11 @@ struct CpuDetailView: View {
                 HStack {
                     Text("Application")
                         .font(.system(size: 12))
-                        .foregroundColor(.white.opacity(0.4))
+                        .foregroundColor(theme.textQuaternary)
                     Spacer()
                     Text("CPU %")
                         .font(.system(size: 12))
-                        .foregroundColor(.white.opacity(0.4))
+                        .foregroundColor(theme.textQuaternary)
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
@@ -216,7 +210,7 @@ struct CpuDetailView: View {
 
                         Text(proc.name)
                             .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(.white)
+                            .foregroundColor(theme.textPrimary)
                             .lineLimit(1)
 
                         Spacer()
@@ -229,7 +223,7 @@ struct CpuDetailView: View {
                     .padding(.vertical, 6)
                 }
             }
-            .background(Color.white.opacity(0.06))
+            .background(theme.cardBgSecondary)
             .cornerRadius(12)
         }
     }
@@ -241,6 +235,7 @@ private struct UsageRow: View {
     let color: Color
     let value: String
     let label: String
+    @Environment(\.theme) private var theme
 
     var body: some View {
         HStack(spacing: 6) {
@@ -250,10 +245,10 @@ private struct UsageRow: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(value)
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(theme.textPrimary)
                 Text(label)
                     .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.5))
+                    .foregroundColor(theme.textTertiary)
             }
         }
     }
@@ -263,6 +258,7 @@ struct CpuGraphView: View {
     let history: [Double]
     let userHistory: [Double]
     let systemHistory: [Double]
+    @Environment(\.theme) private var theme
 
     var body: some View {
         GeometryReader { geo in
@@ -277,7 +273,7 @@ struct CpuGraphView: View {
                         path.move(to: CGPoint(x: 0, y: y))
                         path.addLine(to: CGPoint(x: w, y: y))
                     }
-                    .stroke(Color.white.opacity(0.06), lineWidth: 0.5)
+                    .stroke(theme.gridLine, lineWidth: 0.5)
                 }
 
                 // User fill + line

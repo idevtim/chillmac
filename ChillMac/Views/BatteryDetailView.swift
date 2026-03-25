@@ -3,22 +3,16 @@ import SwiftUI
 struct BatteryDetailView: View {
     @ObservedObject var batteryInfo: BatteryInfo
     @ObservedObject var settings: AppSettings
+    @Environment(\.theme) private var theme
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.06, green: 0.12, blue: 0.20),
-                    Color(red: 0.04, green: 0.08, blue: 0.14)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+            theme.backgroundGradient
 
             VStack(alignment: .leading, spacing: 0) {
                 Text("Battery")
                     .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(theme.textPrimary)
                     .padding(.horizontal, 20)
                     .padding(.top, 18)
                     .padding(.bottom, 14)
@@ -50,7 +44,7 @@ struct BatteryDetailView: View {
             ZStack {
                 // Background track
                 Circle()
-                    .stroke(Color.white.opacity(0.1), lineWidth: 14)
+                    .stroke(theme.ringTrack, lineWidth: 14)
 
                 // Charge level arc
                 Circle()
@@ -65,10 +59,10 @@ struct BatteryDetailView: View {
                 VStack(spacing: 2) {
                     Text("\(batteryInfo.currentCharge)")
                         .font(.system(size: 36, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
+                        .foregroundColor(theme.textPrimary)
                     Text("%")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.white.opacity(0.5))
+                        .foregroundColor(theme.textTertiary)
                 }
             }
             .padding(10)
@@ -78,25 +72,25 @@ struct BatteryDetailView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text(statusTitle)
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(theme.textPrimary)
 
                 Text(statusDescription)
                     .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.5))
+                    .foregroundColor(theme.textTertiary)
 
-                Divider().background(Color.white.opacity(0.1))
+                Divider().background(theme.divider)
 
                 HStack(spacing: 4) {
                     Text("\(batteryInfo.cycleCount)")
                         .font(.system(size: 18, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
+                        .foregroundColor(theme.textPrimary)
                     Text("/ 1000")
                         .font(.system(size: 12))
-                        .foregroundColor(.white.opacity(0.4))
+                        .foregroundColor(theme.textQuaternary)
                 }
                 Text("charge cycles")
                     .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.4))
+                    .foregroundColor(theme.textQuaternary)
             }
         }
         .padding(.vertical, 4)
@@ -139,7 +133,7 @@ struct BatteryDetailView: View {
                         .foregroundColor(healthColor)
                     Text("Health")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(theme.textPrimary)
                     Spacer()
                 }
 
@@ -149,7 +143,7 @@ struct BatteryDetailView: View {
 
                 Text(healthDescription)
                     .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.45))
+                    .foregroundColor(theme.textQuaternary)
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -157,7 +151,7 @@ struct BatteryDetailView: View {
             }
             .padding(14)
             .frame(maxHeight: .infinity)
-            .background(Color.white.opacity(0.07))
+            .background(theme.cardBg)
             .cornerRadius(12)
 
             // Temperature card
@@ -168,7 +162,7 @@ struct BatteryDetailView: View {
                         .foregroundColor(tempColor)
                     Text("Temperature")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(theme.textPrimary)
                     Spacer()
                 }
 
@@ -178,7 +172,7 @@ struct BatteryDetailView: View {
 
                 Text(tempDescription)
                     .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.45))
+                    .foregroundColor(theme.textQuaternary)
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -186,7 +180,7 @@ struct BatteryDetailView: View {
             }
             .padding(14)
             .frame(maxHeight: .infinity)
-            .background(Color.white.opacity(0.07))
+            .background(theme.cardBg)
             .cornerRadius(12)
         }
         .fixedSize(horizontal: false, vertical: true)
@@ -232,36 +226,37 @@ struct BatteryDetailView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("DETAILS")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white.opacity(0.5))
+                .foregroundColor(theme.textTertiary)
                 .tracking(1.2)
                 .padding(.leading, 4)
                 .padding(.top, 4)
 
             VStack(spacing: 0) {
-                DetailRow(label: "Condition", value: batteryInfo.condition)
-                DetailRow(label: "Cycle Count", value: "\(batteryInfo.cycleCount)")
-                DetailRow(label: "Max Capacity", value: "\(batteryInfo.maxCapacity) mAh")
-                DetailRow(label: "Design Capacity", value: "\(batteryInfo.designCapacity) mAh")
+                BatteryDetailRow(label: "Condition", value: batteryInfo.condition)
+                BatteryDetailRow(label: "Cycle Count", value: "\(batteryInfo.cycleCount)")
+                BatteryDetailRow(label: "Max Capacity", value: "\(batteryInfo.maxCapacity) mAh")
+                BatteryDetailRow(label: "Design Capacity", value: "\(batteryInfo.designCapacity) mAh")
             }
-            .background(Color.white.opacity(0.06))
+            .background(theme.cardBgSecondary)
             .cornerRadius(12)
         }
     }
 }
 
-private struct DetailRow: View {
+private struct BatteryDetailRow: View {
     let label: String
     let value: String
+    @Environment(\.theme) private var theme
 
     var body: some View {
         HStack {
             Text(label)
                 .font(.system(size: 13))
-                .foregroundColor(.white.opacity(0.6))
+                .foregroundColor(theme.textSecondary)
             Spacer()
             Text(value)
                 .font(.system(size: 13, weight: .medium, design: .monospaced))
-                .foregroundColor(.white)
+                .foregroundColor(theme.textPrimary)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
