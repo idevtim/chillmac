@@ -90,7 +90,7 @@ final class FanMonitor: ObservableObject {
     @objc private func handleScreenWake() {
         NSLog("FanMonitor: screen woke (lid opened)")
         performanceSuspended = false
-        // Performance curve will reapply on next poll cycle automatically
+        resumePerformanceImmediately()
     }
 
     @objc private func handleScreenLocked() {
@@ -106,7 +106,7 @@ final class FanMonitor: ObservableObject {
     @objc private func handleScreenUnlocked() {
         NSLog("FanMonitor: screen unlocked")
         performanceSuspended = false
-        // Performance curve will reapply on next poll cycle automatically
+        resumePerformanceImmediately()
     }
 
     /// Reset all fans back to auto mode.
@@ -134,6 +134,16 @@ final class FanMonitor: ObservableObject {
             self.manualOverrides.removeAll()
             self.targetOverrides.removeAll()
             self.performanceCurvePercent = 0
+        }
+    }
+
+    /// After screen wake/unlock, trigger an immediate poll so fans don't wait up to 2s.
+    /// Runs on main thread to avoid "Publishing changes from within view updates" warnings.
+    private func resumePerformanceImmediately() {
+        guard AppSettings.shared.performanceMode, helperReady, smc != nil else { return }
+        // Small delay to let the auto-reset XPC calls complete first
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.poll()
         }
     }
 
@@ -327,9 +337,7 @@ final class FanMonitor: ObservableObject {
         // Battery saver: suppress performance mode when on battery below threshold
         let batterySaving = performanceEnabled && checkBatterySaver()
         let isActive = performanceEnabled && !batterySaving
-        DispatchQueue.main.async {
-            self.batterySaverActive = batterySaving
-        }
+        batterySaverActive = batterySaving
 
         guard let helper = helper else {
             if isActive { NSLog("FanMonitor: performance mode active but no helper reference") }
@@ -342,11 +350,9 @@ final class FanMonitor: ObservableObject {
             for fan in fans {
                 helper.setFanMode(fanIndex: fan.id, isAuto: true) { _, _ in }
             }
-            DispatchQueue.main.async {
-                self.manualOverrides.removeAll()
-                self.targetOverrides.removeAll()
-                self.performanceCurvePercent = 0
-            }
+            manualOverrides.removeAll()
+            targetOverrides.removeAll()
+            performanceCurvePercent = 0
             smoothedPeakTemp = nil
             lastSentRPM.removeAll()
             return
@@ -354,6 +360,13 @@ final class FanMonitor: ObservableObject {
 
         guard isActive else { return }
         wasPerformanceModeActive = true
+
+        // Check raw reading first — if it would activate fans, seed the
+        // smoothed value so there's no EMA lag on the idle→active transition
+        let rawPct = fanSpeedPercent(forTemperature: peak)
+        if rawPct > 0 && fanSpeedPercent(forTemperature: smoothedPeakTemp ?? peak) <= 0 {
+            smoothedPeakTemp = peak
+        }
 
         // Smooth the peak temperature to avoid chasing sensor noise
         if let prev = smoothedPeakTemp {
@@ -364,19 +377,15 @@ final class FanMonitor: ObservableObject {
         let smoothedPeak = smoothedPeakTemp!
 
         let pct = fanSpeedPercent(forTemperature: smoothedPeak)
-        DispatchQueue.main.async {
-            self.performanceCurvePercent = pct * 100
-        }
+        performanceCurvePercent = pct * 100
 
         // Below threshold — let macOS auto-manage
         if pct <= 0 {
             // If we previously set manual, return to auto
             for fan in fans where manualOverrides[fan.id] == true {
                 helper.setFanMode(fanIndex: fan.id, isAuto: true) { _, _ in }
-                DispatchQueue.main.async {
-                    self.manualOverrides[fan.id] = nil
-                    self.targetOverrides[fan.id] = nil
-                }
+                manualOverrides[fan.id] = nil
+                targetOverrides[fan.id] = nil
             }
             lastSentRPM.removeAll()
             return
@@ -405,15 +414,11 @@ final class FanMonitor: ObservableObject {
             let currentTarget = targetOverrides[fan.id] ?? 0
             guard abs(rounded - currentTarget) >= 100 else { continue }
 
-            helper.setFanSpeed(fanIndex: fan.id, rpm: Int(rounded)) { [weak self] success, _ in
-                if success {
-                    DispatchQueue.main.async {
-                        self?.manualOverrides[fan.id] = true
-                        self?.targetOverrides[fan.id] = rounded
-                        self?.lastSentRPM[fan.id] = rounded
-                    }
-                }
-            }
+            // Track target immediately so next poll doesn't re-send the same value
+            lastSentRPM[fan.id] = rounded
+            targetOverrides[fan.id] = rounded
+            manualOverrides[fan.id] = true
+            helper.setFanSpeed(fanIndex: fan.id, rpm: Int(rounded)) { _, _ in }
         }
     }
 
