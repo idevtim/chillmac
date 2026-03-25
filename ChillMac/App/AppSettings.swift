@@ -68,6 +68,12 @@ final class AppSettings: ObservableObject {
 
     @AppStorage("detailPanelHeight") var detailPanelHeight: Double = 560
 
+    // Battery saver — disable performance mode when battery is low
+    @AppStorage("batterySaverEnabled") var batterySaverEnabled = true
+    @AppStorage("batterySaverThreshold") var batterySaverThreshold = 20  // percent
+    @AppStorage("forcePerformanceOnBattery") var forcePerformanceOnBattery = false
+    @AppStorage("keepFansOnScreenSleep") var keepFansOnScreenSleep = false
+
     static let popoverMinHeight: CGFloat = 400
     static let popoverMaxHeight: CGFloat = 900
     static let popoverDefaultHeight: CGFloat = 640

@@ -247,6 +247,28 @@ struct PopoverView: View {
 
             if settings.performanceMode {
                 VStack(spacing: 10) {
+                    // Battery saver active indicator
+                    if monitor.batterySaverActive {
+                        HStack(spacing: 6) {
+                            Image(systemName: "battery.25")
+                                .font(.system(size: 13))
+                                .foregroundColor(.yellow)
+                            Text("Battery saver — fans set to auto")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(.yellow)
+                            Spacer()
+                            Button(action: { settings.forcePerformanceOnBattery = true }) {
+                                Text("Override")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(.orange)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(8)
+                        .background(Color.yellow.opacity(0.1))
+                        .cornerRadius(8)
+                    }
+
                     // Level picker
                     Picker("Level", selection: $settings.performanceLevel) {
                         ForEach(PerformanceLevel.allCases, id: \.self) { level in

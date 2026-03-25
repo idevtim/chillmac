@@ -45,6 +45,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.async {
                 self.fanMonitor.helper = self.helperConnection
                 self.fanMonitor.helperReady = true
+                self.fanMonitor.setupSystemObservers()
             }
         }
     }

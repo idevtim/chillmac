@@ -30,6 +30,8 @@ struct SettingsView: View {
                 VStack(spacing: 16) {
                     appearanceSection
                     temperatureSection
+                    batterySaverSection
+                    fanControlSection
                     displaySection
                 }
                 .padding(.horizontal, 16)
@@ -92,6 +94,46 @@ struct SettingsView: View {
         case .system: return .teal
         case .light: return .orange
         case .dark: return .blue
+        }
+    }
+
+    // MARK: - Fan Control
+
+    private var fanControlSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("FAN CONTROL")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(theme.textTertiary)
+                .tracking(1.2)
+                .padding(.leading, 4)
+
+            VStack(spacing: 0) {
+                HStack {
+                    Image(systemName: "display")
+                        .font(.system(size: 16))
+                        .foregroundColor(theme.textTertiary)
+                        .frame(width: 24)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Keep Fans on Screen Sleep")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(theme.textPrimary)
+                        Text("Don't reset fans when display sleeps")
+                            .font(.system(size: 11))
+                            .foregroundColor(theme.textQuaternary)
+                    }
+                    Spacer()
+                    Toggle(isOn: $settings.keepFansOnScreenSleep) {
+                        EmptyView()
+                    }
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .tint(.orange)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+            }
+            .background(theme.cardBg)
+            .cornerRadius(12)
         }
     }
 
@@ -163,6 +205,112 @@ struct SettingsView: View {
             }
             .background(theme.cardBg)
             .cornerRadius(12)
+        }
+    }
+
+    // MARK: - Battery Saver
+
+    private var batterySaverSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("BATTERY SAVER")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(theme.textTertiary)
+                .tracking(1.2)
+                .padding(.leading, 4)
+
+            VStack(spacing: 0) {
+                // Enable toggle
+                HStack {
+                    Image(systemName: "battery.25")
+                        .font(.system(size: 16))
+                        .foregroundColor(theme.textTertiary)
+                        .frame(width: 24)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Battery Saver")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(theme.textPrimary)
+                        Text("Disable fan control on low battery")
+                            .font(.system(size: 11))
+                            .foregroundColor(theme.textQuaternary)
+                    }
+                    Spacer()
+                    Toggle(isOn: $settings.batterySaverEnabled) {
+                        EmptyView()
+                    }
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .tint(.yellow)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+
+                if settings.batterySaverEnabled {
+                    Divider()
+                        .background(theme.dividerSubtle)
+
+                    // Threshold slider
+                    HStack {
+                        Image(systemName: "gauge.low")
+                            .font(.system(size: 16))
+                            .foregroundColor(theme.textTertiary)
+                            .frame(width: 24)
+                        Text("Threshold")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(theme.textPrimary)
+                        Spacer()
+                        Text("\(settings.batterySaverThreshold)%")
+                            .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                            .foregroundColor(.yellow)
+                            .frame(width: 40, alignment: .trailing)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.top, 10)
+                    .padding(.bottom, 4)
+
+                    Slider(
+                        value: Binding(
+                            get: { Double(settings.batterySaverThreshold) },
+                            set: { settings.batterySaverThreshold = Int($0) }
+                        ),
+                        in: 5...50,
+                        step: 5
+                    )
+                    .tint(.yellow)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 10)
+
+                    Divider()
+                        .background(theme.dividerSubtle)
+
+                    // Force performance toggle
+                    HStack {
+                        Image(systemName: "bolt.batteryblock.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(theme.textTertiary)
+                            .frame(width: 24)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Force Performance")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(theme.textPrimary)
+                            Text("Keep fan control on low battery")
+                                .font(.system(size: 11))
+                                .foregroundColor(theme.textQuaternary)
+                        }
+                        Spacer()
+                        Toggle(isOn: $settings.forcePerformanceOnBattery) {
+                            EmptyView()
+                        }
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                        .tint(.orange)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                }
+            }
+            .background(theme.cardBg)
+            .cornerRadius(12)
+            .animation(.easeInOut(duration: 0.2), value: settings.batterySaverEnabled)
         }
     }
 

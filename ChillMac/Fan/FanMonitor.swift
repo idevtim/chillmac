@@ -1,5 +1,6 @@
-import Foundation
+import Cocoa
 import Combine
+import IOKit.ps
 
 final class FanMonitor: ObservableObject {
     @Published var fans: [FanInfo] = []
@@ -11,6 +12,8 @@ final class FanMonitor: ObservableObject {
     @Published var peakTemperature: Double = 0
     /// The target RPM % that performance mode is currently requesting (0–100)
     @Published var performanceCurvePercent: Double = 0
+    /// True when battery saver has suppressed performance mode
+    @Published var batterySaverActive = false
 
     /// User overrides that persist across poll cycles
     @Published var manualOverrides: [Int: Bool] = [:]   // fanIndex → manual on/off
@@ -39,6 +42,81 @@ final class FanMonitor: ObservableObject {
     private let maxRampUpPerCycle: Double = 1000
     /// Max RPM decrease per poll cycle (ramp down slowly — ~150 RPM/sec)
     private let maxRampDownPerCycle: Double = 300
+
+    /// Track whether system is asleep so we skip fan commands
+    private var systemAsleep = false
+
+    // MARK: - System Event Observers
+
+    /// Call once after helper is ready. Listens for sleep/wake/lid-close to reset fans.
+    func setupSystemObservers() {
+        let ws = NSWorkspace.shared.notificationCenter
+
+        ws.addObserver(self, selector: #selector(handleSleep), name: NSWorkspace.willSleepNotification, object: nil)
+        ws.addObserver(self, selector: #selector(handleWake), name: NSWorkspace.didWakeNotification, object: nil)
+        ws.addObserver(self, selector: #selector(handleScreenSleep), name: NSWorkspace.screensDidSleepNotification, object: nil)
+        ws.addObserver(self, selector: #selector(handleScreenWake), name: NSWorkspace.screensDidWakeNotification, object: nil)
+    }
+
+    @objc private func handleSleep() {
+        NSLog("FanMonitor: system going to sleep — resetting fans to auto")
+        systemAsleep = true
+        resetAllFansToAuto()
+    }
+
+    @objc private func handleWake() {
+        NSLog("FanMonitor: system woke up")
+        systemAsleep = false
+        // Performance curve will reapply on next poll cycle automatically
+    }
+
+    @objc private func handleScreenSleep() {
+        if AppSettings.shared.keepFansOnScreenSleep {
+            NSLog("FanMonitor: screen sleep — keeping fans active (user preference)")
+            return
+        }
+        NSLog("FanMonitor: screen sleep (lid closed) — resetting fans to auto")
+        resetAllFansToAuto()
+    }
+
+    @objc private func handleScreenWake() {
+        NSLog("FanMonitor: screen woke (lid opened)")
+        // Performance curve will reapply on next poll cycle automatically
+    }
+
+    /// Reset all fans that we've set to manual back to auto mode
+    func resetAllFansToAuto() {
+        guard let helper = helper else { return }
+        for fan in fans {
+            helper.setFanMode(fanIndex: fan.id, isAuto: true) { _, _ in }
+        }
+        DispatchQueue.main.async {
+            self.manualOverrides.removeAll()
+            self.targetOverrides.removeAll()
+            self.performanceCurvePercent = 0
+        }
+        smoothedPeakTemp = nil
+        lastSentRPM.removeAll()
+    }
+
+    // MARK: - Battery State (lightweight check for battery saver)
+
+    private func checkBatterySaver() -> Bool {
+        let settings = AppSettings.shared
+        guard settings.batterySaverEnabled, !settings.forcePerformanceOnBattery else { return false }
+
+        guard let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
+              let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() as? [CFTypeRef],
+              let firstSource = sources.first,
+              let info = IOPSGetPowerSourceDescription(snapshot, firstSource)?.takeUnretainedValue() as? [String: Any]
+        else { return false }
+
+        let isOnAC = (info[kIOPSPowerSourceStateKey] as? String) == kIOPSACPowerValue
+        if isOnAC { return false }
+
+        let charge = info[kIOPSCurrentCapacityKey] as? Int ?? 100
+        return charge <= settings.batterySaverThreshold
+    }
 
     func startMonitoring() {
         do {
@@ -203,13 +281,24 @@ final class FanMonitor: ObservableObject {
     }
 
     private func applyPerformanceCurve(peak: Double) {
-        let isActive = AppSettings.shared.performanceMode && helperReady
+        // Skip fan commands while system is asleep
+        guard !systemAsleep else { return }
+
+        let performanceEnabled = AppSettings.shared.performanceMode && helperReady
+
+        // Battery saver: suppress performance mode when on battery below threshold
+        let batterySaving = performanceEnabled && checkBatterySaver()
+        let isActive = performanceEnabled && !batterySaving
+        DispatchQueue.main.async {
+            self.batterySaverActive = batterySaving
+        }
+
         guard let helper = helper else {
             if isActive { NSLog("FanMonitor: performance mode active but no helper reference") }
             return
         }
 
-        // If performance mode was just turned off, reset fans to auto
+        // If performance mode was just turned off (or suppressed by battery saver), reset fans
         if wasPerformanceModeActive && !isActive {
             wasPerformanceModeActive = false
             for fan in fans {
