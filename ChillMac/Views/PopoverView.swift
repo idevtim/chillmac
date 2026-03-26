@@ -45,6 +45,7 @@ struct PopoverView: View {
         .environment(\.theme, theme)
         .preferredColorScheme(settings.preferredColorScheme)
         .onReceive(NotificationCenter.default.publisher(for: .popoverDidShow)) { _ in
+            showingSettings = false
             appeared = false
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 appeared = true
@@ -403,6 +404,7 @@ struct PopoverView: View {
                 Spacer()
 
                 Button(action: {
+                    NotificationCenter.default.post(name: .detailPanelHeightReset, object: nil)
                     withAnimation(.easeInOut(duration: 0.2)) {
                         showingSettings = true
                     }
