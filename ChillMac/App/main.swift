@@ -62,12 +62,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        // Disable performance mode so fans return to auto
-        AppSettings.shared.performanceMode = false
-
-        // Reset any manually controlled fans back to auto
-        for (fanIndex, isManual) in fanMonitor.manualOverrides where isManual {
-            helperConnection.setFanMode(fanIndex: fanIndex, isAuto: true) { _, _ in }
+        // Reset all fans back to auto so they aren't stuck at a fixed speed
+        // while the app is closed. Performance mode preference is preserved
+        // and will be re-applied on next launch.
+        if let smc = try? SMCConnection() {
+            let fanCount = (try? smc.readFanCount()) ?? 0
+            smc.close()
+            for i in 0..<fanCount {
+                helperConnection.setFanMode(fanIndex: i, isAuto: true) { _, _ in }
+            }
         }
 
         fanMonitor.stopMonitoring()
