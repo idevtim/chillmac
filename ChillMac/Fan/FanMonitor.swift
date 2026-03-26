@@ -284,42 +284,42 @@ final class FanMonitor: ObservableObject {
 
         switch level {
         case .low:
-            // Gentle: fans stay off longer, ramp slowly, cap at ~70%
+            // Whisper: barely noticeable, just enough to help
             switch temp {
-            case ...70:
+            case ...75:
                 return 0
-            case 70..<85:
-                return 0.20 + (temp - 70) / 15.0 * 0.20   // 20%→40%
-            case 85..<95:
-                return 0.40 + (temp - 85) / 10.0 * 0.30   // 40%→70%
+            case 75..<88:
+                return 0.08 + (temp - 75) / 13.0 * 0.10   // 8%→18%
+            case 88..<97:
+                return 0.18 + (temp - 88) / 9.0 * 0.17    // 18%→35%
+            default:
+                return 0.35
+            }
+        case .medium:
+            // Balanced: gentle cooling, moderate cap
+            switch temp {
+            case ...65:
+                return 0
+            case 65..<80:
+                return 0.15 + (temp - 65) / 15.0 * 0.15   // 15%→30%
+            case 80..<92:
+                return 0.30 + (temp - 80) / 12.0 * 0.25   // 30%→55%
+            case 92..<100:
+                return 0.55 + (temp - 92) / 8.0 * 0.15    // 55%→70%
             default:
                 return 0.70
             }
-        case .medium:
-            // Balanced: moderate thresholds, moderate speeds
-            switch temp {
-            case ...60:
-                return 0
-            case 60..<75:
-                return 0.25 + (temp - 60) / 15.0 * 0.20   // 25%→45%
-            case 75..<88:
-                return 0.45 + (temp - 75) / 13.0 * 0.30   // 45%→75%
-            case 88..<97:
-                return 0.75 + (temp - 88) / 9.0 * 0.20    // 75%→95%
-            default:
-                return 0.95
-            }
         case .high:
-            // Aggressive: early ramp, high ceiling
+            // Aggressive: earlier ramp, higher ceiling
             switch temp {
-            case ...50:
+            case ...55:
                 return 0
-            case 50..<65:
-                return 0.30 + (temp - 50) / 15.0 * 0.20   // 30%→50%
-            case 65..<80:
-                return 0.50 + (temp - 65) / 15.0 * 0.25   // 50%→75%
-            case 80..<92:
-                return 0.75 + (temp - 80) / 12.0 * 0.20   // 75%→95%
+            case 55..<70:
+                return 0.20 + (temp - 55) / 15.0 * 0.20   // 20%→40%
+            case 70..<85:
+                return 0.40 + (temp - 70) / 15.0 * 0.30   // 40%→70%
+            case 85..<95:
+                return 0.70 + (temp - 85) / 10.0 * 0.25   // 70%→95%
             default:
                 return 1.0
             }
