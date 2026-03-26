@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 struct PopoverView: View {
@@ -17,6 +18,7 @@ struct PopoverView: View {
     @State private var showingSettings = false
     @State private var liveHeight: CGFloat = 0
     @State private var dragStartHeight: CGFloat = 0
+    @State private var activePanelID: String?
     @Environment(\.colorScheme) private var colorScheme
 
     private var theme: AppTheme {
@@ -42,11 +44,18 @@ struct PopoverView: View {
         .frame(width: 420, height: liveHeight > 0 ? liveHeight : CGFloat(settings.popoverHeight))
         .environment(\.theme, theme)
         .preferredColorScheme(settings.preferredColorScheme)
-        .onAppear {
-            appeared = true
-        }
-        .onDisappear {
+        .onReceive(NotificationCenter.default.publisher(for: .popoverDidShow)) { _ in
             appeared = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                appeared = true
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .popoverDidClose)) { _ in
+            appeared = false
+            activePanelID = nil
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .detailPanelChanged)) { notification in
+            activePanelID = notification.userInfo?["panelID"] as? String
         }
     }
 
@@ -150,13 +159,13 @@ struct PopoverView: View {
             GridItem(.flexible(), spacing: 12)
         ]
 
-        let cards: [(icon: String, title: String, subtitle: String, accent: Color, onTap: (() -> Void)?)] = [
-            ("cpu", systemInfo.chipName, "Processor", .teal, nil),
-            ("memorychip", systemInfo.ramAmount, "Memory", .green, onMemoryTap),
-            ("internaldrive", systemInfo.diskUsage, "Disk Available", .blue, onDiskTap),
-            ("battery.100", "\(batteryInfo.currentCharge)%", batteryInfo.isCharging ? "Charging" : "Battery", .yellow, onBatteryTap),
-            ("cpu", String(format: "%.0f%%", cpuInfo.totalUsage), "CPU", .teal, onCpuTap),
-            ("thermometer.medium", maxTempDisplay, "Temperatures", thermalStatusColor, onTemperatureTap),
+        let cards: [(icon: String, title: String, subtitle: String, accent: Color, panelID: String?, onTap: (() -> Void)?)] = [
+            ("cpu", systemInfo.chipName, "Processor", .teal, nil, nil),
+            ("memorychip", systemInfo.ramAmount, "Memory", .green, "memory", onMemoryTap),
+            ("internaldrive", systemInfo.diskUsage, "Disk Available", .blue, "disk", onDiskTap),
+            ("battery.100", "\(batteryInfo.currentCharge)%", batteryInfo.isCharging ? "Charging" : "Battery", .yellow, "battery", onBatteryTap),
+            ("cpu", String(format: "%.0f%%", cpuInfo.totalUsage), "CPU", .teal, "cpu", onCpuTap),
+            ("thermometer.medium", maxTempDisplay, "Temperatures", thermalStatusColor, "temperature", onTemperatureTap),
         ]
 
         return LazyVGrid(columns: columns, spacing: 12) {
@@ -166,6 +175,7 @@ struct PopoverView: View {
                     title: card.title,
                     subtitle: card.subtitle,
                     accent: card.accent,
+                    isActive: card.panelID != nil && card.panelID == activePanelID,
                     onTap: card.onTap
                 )
                 .opacity(appeared ? 1 : 0)
@@ -465,6 +475,7 @@ struct InfoCard: View {
     let title: String
     let subtitle: String
     var accent: Color = .blue
+    var isActive: Bool = false
     var onTap: (() -> Void)? = nil
 
     @State private var isHovered = false
@@ -482,6 +493,20 @@ struct InfoCard: View {
                 cardContent
             }
         }
+        .animation(.easeInOut(duration: 0.2), value: isActive)
+    }
+
+    private var cardBackground: Color {
+        if isActive { return theme.cardBgHover }
+        if isClickable && isHovered { return theme.cardBgHover }
+        if isClickable { return theme.cardBgClickable }
+        return theme.cardBg
+    }
+
+    private var borderOpacity: Double {
+        if isActive { return 0.7 }
+        if isHovered { return 0.6 }
+        return 0.4
     }
 
     private var cardContent: some View {
@@ -507,15 +532,15 @@ struct InfoCard: View {
             if isClickable {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(isHovered ? theme.textSecondary : theme.textSubtle)
+                    .foregroundColor(isHovered || isActive ? theme.textSecondary : theme.textSubtle)
             }
         }
         .padding(14)
-        .background(isClickable ? (isHovered ? theme.cardBgHover : theme.cardBgClickable) : theme.cardBg)
+        .background(cardBackground)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(isClickable ? accent.opacity(isHovered ? 0.6 : 0.4) : Color.clear, lineWidth: 1)
+                .stroke(isClickable ? accent.opacity(borderOpacity) : Color.clear, lineWidth: isActive ? 1.5 : 1)
         )
     }
 }

@@ -16,11 +16,15 @@ final class DetailPanelController {
     func toggle<Content: View>(id: String = "", content: Content, relativeTo mainPopover: NSPopover) {
         if isShown {
             let wasShowingSamePanel = currentPanelID == id
-            close()
-            if wasShowingSamePanel { return }
+            if wasShowingSamePanel {
+                close()
+                return
+            }
+            closeImmediately()
         }
 
         currentPanelID = id
+        postPanelChanged()
 
         // Get the main popover window frame to position adjacent
         guard let mainWindow = mainPopover.contentViewController?.view.window else { return }
@@ -49,15 +53,42 @@ final class DetailPanelController {
         panel.titlebarAppearsTransparent = true
         panel.isMovable = false
 
-        let hostingView = NSHostingView(rootView: content)
+        // Wrap content with a close button overlay
+        let wrappedContent = ZStack(alignment: .topTrailing) {
+            content
+            DetailPanelCloseButton { [weak self] in
+                self?.close()
+            }
+            .padding(.top, 16)
+            .padding(.trailing, 14)
+        }
+
+        let hostingView = NSHostingView(rootView: wrappedContent)
         hostingView.frame = NSRect(x: 0, y: 0, width: panelWidth, height: panelHeight)
         hostingView.wantsLayer = true
         hostingView.layer?.cornerRadius = 12
         hostingView.layer?.masksToBounds = true
         panel.contentView = hostingView
 
+        // Start offset to the right and transparent, then animate to final position
+        let slideOffset: CGFloat = 20
+        panel.setFrame(
+            NSRect(x: panelX + slideOffset, y: panelY, width: panelWidth, height: panelHeight),
+            display: false
+        )
+        panel.alphaValue = 0
         panel.orderFront(nil)
         self.panel = panel
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.25
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.animator().setFrame(
+                NSRect(x: panelX, y: panelY, width: panelWidth, height: panelHeight),
+                display: true
+            )
+            panel.animator().alphaValue = 1
+        }
 
         // Close when clicking outside
         eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
@@ -70,12 +101,79 @@ final class DetailPanelController {
         }
     }
 
+    /// Animated close — slides out to the right and fades
     func close() {
+        guard let panel else {
+            cleanupEventMonitor()
+            return
+        }
+
+        currentPanelID = nil
+        postPanelChanged()
+        cleanupEventMonitor()
+        self.panel = nil
+
+        let finalFrame = panel.frame.offsetBy(dx: 20, dy: 0)
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.2
+            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            panel.animator().setFrame(finalFrame, display: true)
+            panel.animator().alphaValue = 0
+        }, completionHandler: {
+            panel.orderOut(nil)
+        })
+    }
+
+    /// Immediate close without animation — used when switching between panels
+    private func closeImmediately() {
         panel?.orderOut(nil)
         panel = nil
+        currentPanelID = nil
+        cleanupEventMonitor()
+    }
+
+    private func postPanelChanged() {
+        NotificationCenter.default.post(
+            name: .detailPanelChanged,
+            object: nil,
+            userInfo: ["panelID": currentPanelID as Any]
+        )
+    }
+
+    private func cleanupEventMonitor() {
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
             eventMonitor = nil
         }
+    }
+}
+
+// MARK: - Close Button
+
+struct DetailPanelCloseButton: View {
+    let action: () -> Void
+    @State private var isHovered = false
+    @Environment(\.theme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var isLight: Bool { colorScheme == .light }
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(isLight
+                    ? (isHovered ? Color(red: 0.08, green: 0.08, blue: 0.10) : Color(red: 0.35, green: 0.37, blue: 0.40))
+                    : (isHovered ? .white : .white.opacity(0.6)))
+                .frame(width: 26, height: 26)
+                .background(
+                    isLight
+                        ? (isHovered ? Color.black.opacity(0.12) : Color.black.opacity(0.06))
+                        : (isHovered ? Color.white.opacity(0.20) : Color.white.opacity(0.10))
+                )
+                .clipShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
     }
 }

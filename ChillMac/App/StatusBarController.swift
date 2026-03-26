@@ -6,7 +6,6 @@ final class StatusBarController: NSObject {
     private let statusItem: NSStatusItem
     private let popover: NSPopover
     private var eventMonitor: Any?
-    private var localEventMonitor: Any?
     private var settingsSub: AnyCancellable?
     private var heightObserver: Any?
     private var detailResetObserver: Any?
@@ -86,21 +85,13 @@ final class StatusBarController: NSObject {
             }
 
             self.detailPanel.close()
+            NotificationCenter.default.post(name: .popoverDidClose, object: nil)
             self.popover.performClose(nil)
             // Pause secondary monitors when popover closes
             self.cpuInfo.stopMonitoring()
             self.memoryInfo.stopMonitoring()
             self.batteryInfo.stopMonitoring()
             self.systemInfo.stopMonitoring()
-        }
-
-        // Close detail panel when clicking inside the main popover
-        localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
-            guard let self, self.detailPanel.isShown,
-                  let popoverWindow = self.popover.contentViewController?.view.window,
-                  event.window === popoverWindow else { return event }
-            self.detailPanel.close()
-            return event
         }
 
         // Update popover appearance and size when settings change
@@ -138,9 +129,6 @@ final class StatusBarController: NSObject {
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
         }
-        if let monitor = localEventMonitor {
-            NSEvent.removeMonitor(monitor)
-        }
         if let observer = heightObserver {
             NotificationCenter.default.removeObserver(observer)
         }
@@ -152,6 +140,7 @@ final class StatusBarController: NSObject {
     @objc private func togglePopover(_ sender: AnyObject?) {
         if popover.isShown {
             detailPanel.close()
+            NotificationCenter.default.post(name: .popoverDidClose, object: nil)
             popover.performClose(sender)
             // Pause secondary monitors when popover closes
             cpuInfo.stopMonitoring()
@@ -164,9 +153,11 @@ final class StatusBarController: NSObject {
             memoryInfo.startMonitoring()
             batteryInfo.startMonitoring()
             systemInfo.startMonitoring()
+            NotificationCenter.default.post(name: .popoverDidClose, object: nil)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             NSApp.activate(ignoringOtherApps: true)
             popover.contentViewController?.view.window?.makeKeyAndOrderFront(nil)
+            NotificationCenter.default.post(name: .popoverDidShow, object: nil)
         }
     }
 
