@@ -284,19 +284,7 @@ final class FanMonitor: ObservableObject {
 
         switch level {
         case .low:
-            // Whisper: barely noticeable, just enough to help
-            switch temp {
-            case ...75:
-                return 0
-            case 75..<88:
-                return 0.08 + (temp - 75) / 13.0 * 0.10   // 8%→18%
-            case 88..<97:
-                return 0.18 + (temp - 88) / 9.0 * 0.17    // 18%→35%
-            default:
-                return 0.35
-            }
-        case .medium:
-            // Balanced: gentle cooling, moderate cap
+            // Gentle cooling, moderate cap
             switch temp {
             case ...65:
                 return 0
@@ -309,8 +297,8 @@ final class FanMonitor: ObservableObject {
             default:
                 return 0.70
             }
-        case .high:
-            // Aggressive: earlier ramp, higher ceiling
+        case .medium:
+            // Balanced: earlier ramp, higher ceiling
             switch temp {
             case ...55:
                 return 0
@@ -320,6 +308,20 @@ final class FanMonitor: ObservableObject {
                 return 0.40 + (temp - 70) / 15.0 * 0.30   // 40%→70%
             case 85..<95:
                 return 0.70 + (temp - 85) / 10.0 * 0.25   // 70%→95%
+            default:
+                return 1.0
+            }
+        case .high:
+            // Aggressive: early ramp, fast escalation
+            switch temp {
+            case ...45:
+                return 0
+            case 45..<60:
+                return 0.30 + (temp - 45) / 15.0 * 0.20   // 30%→50%
+            case 60..<75:
+                return 0.50 + (temp - 60) / 15.0 * 0.30   // 50%→80%
+            case 75..<88:
+                return 0.80 + (temp - 75) / 13.0 * 0.20   // 80%→100%
             default:
                 return 1.0
             }
