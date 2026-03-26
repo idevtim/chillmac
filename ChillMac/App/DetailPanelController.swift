@@ -53,15 +53,17 @@ final class DetailPanelController {
         panel.titlebarAppearsTransparent = true
         panel.isMovable = false
 
-        // Wrap content with a close button overlay
-        let wrappedContent = ZStack(alignment: .topTrailing) {
-            content
-            DetailPanelCloseButton { [weak self] in
-                self?.close()
+        // Wrap content with a close button overlay, inside ThemedView for correct theme
+        let wrappedContent = ThemedView(content:
+            ZStack(alignment: .topTrailing) {
+                content
+                DetailPanelCloseButton { [weak self] in
+                    self?.close()
+                }
+                .padding(.top, 16)
+                .padding(.trailing, 14)
             }
-            .padding(.top, 16)
-            .padding(.trailing, 14)
-        }
+        )
 
         let hostingView = NSHostingView(rootView: wrappedContent)
         hostingView.frame = NSRect(x: 0, y: 0, width: panelWidth, height: panelHeight)
@@ -152,28 +154,14 @@ final class DetailPanelController {
 
 struct DetailPanelCloseButton: View {
     let action: () -> Void
-    @State private var isHovered = false
     @Environment(\.theme) private var theme
-    @Environment(\.colorScheme) private var colorScheme
-
-    private var isLight: Bool { colorScheme == .light }
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "xmark")
-                .font(.system(size: 10, weight: .bold))
-                .foregroundColor(isLight
-                    ? (isHovered ? Color(red: 0.08, green: 0.08, blue: 0.10) : Color(red: 0.35, green: 0.37, blue: 0.40))
-                    : (isHovered ? .white : .white.opacity(0.6)))
-                .frame(width: 26, height: 26)
-                .background(
-                    isLight
-                        ? (isHovered ? Color.black.opacity(0.12) : Color.black.opacity(0.06))
-                        : (isHovered ? Color.white.opacity(0.20) : Color.white.opacity(0.10))
-                )
-                .clipShape(Circle())
+            Image(systemName: "xmark.circle.fill")
+                .font(.system(size: 20))
+                .foregroundColor(theme.textQuaternary)
         }
         .buttonStyle(.plain)
-        .onHover { isHovered = $0 }
     }
 }
