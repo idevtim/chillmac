@@ -1,6 +1,6 @@
 import Foundation
 
-let kHelperMachServiceName = "com.timothymurphy.ChillMac.Helper"
+let kHelperMachServiceName = "com.idevtim.ChillMac.Helper"
 let kHelperVersion = "8.1"
 
 @objc protocol HelperProtocol {

@@ -1,6 +1,6 @@
 name: ChillMac
 options:
-  bundleIdPrefix: com.timothymurphy
+  bundleIdPrefix: com.idevtim
   deploymentTarget:
     macOS: "13.0"
   xcodeVersion: "15.0"
@@ -19,7 +19,7 @@ targets:
       - path: Shared
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.timothymurphy.ChillMac
+        PRODUCT_BUNDLE_IDENTIFIER: com.idevtim.ChillMac
         INFOPLIST_FILE: ChillMac/Info.plist
         CODE_SIGN_ENTITLEMENTS: ChillMac/ChillMac.entitlements
         CODE_SIGN_IDENTITY: "Developer ID Application: Tim Murphy (UA2RJP3TSL)"
@@ -28,19 +28,19 @@ targets:
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
         ENABLE_HARDENED_RUNTIME: YES
     dependencies:
-      - target: com.timothymurphy.ChillMac.Helper
+      - target: com.idevtim.ChillMac.Helper
         embed: false
         codeSign: false
     postCompileScripts:
       - name: "Copy Helper Tool"
         script: |
           mkdir -p "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchServices"
-          cp "${BUILT_PRODUCTS_DIR}/com.timothymurphy.ChillMac.Helper" "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchServices/"
+          cp "${BUILT_PRODUCTS_DIR}/com.idevtim.ChillMac.Helper" "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchServices/"
         inputFiles: []
         outputFiles:
-          - "$(BUILT_PRODUCTS_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchServices/com.timothymurphy.ChillMac.Helper"
+          - "$(BUILT_PRODUCTS_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchServices/com.idevtim.ChillMac.Helper"
 
-  com.timothymurphy.ChillMac.Helper:
+  com.idevtim.ChillMac.Helper:
     type: tool
     platform: macOS
     sources:
@@ -49,8 +49,8 @@ targets:
       - path: ChillMac/SMC
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.timothymurphy.ChillMac.Helper
-        PRODUCT_NAME: com.timothymurphy.ChillMac.Helper
+        PRODUCT_BUNDLE_IDENTIFIER: com.idevtim.ChillMac.Helper
+        PRODUCT_NAME: com.idevtim.ChillMac.Helper
         INFOPLIST_FILE: FanControlHelper/Info.plist
         CODE_SIGN_IDENTITY: "Developer ID Application: Tim Murphy (UA2RJP3TSL)"
         DEVELOPMENT_TEAM: UA2RJP3TSL

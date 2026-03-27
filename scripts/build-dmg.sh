@@ -16,7 +16,7 @@ else
 fi
 
 APP_NAME="ChillMac"
-HELPER_BUNDLE_ID="com.timothymurphy.ChillMac.Helper"
+HELPER_BUNDLE_ID="com.idevtim.ChillMac.Helper"
 SIGNING_IDENTITY="Developer ID Application: Tim Murphy ($APPLE_TEAM_ID)"
 TEAM_ID="$APPLE_TEAM_ID"
 
@@ -60,6 +60,7 @@ HELPER_PATH="$APP_PATH/Contents/Library/LaunchServices/$HELPER_BUNDLE_ID"
 if [ -f "$HELPER_PATH" ]; then
   codesign --force --timestamp --options runtime \
     --sign "$SIGNING_IDENTITY" \
+    --entitlements "$PROJECT_DIR/FanControlHelper/Helper.entitlements" \
     "$HELPER_PATH"
   echo "   ✓ Helper signed"
 fi

@@ -62,8 +62,8 @@ Output: `build/ChillMac.dmg`
 
 | Target | Type | Bundle ID |
 |--------|------|-----------|
-| ChillMac | macOS app | com.timothymurphy.ChillMac |
-| com.timothymurphy.ChillMac.Helper | command-line tool (daemon) | com.timothymurphy.ChillMac.Helper |
+| ChillMac | macOS app | com.idevtim.ChillMac |
+| com.idevtim.ChillMac.Helper | command-line tool (daemon) | com.idevtim.ChillMac.Helper |
 
 - Deployment target: macOS 13.0+
 - Swift 5.9

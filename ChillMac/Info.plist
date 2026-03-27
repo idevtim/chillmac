@@ -30,8 +30,8 @@
     <string>NSApplication</string>
     <key>SMPrivilegedExecutables</key>
     <dict>
-        <key>com.timothymurphy.ChillMac.Helper</key>
-        <string>identifier "com.timothymurphy.ChillMac.Helper" and anchor apple generic and certificate leaf[subject.CN] = "Developer ID Application: Tim Murphy (UA2RJP3TSL)"</string>
+        <key>com.idevtim.ChillMac.Helper</key>
+        <string>identifier "com.idevtim.ChillMac.Helper" and anchor apple generic and certificate leaf[subject.CN] = "Developer ID Application: Tim Murphy (UA2RJP3TSL)"</string>
     </dict>
 </dict>
 </plist>

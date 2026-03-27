@@ -5,18 +5,18 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleIdentifier</key>
-    <string>com.timothymurphy.ChillMac.Helper</string>
+    <string>com.idevtim.ChillMac.Helper</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>com.timothymurphy.ChillMac.Helper</string>
+    <string>com.idevtim.ChillMac.Helper</string>
     <key>CFBundleShortVersionString</key>
     <string>8.0</string>
     <key>CFBundleVersion</key>
     <string>8</string>
     <key>SMAuthorizedClients</key>
     <array>
-        <string>identifier "com.timothymurphy.ChillMac" and anchor apple generic and certificate leaf[subject.CN] = "Developer ID Application: Tim Murphy (UA2RJP3TSL)"</string>
+        <string>identifier "com.idevtim.ChillMac" and anchor apple generic and certificate leaf[subject.CN] = "Developer ID Application: Tim Murphy (UA2RJP3TSL)"</string>
     </array>
 </dict>
 </plist>
