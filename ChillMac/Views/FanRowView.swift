@@ -157,7 +157,6 @@ struct FanRowView: View {
     }
 
     private func setFanMode(manual: Bool) {
-        NSLog("FanRowView: setFanMode fan=%d manual=%d", fan.id, manual ? 1 : 0)
         helper.setFanMode(fanIndex: fan.id, isAuto: !manual) { success, error in
             DispatchQueue.main.async {
                 if !success {
@@ -178,7 +177,6 @@ struct FanRowView: View {
     }
 
     private func setFanSpeed(rpm: Int) {
-        NSLog("FanRowView: setFanSpeed fan=%d rpm=%d", fan.id, rpm)
         helper.setFanSpeed(fanIndex: fan.id, rpm: rpm) { success, error in
             DispatchQueue.main.async {
                 if !success {

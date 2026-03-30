@@ -171,6 +171,29 @@ struct SettingsView: View {
                 Divider()
                     .background(theme.dividerSubtle)
 
+                // FPS counter toggle
+                HStack {
+                    Image(systemName: "gauge.open.with.cells.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(theme.textTertiary)
+                        .frame(width: 24)
+                    Text("Show FPS Counter")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(theme.textPrimary)
+                    Spacer()
+                    Toggle(isOn: $settings.showFPS) {
+                        EmptyView()
+                    }
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .tint(.teal)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+
+                Divider()
+                    .background(theme.dividerSubtle)
+
                 // Reset popover height
                 HStack {
                     Image(systemName: "arrow.up.and.down.square")

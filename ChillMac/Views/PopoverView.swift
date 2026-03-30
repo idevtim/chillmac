@@ -7,6 +7,7 @@ struct PopoverView: View {
     @ObservedObject var systemInfo: SystemInfo
     @ObservedObject var batteryInfo: BatteryInfo
     @ObservedObject var cpuInfo: CpuInfo
+    @ObservedObject var fpsMonitor: DisplayFPSMonitor
     let helper: HelperConnection
     var onMemoryTap: (() -> Void)?
     var onDiskTap: (() -> Void)?
@@ -397,9 +398,15 @@ struct PopoverView: View {
 
                 Spacer()
 
-                Text("ChillMac")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(theme.textQuaternary)
+                if settings.showFPS {
+                    Text("\(fpsMonitor.fps) FPS")
+                        .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        .foregroundColor(theme.textQuaternary)
+                } else {
+                    Text("ChillMac")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(theme.textQuaternary)
+                }
 
                 Spacer()
 

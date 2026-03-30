@@ -18,6 +18,7 @@ final class StatusBarController: NSObject {
     private let batteryInfo: BatteryInfo
     private let cpuInfo: CpuInfo
     private let fanMonitor: FanMonitor
+    private let fpsMonitor: DisplayFPSMonitor
 
     init(fanMonitor: FanMonitor, helper: HelperConnection, systemInfo: SystemInfo, memoryInfo: MemoryInfo, batteryInfo: BatteryInfo, cpuInfo: CpuInfo) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -27,6 +28,7 @@ final class StatusBarController: NSObject {
         self.batteryInfo = batteryInfo
         self.cpuInfo = cpuInfo
         self.fanMonitor = fanMonitor
+        self.fpsMonitor = DisplayFPSMonitor()
 
         super.init()
 
@@ -47,6 +49,7 @@ final class StatusBarController: NSObject {
                 systemInfo: systemInfo,
                 batteryInfo: batteryInfo,
                 cpuInfo: cpuInfo,
+                fpsMonitor: fpsMonitor,
                 helper: helper,
                 onMemoryTap: { [weak self] in
                     self?.toggleMemoryPanel()
@@ -96,6 +99,7 @@ final class StatusBarController: NSObject {
             self.memoryInfo.stopMonitoring()
             self.batteryInfo.stopMonitoring()
             self.systemInfo.stopMonitoring()
+            self.fpsMonitor.stopMonitoring()
             self.fanMonitor.isPopoverVisible = false
         }
 
@@ -167,6 +171,7 @@ final class StatusBarController: NSObject {
             memoryInfo.stopMonitoring()
             batteryInfo.stopMonitoring()
             systemInfo.stopMonitoring()
+            fpsMonitor.stopMonitoring()
             fanMonitor.isPopoverVisible = false
         } else if let button = statusItem.button {
             // Resume secondary monitors when popover opens
@@ -174,6 +179,7 @@ final class StatusBarController: NSObject {
             memoryInfo.startMonitoring()
             batteryInfo.startMonitoring()
             systemInfo.startMonitoring()
+            fpsMonitor.startMonitoring()
             fanMonitor.isPopoverVisible = true
             NotificationCenter.default.post(name: .popoverDidClose, object: nil)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)

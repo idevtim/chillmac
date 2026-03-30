@@ -414,10 +414,7 @@ final class FanMonitor: ObservableObject {
         let isActive = performanceEnabled && !batterySaving
         batterySaverActive = batterySaving
 
-        guard let helper = helper else {
-            if isActive { NSLog("FanMonitor: performance mode active but no helper reference") }
-            return
-        }
+        guard let helper = helper else { return }
 
         // If performance mode was just turned off (or suppressed by battery saver), reset fans
         if wasPerformanceModeActive && !isActive {

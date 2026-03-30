@@ -73,6 +73,7 @@ final class AppSettings: ObservableObject {
     @AppStorage("batterySaverThreshold") var batterySaverThreshold = 20  // percent
     @AppStorage("forcePerformanceOnBattery") var forcePerformanceOnBattery = false
     @AppStorage("keepFansOnScreenSleep") var keepFansOnScreenSleep = false
+    @AppStorage("showFPS") var showFPS = false
 
     static let popoverMinHeight: CGFloat = 400
     static let popoverMaxHeight: CGFloat = 900
