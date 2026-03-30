@@ -4,6 +4,12 @@ final class HelperConnection {
     private var connection: NSXPCConnection?
 
     func connect() -> HelperProtocol? {
+        if let conn = connection {
+            return conn.remoteObjectProxyWithErrorHandler { error in
+                NSLog("HelperConnection: XPC proxy error: %@", error.localizedDescription)
+            } as? HelperProtocol
+        }
+
         let conn = NSXPCConnection(
             machServiceName: kHelperMachServiceName,
             options: .privileged

@@ -9,6 +9,7 @@ final class StatusBarController: NSObject {
     private var settingsSub: AnyCancellable?
     private var heightObserver: Any?
     private var detailResetObserver: Any?
+    private var detailPanelObserver: Any?
     private var lastPopoverHeight: CGFloat = 0
 
     private let detailPanel = DetailPanelController()
@@ -87,7 +88,10 @@ final class StatusBarController: NSObject {
             self.detailPanel.close()
             NotificationCenter.default.post(name: .popoverDidClose, object: nil)
             self.popover.performClose(nil)
-            // Pause secondary monitors when popover closes
+            // Pause secondary monitors and clear visibility flags when popover closes
+            self.cpuInfo.isDetailVisible = false
+            self.memoryInfo.isDetailVisible = false
+            self.systemInfo.isDetailVisible = false
             self.cpuInfo.stopMonitoring()
             self.memoryInfo.stopMonitoring()
             self.batteryInfo.stopMonitoring()
@@ -123,6 +127,15 @@ final class StatusBarController: NSObject {
         detailResetObserver = NotificationCenter.default.addObserver(forName: .detailPanelHeightReset, object: nil, queue: .main) { [weak self] _ in
             self?.detailPanel.close()
         }
+
+        // Gate expensive polling to only run when the relevant detail panel is visible
+        detailPanelObserver = NotificationCenter.default.addObserver(forName: .detailPanelChanged, object: nil, queue: .main) { [weak self] notification in
+            guard let self else { return }
+            let panelID = notification.userInfo?["panelID"] as? String
+            self.cpuInfo.isDetailVisible = (panelID == "cpu")
+            self.memoryInfo.isDetailVisible = (panelID == "memory")
+            self.systemInfo.isDetailVisible = (panelID == "disk")
+        }
     }
 
     deinit {
@@ -135,6 +148,9 @@ final class StatusBarController: NSObject {
         if let observer = detailResetObserver {
             NotificationCenter.default.removeObserver(observer)
         }
+        if let observer = detailPanelObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     @objc private func togglePopover(_ sender: AnyObject?) {
@@ -142,7 +158,10 @@ final class StatusBarController: NSObject {
             detailPanel.close()
             NotificationCenter.default.post(name: .popoverDidClose, object: nil)
             popover.performClose(sender)
-            // Pause secondary monitors when popover closes
+            // Pause secondary monitors and clear visibility flags when popover closes
+            cpuInfo.isDetailVisible = false
+            memoryInfo.isDetailVisible = false
+            systemInfo.isDetailVisible = false
             cpuInfo.stopMonitoring()
             memoryInfo.stopMonitoring()
             batteryInfo.stopMonitoring()

@@ -23,6 +23,9 @@ final class SystemInfo: ObservableObject {
         var denied: Bool = false
     }
 
+    /// When true, fetches disk category breakdown (expensive filesystem walk). Set by StatusBarController when Disk detail panel is visible.
+    var isDetailVisible = false
+
     private var timer: Timer?
 
     init() {
@@ -83,8 +86,10 @@ final class SystemInfo: ObservableObject {
                 self.diskTotalBytes = totalBytes
                 self.diskAvailableBytes = availableBytes
             }
-            // Gather category breakdown on background thread
-            self.fetchDiskCategories(totalBytes: totalBytes, availableBytes: availableBytes)
+            // Gather category breakdown on background thread (expensive — only when detail panel is visible)
+            if self.isDetailVisible {
+                self.fetchDiskCategories(totalBytes: totalBytes, availableBytes: availableBytes)
+            }
         }
 
         // Uptime

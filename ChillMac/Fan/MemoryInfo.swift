@@ -11,10 +11,17 @@ final class MemoryInfo: ObservableObject {
     @Published var swapUsed: UInt64 = 0
     @Published var topProcesses: [ProcessMemory] = []
 
+    /// When true, fetches top processes (expensive). Set by StatusBarController when Memory detail panel is visible.
+    var isDetailVisible = false
+
     let totalMemory = ProcessInfo.processInfo.physicalMemory
 
     private var timer: Timer?
     private let hostPort = mach_host_self()
+
+    deinit {
+        mach_port_deallocate(mach_task_self_, hostPort)
+    }
 
     struct ProcessMemory: Identifiable {
         let id = UUID()
@@ -37,13 +44,17 @@ final class MemoryInfo: ObservableObject {
     }
 
     private func refresh() {
-        // Snapshot running apps on main thread (NSWorkspace is not thread-safe)
-        let apps = NSWorkspace.shared.runningApplications.filter {
-            $0.activationPolicy == .regular
-        }
-        let appSnapshots = apps.compactMap { app -> (pid: pid_t, name: String, icon: NSImage?)? in
-            let name = app.localizedName ?? (app.bundleURL?.deletingPathExtension().lastPathComponent ?? "Unknown")
-            return (app.processIdentifier, name, app.icon)
+        // Snapshot running apps on main thread only when detail panel needs top processes
+        let appSnapshots: [(pid: pid_t, name: String)]?
+        if isDetailVisible {
+            appSnapshots = NSWorkspace.shared.runningApplications
+                .filter { $0.activationPolicy == .regular }
+                .compactMap { app -> (pid: pid_t, name: String)? in
+                    let name = app.localizedName ?? (app.bundleURL?.deletingPathExtension().lastPathComponent ?? "Unknown")
+                    return (app.processIdentifier, name)
+                }
+        } else {
+            appSnapshots = nil
         }
 
         DispatchQueue.global(qos: .utility).async { [weak self] in
@@ -51,7 +62,12 @@ final class MemoryInfo: ObservableObject {
 
             let stats = self.fetchVMStats()
             let swap = self.fetchSwap()
-            let procs = self.fetchTopProcesses(appSnapshots: appSnapshots)
+            let procs: [ProcessMemory]
+            if let appSnapshots {
+                procs = self.fetchTopProcesses(appSnapshots: appSnapshots)
+            } else {
+                procs = []
+            }
 
             DispatchQueue.main.async {
                 self.activeMemory = stats.active
@@ -60,7 +76,9 @@ final class MemoryInfo: ObservableObject {
                 self.availableMemory = self.totalMemory - stats.active - stats.wired - stats.compressed
                 self.pressurePercent = Double(stats.active + stats.wired + stats.compressed) / Double(self.totalMemory) * 100
                 self.swapUsed = swap
-                self.topProcesses = procs
+                if !procs.isEmpty || self.isDetailVisible {
+                    self.topProcesses = procs
+                }
             }
         }
     }
@@ -95,8 +113,8 @@ final class MemoryInfo: ObservableObject {
         return swap.xsu_used
     }
 
-    private func fetchTopProcesses(appSnapshots: [(pid: pid_t, name: String, icon: NSImage?)], limit: Int = 5) -> [ProcessMemory] {
-        var results: [ProcessMemory] = []
+    private func fetchTopProcesses(appSnapshots: [(pid: pid_t, name: String)], limit: Int = 5) -> [ProcessMemory] {
+        var results: [(name: String, memoryBytes: UInt64)] = []
 
         for app in appSnapshots {
             var info = rusage_info_v0()
@@ -109,13 +127,20 @@ final class MemoryInfo: ObservableObject {
             let memBytes = UInt64(info.ri_phys_footprint)
             guard memBytes > 0 else { continue }
 
-            results.append(ProcessMemory(name: app.name, memoryBytes: memBytes, icon: app.icon))
+            results.append((name: app.name, memoryBytes: memBytes))
         }
 
-        return results
+        let top = results
             .sorted { $0.memoryBytes > $1.memoryBytes }
             .prefix(limit)
-            .map { $0 }
+
+        // Fetch icons only for the top results (back on main thread would be ideal,
+        // but NSWorkspace.shared.icon(forFile:) is thread-safe for bundle paths)
+        return top.map { item in
+            let icon = NSWorkspace.shared.runningApplications
+                .first { $0.localizedName == item.name }?.icon
+            return ProcessMemory(name: item.name, memoryBytes: item.memoryBytes, icon: icon)
+        }
     }
 
     // MARK: - Formatting

@@ -1,7 +1,7 @@
 import Foundation
 
 let kHelperMachServiceName = "com.idevtim.ChillMac.Helper"
-let kHelperVersion = "8.1"
+let kHelperVersion = "1.1.0"
 
 @objc protocol HelperProtocol {
     func setFanSpeed(fanIndex: Int, rpm: Int, reply: @escaping (Bool, String?) -> Void)

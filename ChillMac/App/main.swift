@@ -28,6 +28,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Install/load the privileged helper in the background so the UI appears immediately
         DispatchQueue.global(qos: .userInitiated).async { [self] in
             if !HelperInstaller.isHelperInstalled() {
+                // Bootout stale helper before installing the new version
+                NSLog("AppDelegate: helper version mismatch — unloading old helper")
+                let bootout = Process()
+                bootout.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+                bootout.arguments = ["bootout", "system/com.idevtim.ChillMac.Helper"]
+                try? bootout.run()
+                bootout.waitUntilExit()
+
                 _ = HelperInstaller.installHelper()
             }
             // Ensure the daemon is loaded (may have been unloaded on last quit)

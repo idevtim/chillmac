@@ -186,6 +186,12 @@ final class FanMonitor: ObservableObject {
         timer = nil
         smc?.close()
         smc = nil
+        removeSystemObservers()
+    }
+
+    private func removeSystemObservers() {
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+        DistributedNotificationCenter.default().removeObserver(self)
     }
 
     private func poll() {
