@@ -1,6 +1,6 @@
 import Foundation
 
-struct FanInfo: Identifiable {
+struct FanInfo: Identifiable, Equatable {
     let id: Int
     var name: String
     var currentRPM: Double

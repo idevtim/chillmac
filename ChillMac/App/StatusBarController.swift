@@ -96,6 +96,7 @@ final class StatusBarController: NSObject {
             self.memoryInfo.stopMonitoring()
             self.batteryInfo.stopMonitoring()
             self.systemInfo.stopMonitoring()
+            self.fanMonitor.isPopoverVisible = false
         }
 
         // Update popover appearance and size when settings change
@@ -166,12 +167,14 @@ final class StatusBarController: NSObject {
             memoryInfo.stopMonitoring()
             batteryInfo.stopMonitoring()
             systemInfo.stopMonitoring()
+            fanMonitor.isPopoverVisible = false
         } else if let button = statusItem.button {
             // Resume secondary monitors when popover opens
             cpuInfo.startMonitoring()
             memoryInfo.startMonitoring()
             batteryInfo.startMonitoring()
             systemInfo.startMonitoring()
+            fanMonitor.isPopoverVisible = true
             NotificationCenter.default.post(name: .popoverDidClose, object: nil)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             NSApp.activate(ignoringOtherApps: true)

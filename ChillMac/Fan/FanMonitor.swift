@@ -22,6 +22,11 @@ final class FanMonitor: ObservableObject {
     /// Set by AppDelegate after helper is ready
     var helper: HelperConnection?
 
+    /// Set by StatusBarController when popover opens/closes — controls adaptive poll interval
+    var isPopoverVisible = false {
+        didSet { updatePollInterval() }
+    }
+
     private var smc: SMCConnection?
     private var timer: Timer?
     private var discoveredSensors: [String: TemperatureSensor] = [:]
@@ -30,6 +35,16 @@ final class FanMonitor: ObservableObject {
     private var discoveryPollCount: Int = 0
     /// Track whether performance mode was active last poll so we can reset fans on toggle-off
     private var wasPerformanceModeActive = false
+
+    // MARK: - Static Fan Property Cache
+    private var cachedFanCount: Int?
+    private var cachedMinRPM: [Int: Double] = [:]
+    private var cachedMaxRPM: [Int: Double] = [:]
+
+    // MARK: - Background Queue
+    private let smcQueue = DispatchQueue(label: "com.idevtim.ChillMac.smc")
+    /// Guard against overlapping poll cycles
+    private var pollInFlight = false
 
     // MARK: - Fan Speed Smoothing
     /// Exponential moving average of peak temperature to dampen sensor noise
@@ -176,9 +191,7 @@ final class FanMonitor: ObservableObject {
         }
 
         poll()
-        timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            self?.poll()
-        }
+        schedulePollTimer()
     }
 
     func stopMonitoring() {
@@ -186,7 +199,28 @@ final class FanMonitor: ObservableObject {
         timer = nil
         smc?.close()
         smc = nil
+        cachedFanCount = nil
+        cachedMinRPM.removeAll()
+        cachedMaxRPM.removeAll()
         removeSystemObservers()
+    }
+
+    /// Current poll interval: 2s when popover visible or performance mode active, 5s otherwise
+    private var currentPollInterval: TimeInterval {
+        (isPopoverVisible || AppSettings.shared.performanceMode) ? 2.0 : 5.0
+    }
+
+    private func schedulePollTimer() {
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: currentPollInterval, repeats: true) { [weak self] _ in
+            self?.poll()
+        }
+    }
+
+    /// Re-evaluate poll interval when conditions change
+    func updatePollInterval() {
+        guard timer != nil else { return }
+        schedulePollTimer()
     }
 
     private func removeSystemObservers() {
@@ -195,88 +229,116 @@ final class FanMonitor: ObservableObject {
     }
 
     private func poll() {
-        guard let smc = smc else { return }
+        guard let smc = smc, !pollInFlight else { return }
+        pollInFlight = true
 
-        // Read fans
-        do {
-            let fanCount = try smc.readFanCount()
-            var updatedFans: [FanInfo] = []
+        smcQueue.async { [weak self] in
+            guard let self else { return }
+            defer { self.pollInFlight = false }
 
-            for i in 0..<fanCount {
-                let current = clampRPM((try? smc.readFanSpeed(index: i)) ?? 0)
-                var minRPM = clampRPM((try? smc.readFanMinSpeed(index: i)) ?? 0)
-                var maxRPM = clampRPM((try? smc.readFanMaxSpeed(index: i)) ?? 6500)
-                let target = clampRPM((try? smc.readFanTargetSpeed(index: i)) ?? 0)
-                let isManual = (try? smc.readFanMode(index: i)) ?? false
+            // Read fans
+            do {
+                let fanCount = try self.cachedFanCount ?? smc.readFanCount()
+                if self.cachedFanCount == nil { self.cachedFanCount = fanCount }
 
-                // Sanity check: if min/max are nonsensical, use reasonable defaults
-                // M-series MacBook Pro fans can exceed 12,000 RPM
-                if minRPM < 100 { minRPM = 1000 }
-                if maxRPM < 1000 || maxRPM <= minRPM { maxRPM = 15000 }
+                var updatedFans: [FanInfo] = []
 
-                let name: String
-                if fanCount == 1 {
-                    name = "Fan"
-                } else if i == 0 {
-                    name = "Left Fan"
-                } else if i == 1 {
-                    name = "Right Fan"
-                } else {
-                    name = "Fan \(i + 1)"
+                for i in 0..<fanCount {
+                    let current = self.clampRPM((try? smc.readFanSpeed(index: i)) ?? 0)
+
+                    // Use cached min/max — they're hardware constants
+                    let minRPM: Double
+                    if let cached = self.cachedMinRPM[i] {
+                        minRPM = cached
+                    } else {
+                        var raw = self.clampRPM((try? smc.readFanMinSpeed(index: i)) ?? 0)
+                        if raw < 100 { raw = 1000 }
+                        self.cachedMinRPM[i] = raw
+                        minRPM = raw
+                    }
+
+                    let maxRPM: Double
+                    if let cached = self.cachedMaxRPM[i] {
+                        maxRPM = cached
+                    } else {
+                        var raw = self.clampRPM((try? smc.readFanMaxSpeed(index: i)) ?? 6500)
+                        if raw < 1000 || raw <= minRPM { raw = 15000 }
+                        self.cachedMaxRPM[i] = raw
+                        maxRPM = raw
+                    }
+
+                    let target = self.clampRPM((try? smc.readFanTargetSpeed(index: i)) ?? 0)
+                    let isManual = (try? smc.readFanMode(index: i)) ?? false
+
+                    let name: String
+                    if fanCount == 1 {
+                        name = "Fan"
+                    } else if i == 0 {
+                        name = "Left Fan"
+                    } else if i == 1 {
+                        name = "Right Fan"
+                    } else {
+                        name = "Fan \(i + 1)"
+                    }
+
+                    updatedFans.append(FanInfo(
+                        id: i,
+                        name: name,
+                        currentRPM: current,
+                        minRPM: minRPM,
+                        maxRPM: maxRPM,
+                        targetRPM: target,
+                        isManualMode: isManual
+                    ))
                 }
 
-                updatedFans.append(FanInfo(
-                    id: i,
-                    name: name,
-                    currentRPM: current,
-                    minRPM: minRPM,
-                    maxRPM: maxRPM,
-                    targetRPM: target,
-                    isManualMode: isManual
-                ))
+                DispatchQueue.main.async {
+                    if self.fans != updatedFans {
+                        self.fans = updatedFans
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.smcError = error.localizedDescription
+                }
             }
+
+            // Read temperature sensors — after 5 full discovery passes, only poll active keys
+            self.discoveryPollCount += 1
+            let keysToProbe: [(key: String, label: String)]
+            if let activeKeys = self.activeSensorKeys {
+                keysToProbe = SMCKey.temperatureKeys.filter { activeKeys.contains($0.key) }
+            } else {
+                keysToProbe = SMCKey.temperatureKeys
+            }
+
+            for (key, label) in keysToProbe {
+                if let temp = try? smc.readTemperature(key: key), temp > 0, temp < 150 {
+                    self.discoveredSensors[key] = TemperatureSensor(id: key, label: label, temperature: temp)
+                }
+            }
+
+            // After 5 discovery passes, lock to only discovered keys
+            if self.activeSensorKeys == nil && self.discoveryPollCount >= 5 && !self.discoveredSensors.isEmpty {
+                self.activeSensorKeys = Set(self.discoveredSensors.keys)
+            }
+
+            let stableSensors = SMCKey.temperatureKeys.compactMap { key, _ in
+                self.discoveredSensors[key]
+            }
+            let peak = stableSensors.map(\.temperature).max() ?? 0
 
             DispatchQueue.main.async {
-                self.fans = updatedFans
-            }
-        } catch {
-            DispatchQueue.main.async {
-                self.smcError = error.localizedDescription
-            }
-        }
-
-        // Read temperature sensors — after 5 full discovery passes, only poll active keys
-        discoveryPollCount += 1
-        let keysToProbe: [(key: String, label: String)]
-        if let activeKeys = activeSensorKeys {
-            keysToProbe = SMCKey.temperatureKeys.filter { activeKeys.contains($0.key) }
-        } else {
-            keysToProbe = SMCKey.temperatureKeys
-        }
-
-        for (key, label) in keysToProbe {
-            if let temp = try? smc.readTemperature(key: key), temp > 0, temp < 150 {
-                discoveredSensors[key] = TemperatureSensor(id: key, label: label, temperature: temp)
+                if self.sensors != stableSensors {
+                    self.sensors = stableSensors
+                }
+                if self.peakTemperature != peak {
+                    self.peakTemperature = peak
+                }
+                // Performance mode: apply aggressive fan curve based on peak temperature
+                self.applyPerformanceCurve(peak: peak)
             }
         }
-
-        // After 5 discovery passes, lock to only discovered keys
-        if activeSensorKeys == nil && discoveryPollCount >= 5 && !discoveredSensors.isEmpty {
-            activeSensorKeys = Set(discoveredSensors.keys)
-        }
-
-        let stableSensors = SMCKey.temperatureKeys.compactMap { key, _ in
-            discoveredSensors[key]
-        }
-        let peak = stableSensors.map(\.temperature).max() ?? 0
-
-        DispatchQueue.main.async {
-            self.sensors = stableSensors
-            self.peakTemperature = peak
-        }
-
-        // Performance mode: apply aggressive fan curve based on peak temperature
-        applyPerformanceCurve(peak: peak)
     }
 
     // MARK: - Performance Mode Fan Curve
@@ -341,6 +403,11 @@ final class FanMonitor: ObservableObject {
         guard !systemAsleep, !performanceSuspended else { return }
 
         let performanceEnabled = AppSettings.shared.performanceMode && helperReady
+
+        // Re-evaluate poll interval when performance mode changes
+        if performanceEnabled != wasPerformanceModeActive || (performanceEnabled && !wasPerformanceModeActive) {
+            updatePollInterval()
+        }
 
         // Battery saver: suppress performance mode when on battery below threshold
         let batterySaving = performanceEnabled && checkBatterySaver()

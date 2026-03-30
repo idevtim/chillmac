@@ -4,6 +4,8 @@ import IOKit
 final class SMCConnection {
     private var connection: io_connect_t = 0
     private var isOpen = false
+    /// Cache key info (dataSize) per fourCharCode — avoids redundant getKeyInfo IOKit calls
+    private var keyInfoCache: [UInt32: UInt32] = [:]
 
     init() throws {
         let service = IOServiceGetMatchingService(
@@ -38,24 +40,30 @@ final class SMCConnection {
 
     func readKey(_ key: String) throws -> SMCParamStruct {
         var input = SMCParamStruct()
-        input.key = fourCharCode(key)
-        input.data8 = SMCSelector.getKeyInfo.rawValue
+        let fcc = fourCharCode(key)
+        input.key = fcc
 
-        var output = SMCParamStruct()
-        var result = callSMC(&input, output: &output)
-        guard result == kIOReturnSuccess else {
-            throw SMCError.keyNotFound(key)
+        // Check cache for dataSize to skip the getKeyInfo IOKit call
+        let dataSize: UInt32
+        if let cached = keyInfoCache[fcc] {
+            dataSize = cached
+        } else {
+            input.data8 = SMCSelector.getKeyInfo.rawValue
+            var infoOutput = SMCParamStruct()
+            let result = callSMC(&input, output: &infoOutput)
+            guard result == kIOReturnSuccess else {
+                throw SMCError.keyNotFound(key)
+            }
+            dataSize = infoOutput.keyInfo.dataSize
+            keyInfoCache[fcc] = dataSize
         }
-
-        // Save size from getKeyInfo
-        let dataSize = output.keyInfo.dataSize
 
         // Read the actual value
         input.keyInfo.dataSize = dataSize
         input.data8 = SMCSelector.readKey.rawValue
 
-        output = SMCParamStruct()
-        result = callSMC(&input, output: &output)
+        var output = SMCParamStruct()
+        let result = callSMC(&input, output: &output)
         guard result == kIOReturnSuccess else {
             throw SMCError.readFailed(result)
         }
@@ -115,7 +123,8 @@ final class SMCConnection {
 
     func writeKey(_ key: String, bytes: [UInt8]) throws {
         var input = SMCParamStruct()
-        input.key = fourCharCode(key)
+        let fcc = fourCharCode(key)
+        input.key = fcc
         input.data8 = SMCSelector.getKeyInfo.rawValue
 
         var infoOutput = SMCParamStruct()
@@ -123,9 +132,11 @@ final class SMCConnection {
         guard result == kIOReturnSuccess else {
             throw SMCError.keyNotFound(key)
         }
+        // Populate cache for future readKey calls
+        keyInfoCache[fcc] = infoOutput.keyInfo.dataSize
 
         input = SMCParamStruct()
-        input.key = fourCharCode(key)
+        input.key = fcc
         input.data8 = SMCSelector.writeKey.rawValue
         input.keyInfo.dataSize = infoOutput.keyInfo.dataSize
         input.keyInfo.dataType = infoOutput.keyInfo.dataType
