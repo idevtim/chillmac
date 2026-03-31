@@ -1,3 +1,4 @@
+import ServiceManagement
 import SwiftUI
 
 enum PerformanceLevel: String, CaseIterable {
@@ -59,6 +60,8 @@ enum AppearanceMode: String, CaseIterable {
 final class AppSettings: ObservableObject {
     static let shared = AppSettings()
 
+    @Published var launchAtLogin: Bool = false
+
     @AppStorage("useFahrenheit") var useFahrenheit = false
     @AppStorage("appearanceMode") var appearanceMode: AppearanceMode = .dark
     @AppStorage("performanceMode") var performanceMode = false
@@ -106,6 +109,28 @@ final class AppSettings: ObservableObject {
         appearanceMode = mode
         DispatchQueue.main.async {
             self.objectWillChange.send()
+        }
+    }
+
+    private init() {
+        syncLaunchAtLogin()
+    }
+
+    func syncLaunchAtLogin() {
+        launchAtLogin = (SMAppService.mainApp.status == .enabled)
+    }
+
+    func setLaunchAtLogin(_ enabled: Bool) {
+        do {
+            if enabled {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
+            launchAtLogin = enabled
+        } catch {
+            NSLog("Launch at login failed: \(error)")
+            syncLaunchAtLogin()
         }
     }
 

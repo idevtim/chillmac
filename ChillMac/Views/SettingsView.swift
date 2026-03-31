@@ -28,6 +28,7 @@ struct SettingsView: View {
 
             ScrollView(.vertical, showsIndicators: settings.showScrollIndicators) {
                 VStack(spacing: 16) {
+                    generalSection
                     appearanceSection
                     temperatureSection
                     batterySaverSection
@@ -49,6 +50,49 @@ struct SettingsView: View {
                 Spacer()
             }
             .padding(.bottom, 12)
+        }
+    }
+
+    // MARK: - General
+
+    private var generalSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("GENERAL")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(theme.textTertiary)
+                .tracking(1.2)
+                .padding(.leading, 4)
+
+            VStack(spacing: 0) {
+                HStack {
+                    Image(systemName: "sunrise")
+                        .font(.system(size: 16))
+                        .foregroundColor(theme.textTertiary)
+                        .frame(width: 24)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Launch at Login")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(theme.textPrimary)
+                        Text("Start ChillMac when you log in")
+                            .font(.system(size: 11))
+                            .foregroundColor(theme.textQuaternary)
+                    }
+                    Spacer()
+                    Toggle(isOn: Binding(
+                        get: { settings.launchAtLogin },
+                        set: { settings.setLaunchAtLogin($0) }
+                    )) {
+                        EmptyView()
+                    }
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .tint(.teal)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+            }
+            .background(theme.cardBg)
+            .cornerRadius(12)
         }
     }
 

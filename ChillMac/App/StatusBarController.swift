@@ -181,6 +181,7 @@ final class StatusBarController: NSObject {
             systemInfo.startMonitoring()
             fpsMonitor.startMonitoring()
             fanMonitor.isPopoverVisible = true
+            AppSettings.shared.syncLaunchAtLogin()
             NotificationCenter.default.post(name: .popoverDidClose, object: nil)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             NSApp.activate(ignoringOtherApps: true)
