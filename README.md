@@ -60,6 +60,16 @@ On first launch, the app prompts for administrator credentials to install the he
 
 On Apple Silicon Macs, the helper also manages SMC test mode to bypass `thermalmonitord` when manually controlling fans. Signal handlers ensure test mode is disabled if the helper exits unexpectedly.
 
+## Development Notes
+
+The privileged helper validates the caller's code signature before accepting XPC connections. If you're building from source with your own signing identity, debug builds (`#if DEBUG`) skip this check so the helper works without matching the original signature.
+
+Fans are always reset to automatic mode when the app launches.
+
+## License
+
+MIT — see [LICENSE](LICENSE) for details.
+
 ## Project Structure
 
 ```
