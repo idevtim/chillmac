@@ -46,9 +46,40 @@ final class FanMonitor: ObservableObject {
     /// Guard against overlapping poll cycles
     private var pollInFlight = false
 
+    // MARK: - Thermal Zones
+
+    private enum ThermalZone: String, CaseIterable {
+        case cpu, gpu, memory, ssd, dieVRM, battery, ambient
+    }
+
+    /// Which SMC sensor keys belong to each thermal zone
+    private static let zoneSensorKeys: [ThermalZone: Set<String>] = [
+        .cpu:     ["Tp09","Tp0T","Tp01","Tp05","Tp0D","Tp0H","Tp0L","Tp0P","Tp0X","Tp0b",
+                   "TCDX","TCMb","TCMz","TCHP","TC0P","TC0D"],
+        .gpu:     ["TPDX","TPMP","TPSP","TG0P","TG0D"],
+        .memory:  ["TRDX","TRD0","TMVR","Tm0P"],
+        .ssd:     ["TH0x","TH0a","TH0b"],
+        .dieVRM:  ["TDVx","TDTP","TDBP","TDCR"],
+        .battery: ["TB0T","TB1T","TB2T"],
+        .ambient: ["TAOL","TDEL","TDER","TDeL","TDeR","Ts0P","TA0P"],
+    ]
+
+    /// Fan affinity weights per zone: (Fan 0 / Left, Fan 1 / Right)
+    /// Higher weight = this fan is more responsible for cooling this zone
+    private static let zoneFanAffinity: [ThermalZone: (left: Double, right: Double)] = [
+        .cpu:     (1.0, 1.0),   // SoC is center — both fans equally
+        .gpu:     (1.0, 1.0),   // GPU is on-die with CPU on Apple Silicon
+        .memory:  (1.0, 1.0),   // On-package DRAM — both fans
+        .ssd:     (0.4, 1.0),   // SSD controller typically near right side
+        .dieVRM:  (0.8, 0.8),   // Distributed power delivery
+        .battery: (0.6, 0.6),   // Batteries span both sides, low priority
+        .ambient: (0.5, 0.5),   // General — minimal contribution
+    ]
+
     // MARK: - Fan Speed Smoothing
-    /// Exponential moving average of peak temperature to dampen sensor noise
-    private var smoothedPeakTemp: Double?
+
+    /// Per-zone exponential moving average of peak temperature
+    private var smoothedZoneTemps: [ThermalZone: Double] = [:]
     /// EMA factor: 0.3 = 30% new reading, 70% history (smooths out 2-3°C fluctuations)
     private let tempSmoothingFactor: Double = 0.3
     /// Track the last RPM we actually sent to each fan for gradual ramping
@@ -143,7 +174,7 @@ final class FanMonitor: ObservableObject {
         }
 
         wasPerformanceModeActive = false
-        smoothedPeakTemp = nil
+        smoothedZoneTemps.removeAll()
         lastSentRPM.removeAll()
         DispatchQueue.main.async {
             self.manualOverrides.removeAll()
@@ -335,8 +366,8 @@ final class FanMonitor: ObservableObject {
                 if self.peakTemperature != peak {
                     self.peakTemperature = peak
                 }
-                // Performance mode: apply aggressive fan curve based on peak temperature
-                self.applyPerformanceCurve(peak: peak)
+                // Performance mode: zone-aware fan curve based on per-zone temperatures
+                self.applyPerformanceCurve(sensors: self.discoveredSensors)
             }
         }
     }
@@ -398,7 +429,7 @@ final class FanMonitor: ObservableObject {
         }
     }
 
-    private func applyPerformanceCurve(peak: Double) {
+    private func applyPerformanceCurve(sensors: [String: TemperatureSensor]) {
         // Skip fan commands while system is asleep or performance is suspended (screen lock/sleep)
         guard !systemAsleep, !performanceSuspended else { return }
 
@@ -425,7 +456,7 @@ final class FanMonitor: ObservableObject {
             manualOverrides.removeAll()
             targetOverrides.removeAll()
             performanceCurvePercent = 0
-            smoothedPeakTemp = nil
+            smoothedZoneTemps.removeAll()
             lastSentRPM.removeAll()
             return
         }
@@ -433,27 +464,64 @@ final class FanMonitor: ObservableObject {
         guard isActive else { return }
         wasPerformanceModeActive = true
 
-        // Check raw reading first — if it would activate fans, seed the
-        // smoothed value so there's no EMA lag on the idle→active transition
-        let rawPct = fanSpeedPercent(forTemperature: peak)
-        if rawPct > 0 && fanSpeedPercent(forTemperature: smoothedPeakTemp ?? peak) <= 0 {
-            smoothedPeakTemp = peak
+        // Compute per-zone peak temperatures and fan speed percentages
+        var zonePcts: [ThermalZone: Double] = [:]
+
+        for zone in ThermalZone.allCases {
+            guard let zoneKeys = Self.zoneSensorKeys[zone] else { continue }
+
+            // Peak temperature for this zone from discovered sensors
+            let zonePeak = zoneKeys.compactMap { sensors[$0]?.temperature }.max()
+            guard let peak = zonePeak, peak > 0 else { continue }
+
+            // Seed EMA on idle→active transition to avoid lag
+            let rawPct = fanSpeedPercent(forTemperature: peak)
+            if rawPct > 0 && fanSpeedPercent(forTemperature: smoothedZoneTemps[zone] ?? peak) <= 0 {
+                smoothedZoneTemps[zone] = peak
+            }
+
+            // Apply per-zone EMA smoothing
+            if let prev = smoothedZoneTemps[zone] {
+                smoothedZoneTemps[zone] = prev + tempSmoothingFactor * (peak - prev)
+            } else {
+                smoothedZoneTemps[zone] = peak
+            }
+
+            zonePcts[zone] = fanSpeedPercent(forTemperature: smoothedZoneTemps[zone]!)
         }
 
-        // Smooth the peak temperature to avoid chasing sensor noise
-        if let prev = smoothedPeakTemp {
-            smoothedPeakTemp = prev + tempSmoothingFactor * (peak - prev)
-        } else {
-            smoothedPeakTemp = peak
+        // Compute per-fan speed as the max of all zone contributions weighted by affinity
+        var fanPcts: [Int: Double] = [:]
+        let isSingleFan = fans.count <= 1
+
+        for (zone, pct) in zonePcts {
+            guard let affinity = Self.zoneFanAffinity[zone] else { continue }
+
+            if isSingleFan {
+                // Single fan gets the max of both affinity sides
+                let contribution = pct * max(affinity.left, affinity.right)
+                fanPcts[0] = max(fanPcts[0] ?? 0, contribution)
+            } else {
+                // Left fan (index 0)
+                let leftContribution = pct * affinity.left
+                fanPcts[0] = max(fanPcts[0] ?? 0, leftContribution)
+                // Right fan (index 1)
+                let rightContribution = pct * affinity.right
+                fanPcts[1] = max(fanPcts[1] ?? 0, rightContribution)
+                // Additional fans get the max of both sides
+                for fan in fans where fan.id > 1 {
+                    let contribution = pct * max(affinity.left, affinity.right)
+                    fanPcts[fan.id] = max(fanPcts[fan.id] ?? 0, contribution)
+                }
+            }
         }
-        let smoothedPeak = smoothedPeakTemp!
 
-        let pct = fanSpeedPercent(forTemperature: smoothedPeak)
-        performanceCurvePercent = pct * 100
+        // UI: show the highest fan percentage
+        let maxPct = fanPcts.values.max() ?? 0
+        performanceCurvePercent = maxPct * 100
 
-        // Below threshold — let macOS auto-manage
-        if pct <= 0 {
-            // If we previously set manual, return to auto
+        // Below threshold for all fans — let macOS auto-manage
+        if maxPct <= 0 {
             for fan in fans where manualOverrides[fan.id] == true {
                 helper.setFanMode(fanIndex: fan.id, isAuto: true) { _, _ in }
                 manualOverrides[fan.id] = nil
@@ -463,8 +531,21 @@ final class FanMonitor: ObservableObject {
             return
         }
 
-        // Set each fan to the calculated RPM with gradual ramping
+        // Set each fan to its calculated RPM with gradual ramping
         for fan in fans {
+            let pct = fanPcts[fan.id] ?? 0
+
+            // If this fan has no zone contribution, return it to auto
+            if pct <= 0 {
+                if manualOverrides[fan.id] == true {
+                    helper.setFanMode(fanIndex: fan.id, isAuto: true) { _, _ in }
+                    manualOverrides[fan.id] = nil
+                    targetOverrides[fan.id] = nil
+                    lastSentRPM[fan.id] = nil
+                }
+                continue
+            }
+
             let desiredRPM = fan.minRPM + pct * (fan.maxRPM - fan.minRPM)
 
             // Apply rate limiting: ramp up faster than ramp down
@@ -472,21 +553,18 @@ final class FanMonitor: ObservableObject {
             if let lastRPM = lastSentRPM[fan.id] {
                 let delta = desiredRPM - lastRPM
                 if delta > 0 {
-                    // Ramping up — allow up to maxRampUpPerCycle per poll
                     rampedRPM = min(desiredRPM, lastRPM + maxRampUpPerCycle)
                 } else {
-                    // Ramping down — limit decrease for smooth wind-down
                     rampedRPM = max(desiredRPM, lastRPM - maxRampDownPerCycle)
                 }
             }
 
-            let rounded = (rampedRPM / 100).rounded() * 100  // snap to 100 RPM increments
+            let rounded = (rampedRPM / 100).rounded() * 100
 
             // Only send commands if target changed meaningfully (avoid XPC spam)
             let currentTarget = targetOverrides[fan.id] ?? 0
             guard abs(rounded - currentTarget) >= 100 else { continue }
 
-            // Track target immediately so next poll doesn't re-send the same value
             lastSentRPM[fan.id] = rounded
             targetOverrides[fan.id] = rounded
             manualOverrides[fan.id] = true
