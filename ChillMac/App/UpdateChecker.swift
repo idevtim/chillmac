@@ -6,6 +6,7 @@ class UpdateChecker: ObservableObject {
     @Published var downloadURL: URL?
     @Published var releaseURL: URL?
     @Published var isChecking = false
+    @Published var hasChecked = false
 
     private var timer: Timer?
     private static let checkInterval: TimeInterval = 6 * 3600
@@ -67,6 +68,7 @@ class UpdateChecker: ObservableObject {
                 self.releaseURL = remoteReleaseURL
                 self.downloadURL = remoteDownloadURL
                 self.updateAvailable = newer
+                self.hasChecked = true
             }
         } catch {
             NSLog("UpdateChecker: failed to check for updates — \(error.localizedDescription)")

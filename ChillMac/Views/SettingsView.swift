@@ -131,6 +131,22 @@ struct SettingsView: View {
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
+                } else if updateChecker.hasChecked && !updateChecker.updateAvailable {
+                    Divider()
+                        .background(theme.dividerSubtle)
+
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(.green)
+                            .frame(width: 24)
+                        Text("You're up to date")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(theme.textPrimary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
                 }
             }
             .background(theme.cardBg)
