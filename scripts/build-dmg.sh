@@ -15,6 +15,16 @@ else
   exit 1
 fi
 
+# ─── Pre-flight: release notes check ────────────────────────────────────────
+VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$PROJECT_DIR/ChillMac/Info.plist")
+RELEASE_NOTES="$PROJECT_DIR/release-notes/v$VERSION.md"
+if [ ! -f "$RELEASE_NOTES" ]; then
+  echo "❌ Missing release notes: release-notes/v$VERSION.md"
+  echo "   Create this file before releasing."
+  exit 1
+fi
+echo "✓ Found release notes for v$VERSION"
+
 APP_NAME="ChillMac"
 HELPER_BUNDLE_ID="com.idevtim.ChillMac.Helper"
 SIGNING_IDENTITY="Developer ID Application: Tim Murphy ($APPLE_TEAM_ID)"
@@ -144,5 +154,6 @@ echo "✅ Build complete: $DMG_PATH (v$VERSION)"
 echo "🚀 Creating GitHub release v$VERSION..."
 git tag "v$VERSION" 2>/dev/null || echo "   Tag v$VERSION already exists"
 git push origin "v$VERSION" 2>&1
-gh release create "v$VERSION" "$DMG_PATH" --title "ChillMac $VERSION" --generate-notes
-echo "✅ Released ChillMac $VERSION on GitHub"
+
+gh release create "v$VERSION" "$DMG_PATH" --title "v$VERSION" --notes-file "$RELEASE_NOTES"
+echo "✅ Released v$VERSION on GitHub"
