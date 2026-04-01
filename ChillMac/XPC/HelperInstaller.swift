@@ -2,55 +2,50 @@ import Foundation
 import ServiceManagement
 
 enum HelperInstaller {
-    static func installHelper() -> Bool {
-        if #available(macOS 13.0, *) {
-            return installWithSMAppService()
-        } else {
-            return installWithSMJobBless()
-        }
+
+    enum HelperStatus {
+        case runningCorrectVersion
+        case runningWrongVersion
+        case notRunning
     }
 
-    @available(macOS 13.0, *)
-    private static func installWithSMAppService() -> Bool {
+    // MARK: - Registration (SMAppService)
+
+    /// Whether the daemon is registered with launchd via SMAppService.
+    static func isRegistered() -> Bool {
+        let service = SMAppService.daemon(plistName: "com.idevtim.ChillMac.Helper.plist")
+        let status = service.status
+        NSLog("HelperInstaller: SMAppService status = \(status.rawValue)")
+        return status == .enabled
+    }
+
+    /// Register the daemon. This is the only path that may prompt for authorization.
+    static func register() -> Bool {
         let service = SMAppService.daemon(plistName: "com.idevtim.ChillMac.Helper.plist")
         do {
             try service.register()
+            NSLog("HelperInstaller: registered successfully")
             return true
         } catch {
-            NSLog("SMAppService registration failed: \(error)")
-            // Fall back to SMJobBless
-            return installWithSMJobBless()
-        }
-    }
-
-    private static func installWithSMJobBless() -> Bool {
-        var authRef: AuthorizationRef?
-        let flags: AuthorizationFlags = [.interactionAllowed, .preAuthorize, .extendRights]
-
-        let status = AuthorizationCreate(nil, nil, flags, &authRef)
-        guard status == errAuthorizationSuccess, let auth = authRef else {
-            NSLog("Authorization failed: \(status)")
+            NSLog("HelperInstaller: registration failed — \(error)")
             return false
         }
-        defer { AuthorizationFree(auth, [.destroyRights]) }
-
-        var error: Unmanaged<CFError>?
-        let success = SMJobBless(
-            kSMDomainSystemLaunchd,
-            kHelperMachServiceName as CFString,
-            auth,
-            &error
-        )
-
-        if !success {
-            let cfError = error?.takeRetainedValue()
-            NSLog("SMJobBless failed: \(cfError?.localizedDescription ?? "unknown")")
-        }
-
-        return success
     }
 
-    static func isHelperInstalled() -> Bool {
+    /// Unregister the daemon so a new version can be registered.
+    static func unregister() {
+        let service = SMAppService.daemon(plistName: "com.idevtim.ChillMac.Helper.plist")
+        do {
+            try service.unregister()
+            NSLog("HelperInstaller: unregistered successfully")
+        } catch {
+            NSLog("HelperInstaller: unregister failed — \(error)")
+        }
+    }
+
+    // MARK: - Version check (XPC)
+
+    static func checkHelperStatus() -> HelperStatus {
         let connection = NSXPCConnection(
             machServiceName: kHelperMachServiceName,
             options: .privileged
@@ -58,16 +53,18 @@ enum HelperInstaller {
         connection.remoteObjectInterface = NSXPCInterface(with: HelperProtocol.self)
         connection.resume()
 
-        var matchesVersion = false
+        var status: HelperStatus = .notRunning
         let semaphore = DispatchSemaphore(value: 0)
 
         if let helper = connection.remoteObjectProxyWithErrorHandler({ _ in
             semaphore.signal()
         }) as? HelperProtocol {
             helper.getVersion { version in
-                matchesVersion = (version == kHelperVersion)
-                if !matchesVersion {
+                if version == kHelperVersion {
+                    status = .runningCorrectVersion
+                } else {
                     NSLog("HelperInstaller: installed version '%@' != expected '%@', needs update", version, kHelperVersion)
+                    status = .runningWrongVersion
                 }
                 semaphore.signal()
             }
@@ -75,6 +72,6 @@ enum HelperInstaller {
 
         _ = semaphore.wait(timeout: .now() + 2)
         connection.invalidate()
-        return matchesVersion
+        return status
     }
 }

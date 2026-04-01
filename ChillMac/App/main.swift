@@ -9,6 +9,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let batteryInfo = BatteryInfo()
     let cpuInfo = CpuInfo()
     let helperConnection = HelperConnection()
+    let updateChecker = UpdateChecker()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         fanMonitor.startMonitoring()
@@ -22,29 +23,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             systemInfo: systemInfo,
             memoryInfo: memoryInfo,
             batteryInfo: batteryInfo,
-            cpuInfo: cpuInfo
+            cpuInfo: cpuInfo,
+            updateChecker: updateChecker
         )
+        updateChecker.startPeriodicChecks()
 
         // Install/load the privileged helper in the background so the UI appears immediately
         DispatchQueue.global(qos: .userInitiated).async { [self] in
-            if !HelperInstaller.isHelperInstalled() {
-                // Bootout stale helper before installing the new version
-                NSLog("AppDelegate: helper version mismatch — unloading old helper")
-                let bootout = Process()
-                bootout.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-                bootout.arguments = ["bootout", "system/com.idevtim.ChillMac.Helper"]
-                try? bootout.run()
-                bootout.waitUntilExit()
-
-                _ = HelperInstaller.installHelper()
-            }
-            // Ensure the daemon is loaded (may have been unloaded on last quit)
-            if !HelperInstaller.isHelperInstalled() {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-                process.arguments = ["bootstrap", "system", "/Library/LaunchDaemons/com.idevtim.ChillMac.Helper.plist"]
-                try? process.run()
-                process.waitUntilExit()
+            if HelperInstaller.isRegistered() {
+                // Daemon is registered — check if it's the right version
+                let status = HelperInstaller.checkHelperStatus()
+                switch status {
+                case .runningCorrectVersion:
+                    NSLog("AppDelegate: helper already running with correct version")
+                case .runningWrongVersion:
+                    NSLog("AppDelegate: helper version mismatch — re-registering")
+                    HelperInstaller.unregister()
+                    _ = HelperInstaller.register()
+                case .notRunning:
+                    // Registered but not responding — likely just needs a moment after launch
+                    NSLog("AppDelegate: helper registered but not responding")
+                }
+            } else {
+                // Not registered at all — first install, prompt is expected
+                NSLog("AppDelegate: helper not registered — installing")
+                _ = HelperInstaller.register()
             }
 
             // Reset all fans to auto on startup
@@ -87,13 +90,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         batteryInfo.stopMonitoring()
         cpuInfo.stopMonitoring()
         helperConnection.disconnect()
-
-        // Unload the helper daemon so it's not running when the app isn't
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-        process.arguments = ["bootout", "system/com.idevtim.ChillMac.Helper"]
-        try? process.run()
-        process.waitUntilExit()
     }
 }
 

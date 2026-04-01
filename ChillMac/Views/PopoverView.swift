@@ -8,6 +8,7 @@ struct PopoverView: View {
     @ObservedObject var batteryInfo: BatteryInfo
     @ObservedObject var cpuInfo: CpuInfo
     @ObservedObject var fpsMonitor: DisplayFPSMonitor
+    @ObservedObject var updateChecker: UpdateChecker
     let helper: HelperConnection
     var onMemoryTap: (() -> Void)?
     var onDiskTap: (() -> Void)?
@@ -31,7 +32,7 @@ struct PopoverView: View {
             theme.backgroundGradient
 
             if showingSettings {
-                SettingsView(settings: settings) {
+                SettingsView(settings: settings, updateChecker: updateChecker) {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         showingSettings = false
                     }
@@ -416,9 +417,18 @@ struct PopoverView: View {
                         showingSettings = true
                     }
                 }) {
-                    Image(systemName: "gearshape.fill")
-                        .font(.system(size: 16))
-                        .foregroundColor(theme.textTertiary)
+                    ZStack(alignment: .topTrailing) {
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(theme.textTertiary)
+
+                        if updateChecker.updateAvailable {
+                            Circle()
+                                .fill(Color.teal)
+                                .frame(width: 7, height: 7)
+                                .offset(x: 2, y: -2)
+                        }
+                    }
                 }
                 .buttonStyle(.plain)
             }

@@ -136,6 +136,12 @@ xcrun stapler staple "$DMG_PATH"
 echo "🔍 Final Gatekeeper check..."
 spctl --assess --type open --context context:primary-signature --verbose "$DMG_PATH" 2>&1
 
+VERSION=$(defaults read "$APP_PATH/Contents/Info.plist" CFBundleShortVersionString)
 echo ""
 echo "✅ Done! Ready to distribute:"
 echo "   $DMG_PATH"
+echo "   Version: $VERSION"
+echo ""
+echo "To create a GitHub release:"
+echo "   git tag v$VERSION && git push origin v$VERSION"
+echo "   gh release create v$VERSION $DMG_PATH --title \"ChillMac $VERSION\" --generate-notes"

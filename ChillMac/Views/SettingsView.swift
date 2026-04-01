@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var settings: AppSettings
+    @ObservedObject var updateChecker: UpdateChecker
     @Environment(\.theme) private var theme
     let onDismiss: () -> Void
 
@@ -29,6 +30,7 @@ struct SettingsView: View {
             ScrollView(.vertical, showsIndicators: settings.showScrollIndicators) {
                 VStack(spacing: 16) {
                     generalSection
+                    updatesSection
                     appearanceSection
                     temperatureSection
                     batterySaverSection
@@ -50,6 +52,89 @@ struct SettingsView: View {
                 Spacer()
             }
             .padding(.bottom, 12)
+        }
+    }
+
+    // MARK: - Updates
+
+    private var updatesSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("UPDATES")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(theme.textTertiary)
+                .tracking(1.2)
+                .padding(.leading, 4)
+
+            VStack(spacing: 0) {
+                HStack {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 16))
+                        .foregroundColor(theme.textTertiary)
+                        .frame(width: 24)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Current Version")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(theme.textPrimary)
+                        Text("v\(updateChecker.currentVersion)")
+                            .font(.system(size: 11))
+                            .foregroundColor(theme.textQuaternary)
+                    }
+                    Spacer()
+                    Button(action: {
+                        updateChecker.performCheck()
+                    }) {
+                        if updateChecker.isChecking {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Text("Check")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.teal)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(updateChecker.isChecking)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+
+                if updateChecker.updateAvailable, let version = updateChecker.latestVersion {
+                    Divider()
+                        .background(theme.dividerSubtle)
+
+                    HStack {
+                        Image(systemName: "gift.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(.teal)
+                            .frame(width: 24)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("v\(version) Available")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(theme.textPrimary)
+                            Text("A new version is ready to download")
+                                .font(.system(size: 11))
+                                .foregroundColor(theme.textQuaternary)
+                        }
+                        Spacer()
+                        if let url = updateChecker.downloadURL ?? updateChecker.releaseURL {
+                            Button(action: { NSWorkspace.shared.open(url) }) {
+                                Text("Download")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 5)
+                                    .background(Color.teal)
+                                    .cornerRadius(8)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                }
+            }
+            .background(theme.cardBg)
+            .cornerRadius(12)
         }
     }
 

@@ -19,8 +19,9 @@ final class StatusBarController: NSObject {
     private let cpuInfo: CpuInfo
     private let fanMonitor: FanMonitor
     private let fpsMonitor: DisplayFPSMonitor
+    private let updateChecker: UpdateChecker
 
-    init(fanMonitor: FanMonitor, helper: HelperConnection, systemInfo: SystemInfo, memoryInfo: MemoryInfo, batteryInfo: BatteryInfo, cpuInfo: CpuInfo) {
+    init(fanMonitor: FanMonitor, helper: HelperConnection, systemInfo: SystemInfo, memoryInfo: MemoryInfo, batteryInfo: BatteryInfo, cpuInfo: CpuInfo, updateChecker: UpdateChecker) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         popover = NSPopover()
         self.memoryInfo = memoryInfo
@@ -29,6 +30,7 @@ final class StatusBarController: NSObject {
         self.cpuInfo = cpuInfo
         self.fanMonitor = fanMonitor
         self.fpsMonitor = DisplayFPSMonitor()
+        self.updateChecker = updateChecker
 
         super.init()
 
@@ -50,6 +52,7 @@ final class StatusBarController: NSObject {
                 batteryInfo: batteryInfo,
                 cpuInfo: cpuInfo,
                 fpsMonitor: fpsMonitor,
+                updateChecker: updateChecker,
                 helper: helper,
                 onMemoryTap: { [weak self] in
                     self?.toggleMemoryPanel()
