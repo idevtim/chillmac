@@ -138,10 +138,11 @@ spctl --assess --type open --context context:primary-signature --verbose "$DMG_P
 
 VERSION=$(defaults read "$APP_PATH/Contents/Info.plist" CFBundleShortVersionString)
 echo ""
-echo "✅ Done! Ready to distribute:"
-echo "   $DMG_PATH"
-echo "   Version: $VERSION"
-echo ""
-echo "To create a GitHub release:"
-echo "   git tag v$VERSION && git push origin v$VERSION"
-echo "   gh release create v$VERSION $DMG_PATH --title \"ChillMac $VERSION\" --generate-notes"
+echo "✅ Build complete: $DMG_PATH (v$VERSION)"
+
+# ─── GitHub Release ─────────────────────────────────────────────────────────
+echo "🚀 Creating GitHub release v$VERSION..."
+git tag "v$VERSION" 2>/dev/null || echo "   Tag v$VERSION already exists"
+git push origin "v$VERSION" 2>&1
+gh release create "v$VERSION" "$DMG_PATH" --title "ChillMac $VERSION" --generate-notes
+echo "✅ Released ChillMac $VERSION on GitHub"
