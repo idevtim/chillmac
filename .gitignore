@@ -5,8 +5,8 @@ DerivedData/
 *.xcworkspace/xcuserdata/
 *.xcodeproj/project.xcworkspace/xcuserdata/
 
-# XcodeGen (regenerated from project.yml)
-*.xcodeproj/project.pbxproj
+# XcodeGen (entire xcodeproj is regenerated from project.yml)
+*.xcodeproj/
 
 # Swift Package Manager
 .build/
