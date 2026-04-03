@@ -93,11 +93,12 @@ final class DetailPanelController {
         }
 
         // Close when clicking outside
-        eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+        eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self, weak mainWindow] _ in
             guard let self, let panel = self.panel else { return }
             // Check if click is outside both the panel and the main popover
+            let currentMainFrame = mainWindow?.frame ?? .zero
             if !panel.frame.contains(NSEvent.mouseLocation) &&
-               !mainFrame.contains(NSEvent.mouseLocation) {
+               !currentMainFrame.contains(NSEvent.mouseLocation) {
                 self.close()
             }
         }

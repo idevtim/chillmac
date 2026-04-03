@@ -91,6 +91,8 @@ final class FanMonitor: ObservableObject {
 
     /// Track whether system is asleep so we skip fan commands
     private var systemAsleep = false
+    /// Guard against double-registering system observers
+    private var observersInstalled = false
     /// Track whether performance curve is suspended (screen sleep/lock)
     private var performanceSuspended = false
 
@@ -98,6 +100,9 @@ final class FanMonitor: ObservableObject {
 
     /// Call once after helper is ready. Listens for sleep/wake/lid-close to reset fans.
     func setupSystemObservers() {
+        guard !observersInstalled else { return }
+        observersInstalled = true
+
         let ws = NSWorkspace.shared.notificationCenter
 
         ws.addObserver(self, selector: #selector(handleSleep), name: NSWorkspace.willSleepNotification, object: nil)
@@ -324,7 +329,10 @@ final class FanMonitor: ObservableObject {
                 }
 
                 DispatchQueue.main.async {
-                    if self.fans != updatedFans {
+                    // Only publish when popover is visible or performance mode needs fan data,
+                    // to avoid unnecessary SwiftUI view diffs while the popover is hidden
+                    if (self.isPopoverVisible || AppSettings.shared.performanceMode),
+                       self.fans != updatedFans {
                         self.fans = updatedFans
                     }
                 }
@@ -360,11 +368,14 @@ final class FanMonitor: ObservableObject {
             let peak = stableSensors.map(\.temperature).max() ?? 0
 
             DispatchQueue.main.async {
-                if self.sensors != stableSensors {
-                    self.sensors = stableSensors
-                }
-                if self.peakTemperature != peak {
-                    self.peakTemperature = peak
+                // Only publish sensor/temperature UI data when the popover is visible
+                if self.isPopoverVisible {
+                    if self.sensors != stableSensors {
+                        self.sensors = stableSensors
+                    }
+                    if self.peakTemperature != peak {
+                        self.peakTemperature = peak
+                    }
                 }
                 // Performance mode: zone-aware fan curve based on per-zone temperatures
                 self.applyPerformanceCurve(sensors: self.discoveredSensors)

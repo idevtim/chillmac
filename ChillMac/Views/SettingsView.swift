@@ -53,6 +53,9 @@ struct SettingsView: View {
             }
             .padding(.bottom, 12)
         }
+        .onAppear {
+            updateChecker.performCheck()
+        }
     }
 
     // MARK: - Updates
