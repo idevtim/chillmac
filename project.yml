@@ -22,9 +22,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.idevtim.ChillMac
         INFOPLIST_FILE: ChillMac/Info.plist
         CODE_SIGN_ENTITLEMENTS: ChillMac/ChillMac.entitlements
-        CODE_SIGN_IDENTITY: "Developer ID Application: Tim Murphy (UA2RJP3TSL)"
-        DEVELOPMENT_TEAM: UA2RJP3TSL
-        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Automatic
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
         ENABLE_HARDENED_RUNTIME: YES
     dependencies:
@@ -52,9 +51,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.idevtim.ChillMac.Helper
         PRODUCT_NAME: com.idevtim.ChillMac.Helper
         INFOPLIST_FILE: FanControlHelper/Info.plist
-        CODE_SIGN_IDENTITY: "Developer ID Application: Tim Murphy (UA2RJP3TSL)"
-        DEVELOPMENT_TEAM: UA2RJP3TSL
-        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Automatic
         ENABLE_HARDENED_RUNTIME: YES
         CREATE_INFOPLIST_SECTION_IN_BINARY: YES
         INFOPLIST_OTHER_PREPROCESSOR_FLAGS: ""
