@@ -47,6 +47,7 @@ xcodebuild \
   -scheme "$APP_NAME" \
   -configuration Release \
   -derivedDataPath "$DERIVED_DIR" \
+  CODE_SIGN_STYLE="Manual" \
   CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
   DEVELOPMENT_TEAM="$TEAM_ID" \
   OTHER_CODE_SIGN_FLAGS="--timestamp --options runtime" \
