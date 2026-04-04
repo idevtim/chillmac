@@ -17,6 +17,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         memoryInfo.startMonitoring()
         batteryInfo.startMonitoring()
         cpuInfo.startMonitoring()
+
+        DiagnosticLogger.shared.fanMonitor = fanMonitor
+        DiagnosticLogger.shared.startLogging()
+
         statusBarController = StatusBarController(
             fanMonitor: fanMonitor,
             helper: helperConnection,
@@ -84,6 +88,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
+        DiagnosticLogger.shared.stopLogging()
         fanMonitor.stopMonitoring()
         systemInfo.stopMonitoring()
         memoryInfo.stopMonitoring()

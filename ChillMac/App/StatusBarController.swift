@@ -51,6 +51,7 @@ final class StatusBarController: NSObject {
                 systemInfo: systemInfo,
                 batteryInfo: batteryInfo,
                 cpuInfo: cpuInfo,
+                memoryInfo: memoryInfo,
                 fpsMonitor: fpsMonitor,
                 updateChecker: updateChecker,
                 helper: helper,

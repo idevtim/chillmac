@@ -7,6 +7,7 @@ struct PopoverView: View {
     @ObservedObject var systemInfo: SystemInfo
     @ObservedObject var batteryInfo: BatteryInfo
     @ObservedObject var cpuInfo: CpuInfo
+    @ObservedObject var memoryInfo: MemoryInfo
     @ObservedObject var fpsMonitor: DisplayFPSMonitor
     @ObservedObject var updateChecker: UpdateChecker
     let helper: HelperConnection
@@ -32,7 +33,15 @@ struct PopoverView: View {
             theme.backgroundGradient
 
             if showingSettings {
-                SettingsView(settings: settings, updateChecker: updateChecker) {
+                SettingsView(
+                    settings: settings,
+                    updateChecker: updateChecker,
+                    systemInfo: systemInfo,
+                    fanMonitor: monitor,
+                    cpuInfo: cpuInfo,
+                    memoryInfo: memoryInfo,
+                    batteryInfo: batteryInfo
+                ) {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         showingSettings = false
                     }

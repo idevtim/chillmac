@@ -3,6 +3,11 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var updateChecker: UpdateChecker
+    let systemInfo: SystemInfo
+    let fanMonitor: FanMonitor
+    let cpuInfo: CpuInfo
+    let memoryInfo: MemoryInfo
+    let batteryInfo: BatteryInfo
     @Environment(\.theme) private var theme
     let onDismiss: () -> Void
 
@@ -36,6 +41,7 @@ struct SettingsView: View {
                     batterySaverSection
                     fanControlSection
                     displaySection
+                    diagnosticsSection
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
@@ -534,6 +540,53 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.plain)
             }
+        }
+    }
+
+    // MARK: - Diagnostics
+
+    private var diagnosticsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("DIAGNOSTICS")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(theme.textTertiary)
+                .tracking(1.2)
+                .padding(.leading, 4)
+
+            VStack(spacing: 0) {
+                HStack {
+                    Image(systemName: "doc.text.magnifyingglass")
+                        .font(.system(size: 16))
+                        .foregroundColor(theme.textTertiary)
+                        .frame(width: 24)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Export Diagnostics")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(theme.textPrimary)
+                        Text("Save system metrics log for troubleshooting")
+                            .font(.system(size: 11))
+                            .foregroundColor(theme.textQuaternary)
+                    }
+                    Spacer()
+                    Button("Export") {
+                        DiagnosticExporter.export(
+                            logger: DiagnosticLogger.shared,
+                            systemInfo: systemInfo,
+                            fanMonitor: fanMonitor,
+                            cpuInfo: cpuInfo,
+                            memoryInfo: memoryInfo,
+                            batteryInfo: batteryInfo
+                        )
+                    }
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.teal)
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+            }
+            .background(theme.cardBg)
+            .cornerRadius(12)
         }
     }
 }
