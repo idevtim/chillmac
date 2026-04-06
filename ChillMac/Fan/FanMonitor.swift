@@ -368,13 +368,14 @@ final class FanMonitor: ObservableObject {
             let peak = stableSensors.map(\.temperature).max() ?? 0
 
             DispatchQueue.main.async {
-                // Only publish sensor/temperature UI data when the popover is visible
+                // Always update peak temperature (used by diagnostic logger and performance curve)
+                if self.peakTemperature != peak {
+                    self.peakTemperature = peak
+                }
+                // Only publish sensor array UI data when the popover is visible
                 if self.isPopoverVisible {
                     if self.sensors != stableSensors {
                         self.sensors = stableSensors
-                    }
-                    if self.peakTemperature != peak {
-                        self.peakTemperature = peak
                     }
                 }
                 // Performance mode: zone-aware fan curve based on per-zone temperatures
