@@ -8,7 +8,7 @@ struct DiagnosticReport: Codable {
     let appVersion: String
     let system: SystemSnapshot
     let settings: SettingsSnapshot
-    let currentState: CurrentStateSnapshot
+    let sleepIntervals: [SleepInterval]
     let history: [DiagnosticSample]
 }
 
@@ -30,54 +30,12 @@ struct SettingsSnapshot: Codable {
     let keepFansOnScreenSleep: Bool
 }
 
-struct SensorSample: Codable {
-    let label: String
-    let id: String
-    let temperature: Double
-}
-
-struct CpuSnapshot: Codable {
-    let totalUsage: Double
-    let userPercent: Double
-    let systemPercent: Double
-}
-
-struct MemorySnapshot: Codable {
-    let activeMemory: UInt64
-    let wiredMemory: UInt64
-    let compressedMemory: UInt64
-    let availableMemory: UInt64
-    let pressurePercent: Double
-    let swapUsed: UInt64
-}
-
-struct BatterySnapshot: Codable {
-    let currentCharge: Int
-    let healthPercent: Int
-    let cycleCount: Int
-    let temperature: Double
-    let isCharging: Bool
-    let isPluggedIn: Bool
-}
-
-struct CurrentStateSnapshot: Codable {
-    let fans: [FanSample]
-    let sensors: [SensorSample]
-    let cpu: CpuSnapshot
-    let memory: MemorySnapshot
-    let battery: BatterySnapshot
-}
-
 // MARK: - Exporter
 
 enum DiagnosticExporter {
     static func export(
         logger: DiagnosticLogger,
-        systemInfo: SystemInfo,
-        fanMonitor: FanMonitor,
-        cpuInfo: CpuInfo,
-        memoryInfo: MemoryInfo,
-        batteryInfo: BatteryInfo
+        systemInfo: SystemInfo
     ) {
         let settings = AppSettings.shared
 
@@ -100,40 +58,12 @@ enum DiagnosticExporter {
                 useFahrenheit: settings.useFahrenheit,
                 keepFansOnScreenSleep: settings.keepFansOnScreenSleep
             ),
-            currentState: CurrentStateSnapshot(
-                fans: fanMonitor.fans.map {
-                    FanSample(name: $0.name, currentRPM: $0.currentRPM, targetRPM: $0.targetRPM, isManualMode: $0.isManualMode)
-                },
-                sensors: fanMonitor.sensors.map {
-                    SensorSample(label: $0.label, id: $0.id, temperature: $0.temperature)
-                },
-                cpu: CpuSnapshot(
-                    totalUsage: cpuInfo.totalUsage,
-                    userPercent: cpuInfo.userPercent,
-                    systemPercent: cpuInfo.systemPercent
-                ),
-                memory: MemorySnapshot(
-                    activeMemory: memoryInfo.activeMemory,
-                    wiredMemory: memoryInfo.wiredMemory,
-                    compressedMemory: memoryInfo.compressedMemory,
-                    availableMemory: memoryInfo.availableMemory,
-                    pressurePercent: memoryInfo.pressurePercent,
-                    swapUsed: memoryInfo.swapUsed
-                ),
-                battery: BatterySnapshot(
-                    currentCharge: batteryInfo.currentCharge,
-                    healthPercent: batteryInfo.healthPercent,
-                    cycleCount: batteryInfo.cycleCount,
-                    temperature: batteryInfo.temperature,
-                    isCharging: batteryInfo.isCharging,
-                    isPluggedIn: batteryInfo.isPluggedIn
-                )
-            ),
+            sleepIntervals: logger.sleepIntervalsSnapshot(),
             history: logger.snapshot()
         )
 
         let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.outputFormatting = [.sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
 
         guard let data = try? encoder.encode(report) else {

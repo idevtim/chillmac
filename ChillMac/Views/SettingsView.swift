@@ -571,11 +571,7 @@ struct SettingsView: View {
                     Button("Export") {
                         DiagnosticExporter.export(
                             logger: DiagnosticLogger.shared,
-                            systemInfo: systemInfo,
-                            fanMonitor: fanMonitor,
-                            cpuInfo: cpuInfo,
-                            memoryInfo: memoryInfo,
-                            batteryInfo: batteryInfo
+                            systemInfo: systemInfo
                         )
                     }
                     .font(.system(size: 12, weight: .medium))

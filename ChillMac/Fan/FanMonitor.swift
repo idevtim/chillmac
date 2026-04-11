@@ -10,6 +10,14 @@ final class FanMonitor: ObservableObject {
 
     /// The hottest sensor temperature from the last poll (used by performance mode UI)
     @Published var peakTemperature: Double = 0
+    /// Label of the sensor currently holding `peakTemperature` (e.g. "CPU Die (Peak)")
+    @Published var peakTemperatureLabel: String = ""
+    /// Peak temperature for the CPU zone (nil if no CPU sensors discovered)
+    @Published var peakCpuTemperature: Double = 0
+    /// Peak temperature for the GPU zone
+    @Published var peakGpuTemperature: Double = 0
+    /// Peak temperature for the SSD zone
+    @Published var peakSsdTemperature: Double = 0
     /// The target RPM % that performance mode is currently requesting (0–100)
     @Published var performanceCurvePercent: Double = 0
     /// True when battery saver has suppressed performance mode
@@ -365,12 +373,35 @@ final class FanMonitor: ObservableObject {
             let stableSensors = SMCKey.temperatureKeys.compactMap { key, _ in
                 self.discoveredSensors[key]
             }
-            let peak = stableSensors.map(\.temperature).max() ?? 0
+            let hottest = stableSensors.max { $0.temperature < $1.temperature }
+            let peak = hottest?.temperature ?? 0
+            let peakLabel = hottest?.label ?? ""
+
+            // Categorical peaks by thermal zone (used by DiagnosticLogger)
+            func zonePeak(_ zone: ThermalZone) -> Double {
+                guard let keys = Self.zoneSensorKeys[zone] else { return 0 }
+                return keys.compactMap { self.discoveredSensors[$0]?.temperature }.max() ?? 0
+            }
+            let cpuPeak = zonePeak(.cpu)
+            let gpuPeak = zonePeak(.gpu)
+            let ssdPeak = zonePeak(.ssd)
 
             DispatchQueue.main.async {
                 // Always update peak temperature (used by diagnostic logger and performance curve)
                 if self.peakTemperature != peak {
                     self.peakTemperature = peak
+                }
+                if self.peakTemperatureLabel != peakLabel {
+                    self.peakTemperatureLabel = peakLabel
+                }
+                if self.peakCpuTemperature != cpuPeak {
+                    self.peakCpuTemperature = cpuPeak
+                }
+                if self.peakGpuTemperature != gpuPeak {
+                    self.peakGpuTemperature = gpuPeak
+                }
+                if self.peakSsdTemperature != ssdPeak {
+                    self.peakSsdTemperature = ssdPeak
                 }
                 // Only publish sensor array UI data when the popover is visible
                 if self.isPopoverVisible {
