@@ -35,7 +35,7 @@ final class CpuInfo: ObservableObject {
     func startMonitoring() {
         guard timer == nil else { return }
         previousInfo = fetchCpuLoadInfo()
-        timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { [weak self] _ in
             self?.refresh()
         }
     }

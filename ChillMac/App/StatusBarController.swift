@@ -34,11 +34,7 @@ final class StatusBarController: NSObject {
 
         super.init()
 
-        // Start secondary monitors paused — they'll start when popover opens
-        cpuInfo.stopMonitoring()
-        memoryInfo.stopMonitoring()
-        batteryInfo.stopMonitoring()
-        systemInfo.stopMonitoring()
+        // Secondary monitors start when popover opens, stop when it closes.
 
         popover.behavior = .applicationDefined
         popover.animates = false

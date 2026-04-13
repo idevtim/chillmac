@@ -33,7 +33,7 @@ final class MemoryInfo: ObservableObject {
     func startMonitoring() {
         guard timer == nil else { return }
         refresh()
-        timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
             self?.refresh()
         }
     }

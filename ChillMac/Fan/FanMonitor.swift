@@ -53,6 +53,8 @@ final class FanMonitor: ObservableObject {
     private let smcQueue = DispatchQueue(label: "com.idevtim.ChillMac.smc")
     /// Guard against overlapping poll cycles
     private var pollInFlight = false
+    /// Counter for periodic full fan reads when popover is hidden (for diagnostic accuracy)
+    private var backgroundPollCount: UInt = 0
 
     // MARK: - Thermal Zones
 
@@ -96,6 +98,11 @@ final class FanMonitor: ObservableObject {
     private let maxRampUpPerCycle: Double = 1000
     /// Max RPM decrease per poll cycle (ramp down slowly — ~150 RPM/sec)
     private let maxRampDownPerCycle: Double = 300
+    /// Hysteresis: once fans activate, temp must drop this many °C below the activation
+    /// threshold before deactivating. Prevents rapid auto↔manual oscillation.
+    private let deactivationHysteresis: Double = 5.0
+    /// Track whether each zone's fans are currently active (above threshold)
+    private var zoneActive: [ThermalZone: Bool] = [:]
 
     /// Track whether system is asleep so we skip fan commands
     private var systemAsleep = false
@@ -189,6 +196,7 @@ final class FanMonitor: ObservableObject {
         wasPerformanceModeActive = false
         smoothedZoneTemps.removeAll()
         lastSentRPM.removeAll()
+        zoneActive.removeAll()
         DispatchQueue.main.async {
             self.manualOverrides.removeAll()
             self.targetOverrides.removeAll()
@@ -249,9 +257,10 @@ final class FanMonitor: ObservableObject {
         removeSystemObservers()
     }
 
-    /// Current poll interval: 2s when popover visible or performance mode active, 5s otherwise
+    /// Current poll interval: 2s when popover visible or performance mode active, 10s idle
     private var currentPollInterval: TimeInterval {
-        (isPopoverVisible || AppSettings.shared.performanceMode) ? 2.0 : 5.0
+        if isPopoverVisible || AppSettings.shared.performanceMode { return 2.0 }
+        return 10.0
     }
 
     private func schedulePollTimer() {
@@ -287,6 +296,11 @@ final class FanMonitor: ObservableObject {
 
                 var updatedFans: [FanInfo] = []
 
+                // Full read every cycle when visible; every 15th cycle (~30s) when hidden
+                // to keep diagnostic samples accurate without constant IOKit overhead
+                self.backgroundPollCount += 1
+                let needsFullRead = self.isPopoverVisible || (!self.isPopoverVisible && self.backgroundPollCount % 15 == 0)
+
                 for i in 0..<fanCount {
                     let current = self.clampRPM((try? smc.readFanSpeed(index: i)) ?? 0)
 
@@ -311,8 +325,16 @@ final class FanMonitor: ObservableObject {
                         maxRPM = raw
                     }
 
-                    let target = self.clampRPM((try? smc.readFanTargetSpeed(index: i)) ?? 0)
-                    let isManual = (try? smc.readFanMode(index: i)) ?? false
+                    // Skip target/mode reads when popover is hidden — saves 2 IOKit calls per fan
+                    let target: Double
+                    let isManual: Bool
+                    if needsFullRead {
+                        target = self.clampRPM((try? smc.readFanTargetSpeed(index: i)) ?? 0)
+                        isManual = (try? smc.readFanMode(index: i)) ?? false
+                    } else {
+                        target = self.targetOverrides[i] ?? 0
+                        isManual = self.manualOverrides[i] ?? false
+                    }
 
                     let name: String
                     if fanCount == 1 {
@@ -417,6 +439,16 @@ final class FanMonitor: ObservableObject {
 
     // MARK: - Performance Mode Fan Curve
 
+    /// Returns the temperature at which the current performance level first activates fans.
+    private func activationThreshold() -> Double {
+        switch AppSettings.shared.performanceLevel {
+        case .low: return 65
+        case .medium: return 55
+        case .high: return 45
+        case .max: return 0
+        }
+    }
+
     /// Maps peak sensor temperature to fan speed % based on the selected performance level.
     private func fanSpeedPercent(forTemperature temp: Double) -> Double {
         let level = AppSettings.shared.performanceLevel
@@ -501,6 +533,7 @@ final class FanMonitor: ObservableObject {
             performanceCurvePercent = 0
             smoothedZoneTemps.removeAll()
             lastSentRPM.removeAll()
+            zoneActive.removeAll()
             return
         }
 
@@ -530,7 +563,26 @@ final class FanMonitor: ObservableObject {
                 smoothedZoneTemps[zone] = peak
             }
 
-            zonePcts[zone] = fanSpeedPercent(forTemperature: smoothedZoneTemps[zone]!)
+            let pct = fanSpeedPercent(forTemperature: smoothedZoneTemps[zone]!)
+
+            // Hysteresis: once active, require temp to drop further before deactivating.
+            // This prevents rapid oscillation when temp hovers near the curve's zero-crossing.
+            if pct > 0 {
+                zoneActive[zone] = true
+                zonePcts[zone] = pct
+            } else if zoneActive[zone] == true {
+                // Zone was active — check if temp has dropped enough below activation threshold
+                let activationTemp = activationThreshold()
+                if (smoothedZoneTemps[zone] ?? peak) <= activationTemp - deactivationHysteresis {
+                    zoneActive[zone] = false
+                    zonePcts[zone] = 0
+                } else {
+                    // Still in hysteresis band — hold at minimum fan speed
+                    zonePcts[zone] = fanSpeedPercent(forTemperature: activationTemp)
+                }
+            } else {
+                zonePcts[zone] = 0
+            }
         }
 
         // Compute per-fan speed as the max of all zone contributions weighted by affinity
