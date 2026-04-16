@@ -74,7 +74,7 @@ final class DiagnosticLogger {
         try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("history.json")
     }()
-    private let persistInterval = 5 // flush every N samples
+    private let persistInterval = 15 // flush every N samples (~15 min)
     private var samplesSinceFlush = 0
 
     weak var fanMonitor: FanMonitor?
@@ -154,6 +154,7 @@ final class DiagnosticLogger {
     // MARK: - Sampling
 
     private func takeSample() {
+        // Snapshot fan-monitor values on main (cheap) — they're @Published so must be read here.
         let fans = fanMonitor?.fans.map {
             FanSample(name: $0.name, currentRPM: $0.currentRPM, targetRPM: $0.targetRPM, isManualMode: $0.isManualMode)
         } ?? []
@@ -163,18 +164,19 @@ final class DiagnosticLogger {
         let peakGpu = fanMonitor?.peakGpuTemperature ?? 0
         let peakSsd = fanMonitor?.peakSsdTemperature ?? 0
         let perfCurve = fanMonitor?.performanceCurvePercent ?? 0
-
-        let mem = readMemoryStats()
-        let totalMem = ProcessInfo.processInfo.physicalMemory
-        let usedPct = Double(mem.active + mem.wired + mem.compressed) / Double(totalMem) * 100
-        let pressureLevel = readMemoryPressureLevel()
-        let batt = readBatteryState()
-        let gpu = readGpuUsage()
-        let thermal = readThermalState()
         let timestamp = Date()
+        let totalMem = ProcessInfo.processInfo.physicalMemory
+        let thermal = readThermalState()
 
+        // Move IOKit/sysctl reads off main thread — they stall the UI over 24/7 operation.
         queue.async {
+            let mem = self.readMemoryStats()
+            let usedPct = Double(mem.active + mem.wired + mem.compressed) / Double(totalMem) * 100
+            let pressureLevel = self.readMemoryPressureLevel()
+            let batt = self.readBatteryState()
+            let gpu = self.readGpuUsage()
             let cpuUsage = self.computeCpuUsage()
+
             let sample = DiagnosticSample(
                 timestamp: timestamp,
                 cpuUsage: cpuUsage,

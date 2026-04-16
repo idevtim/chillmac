@@ -409,20 +409,23 @@ final class FanMonitor: ObservableObject {
             let ssdPeak = zonePeak(.ssd)
 
             DispatchQueue.main.async {
-                // Always update peak temperature (used by diagnostic logger and performance curve)
-                if self.peakTemperature != peak {
+                // Threshold @Published updates — EMA produces hundredths-of-a-degree noise that
+                // would otherwise fire SwiftUI invalidations every 2s for the entire 24/7 lifetime
+                // of the app, even with the popover closed (NSHostingController retains the view tree).
+                let tempEpsilon = 0.1
+                if abs(self.peakTemperature - peak) >= tempEpsilon {
                     self.peakTemperature = peak
                 }
                 if self.peakTemperatureLabel != peakLabel {
                     self.peakTemperatureLabel = peakLabel
                 }
-                if self.peakCpuTemperature != cpuPeak {
+                if abs(self.peakCpuTemperature - cpuPeak) >= tempEpsilon {
                     self.peakCpuTemperature = cpuPeak
                 }
-                if self.peakGpuTemperature != gpuPeak {
+                if abs(self.peakGpuTemperature - gpuPeak) >= tempEpsilon {
                     self.peakGpuTemperature = gpuPeak
                 }
-                if self.peakSsdTemperature != ssdPeak {
+                if abs(self.peakSsdTemperature - ssdPeak) >= tempEpsilon {
                     self.peakSsdTemperature = ssdPeak
                 }
                 // Only publish sensor array UI data when the popover is visible
