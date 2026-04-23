@@ -20,6 +20,7 @@ final class CpuInfo: ObservableObject {
     private let maxHistory = 120
     private let hostPort = mach_host_self()
     private var pollCount: UInt = 0
+    private var topProcessFetchInFlight = false
 
     deinit {
         mach_port_deallocate(mach_task_self_, hostPort)
@@ -81,15 +82,16 @@ final class CpuInfo: ObservableObject {
             systemHistory.removeFirst(systemHistory.count - maxHistory)
         }
 
-        // Fetch top processes every 5th poll (10 seconds), only when detail panel is visible
+        // Fetch top processes every 5th poll, only when detail panel is visible.
         pollCount += 1
-        guard isDetailVisible, pollCount % 5 == 0 else { return }
+        guard isDetailVisible, pollCount % 5 == 0, !topProcessFetchInFlight else { return }
+        topProcessFetchInFlight = true
 
-        // Snapshot app bundle paths on main thread (no icons yet — defer to after sorting)
-        var appBundles: [(path: String, name: String)] = []
+        // Snapshot app metadata on main thread. NSWorkspace/AppKit stays on main; sorting stays off-main.
+        var appBundles: [(path: String, name: String, icon: NSImage?)] = []
         for app in NSWorkspace.shared.runningApplications where app.activationPolicy == .regular {
             if let bundleURL = app.bundleURL, let name = app.localizedName {
-                appBundles.append((bundleURL.path, name))
+                appBundles.append((bundleURL.path, name, app.icon))
             }
         }
 
@@ -97,6 +99,7 @@ final class CpuInfo: ObservableObject {
             let procs = self?.fetchTopProcesses(appBundles: appBundles) ?? []
             DispatchQueue.main.async {
                 self?.topProcesses = procs
+                self?.topProcessFetchInFlight = false
             }
         }
     }
@@ -116,7 +119,7 @@ final class CpuInfo: ObservableObject {
         return result == KERN_SUCCESS ? info : nil
     }
 
-    private func fetchTopProcesses(appBundles: [(path: String, name: String)], limit: Int = 5) -> [CpuProcess] {
+    private func fetchTopProcesses(appBundles: [(path: String, name: String, icon: NSImage?)], limit: Int = 5) -> [CpuProcess] {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/ps")
         process.arguments = ["-A", "-o", "pid=", "-o", "%cpu=", "-o", "comm="]
@@ -132,7 +135,7 @@ final class CpuInfo: ObservableObject {
 
         guard let output = String(data: data, encoding: .utf8) else { return [] }
 
-        var cpuByApp: [String: (cpu: Double, name: String)] = [:]
+        var cpuByApp: [String: (cpu: Double, name: String, icon: NSImage?)] = [:]
 
         for line in output.split(separator: "\n") {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
@@ -144,7 +147,7 @@ final class CpuInfo: ObservableObject {
 
             for app in appBundles {
                 if comm.hasPrefix(app.path) {
-                    cpuByApp[app.name, default: (0, app.name)].cpu += cpu
+                    cpuByApp[app.name, default: (0, app.name, app.icon)].cpu += cpu
                     break
                 }
             }
@@ -156,9 +159,7 @@ final class CpuInfo: ObservableObject {
             .prefix(limit)
 
         return top.map { item in
-            let icon = NSWorkspace.shared.runningApplications
-                .first { $0.localizedName == item.name }?.icon
-            return CpuProcess(name: item.name, cpuPercent: item.cpu, icon: icon)
+            CpuProcess(name: item.name, cpuPercent: item.cpu, icon: item.icon)
         }
     }
 }

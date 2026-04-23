@@ -24,9 +24,19 @@ final class SystemInfo: ObservableObject {
     }
 
     /// When true, fetches disk category breakdown (expensive filesystem walk). Set by StatusBarController when Disk detail panel is visible.
-    var isDetailVisible = false
+    var isDetailVisible = false {
+        didSet {
+            if isDetailVisible && !oldValue {
+                refreshDynamic(forceDiskCategories: true)
+            }
+        }
+    }
 
     private var timer: Timer?
+    private let diskCategoryQueue = DispatchQueue(label: "com.idevtim.ChillMac.diskCategories", qos: .utility)
+    private var diskCategoryRefreshInFlight = false
+    private var lastDiskCategoryRefreshAt: Date?
+    private let diskCategoryRefreshInterval: TimeInterval = 5 * 60
 
     init() {
         // RAM — available immediately
@@ -64,7 +74,7 @@ final class SystemInfo: ObservableObject {
 
     // MARK: - Private
 
-    private func refreshDynamic() {
+    private func refreshDynamic(forceDiskCategories: Bool = false) {
         // Disk usage — use volumeAvailableCapacityForImportantUsage to include purgeable space
         let fileURL = URL(fileURLWithPath: "/")
         if let values = try? fileURL.resourceValues(forKeys: [
@@ -86,8 +96,9 @@ final class SystemInfo: ObservableObject {
                 self.diskTotalBytes = totalBytes
                 self.diskAvailableBytes = availableBytes
             }
-            // Gather category breakdown on background thread (expensive — only when detail panel is visible)
-            if self.isDetailVisible {
+            // Gather category breakdown on background thread. This can be a large filesystem walk,
+            // so keep it single-flight and refresh it less often than the cheap disk capacity value.
+            if self.shouldRefreshDiskCategories(force: forceDiskCategories) {
                 self.fetchDiskCategories(totalBytes: totalBytes, availableBytes: availableBytes)
             }
         }
@@ -108,6 +119,12 @@ final class SystemInfo: ObservableObject {
         DispatchQueue.main.async {
             self.uptime = formatted
         }
+    }
+
+    private func shouldRefreshDiskCategories(force: Bool) -> Bool {
+        guard isDetailVisible, !diskCategoryRefreshInFlight else { return false }
+        guard !force, let lastDiskCategoryRefreshAt else { return true }
+        return Date().timeIntervalSince(lastDiskCategoryRefreshAt) >= diskCategoryRefreshInterval
     }
 
     private func fetchHardwareInfo() {
@@ -139,7 +156,8 @@ final class SystemInfo: ObservableObject {
     }
 
     private func fetchDiskCategories(totalBytes: Int64, availableBytes: Int64) {
-        DispatchQueue.global(qos: .utility).async { [weak self] in
+        diskCategoryRefreshInFlight = true
+        diskCategoryQueue.async { [weak self] in
             let fm = FileManager.default
             let home = fm.homeDirectoryForCurrentUser
 
@@ -151,10 +169,12 @@ final class SystemInfo: ObservableObject {
                 }
                 var total: Int64 = 0
                 for case let fileURL as URL in enumerator {
-                    guard let values = try? fileURL.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey]),
-                          values.isRegularFile == true,
-                          let size = values.totalFileAllocatedSize else { continue }
-                    total += Int64(size)
+                    autoreleasepool {
+                        guard let values = try? fileURL.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey]),
+                              values.isRegularFile == true,
+                              let size = values.totalFileAllocatedSize else { return }
+                        total += Int64(size)
+                    }
                 }
                 return (total, false)
             }
@@ -183,8 +203,12 @@ final class SystemInfo: ObservableObject {
             ]
 
             DispatchQueue.main.async {
-                self?.diskCategories = categories
-                self?.deniedFolders = denied
+                guard let self else { return }
+                self.diskCategoryRefreshInFlight = false
+                self.lastDiskCategoryRefreshAt = Date()
+                guard self.isDetailVisible else { return }
+                self.diskCategories = categories
+                self.deniedFolders = denied
             }
         }
     }

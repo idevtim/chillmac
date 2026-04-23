@@ -216,9 +216,14 @@ final class FanMonitor: ObservableObject {
 
     // MARK: - Battery State (lightweight check for battery saver)
 
-    private func checkBatterySaver() -> Bool {
-        let settings = AppSettings.shared
-        guard settings.batterySaverEnabled, !settings.forcePerformanceOnBattery else { return false }
+    private struct BatterySaverPolicy {
+        let enabled: Bool
+        let forcePerformanceOnBattery: Bool
+        let threshold: Int
+    }
+
+    private func checkBatterySaver(policy: BatterySaverPolicy) -> Bool {
+        guard policy.enabled, !policy.forcePerformanceOnBattery else { return false }
 
         guard let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
               let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() as? [CFTypeRef],
@@ -230,7 +235,7 @@ final class FanMonitor: ObservableObject {
         if isOnAC { return false }
 
         let charge = info[kIOPSCurrentCapacityKey] as? Int ?? 100
-        return charge <= settings.batterySaverThreshold
+        return charge <= policy.threshold
     }
 
     func startMonitoring() {
@@ -284,22 +289,33 @@ final class FanMonitor: ObservableObject {
     private func poll() {
         guard let smc = smc, !pollInFlight else { return }
         pollInFlight = true
+        let popoverVisible = isPopoverVisible
+        let performanceMode = AppSettings.shared.performanceMode
+        let helperReadySnapshot = helperReady
+        let manualOverridesSnapshot = manualOverrides
+        let targetOverridesSnapshot = targetOverrides
+        let batterySaverPolicy = BatterySaverPolicy(
+            enabled: AppSettings.shared.batterySaverEnabled,
+            forcePerformanceOnBattery: AppSettings.shared.forcePerformanceOnBattery,
+            threshold: AppSettings.shared.batterySaverThreshold
+        )
 
         smcQueue.async { [weak self] in
             guard let self else { return }
-            defer { self.pollInFlight = false }
+            var updatedFans: [FanInfo]?
+            var pollError: String?
 
             // Read fans
             do {
                 let fanCount = try self.cachedFanCount ?? smc.readFanCount()
                 if self.cachedFanCount == nil { self.cachedFanCount = fanCount }
 
-                var updatedFans: [FanInfo] = []
+                var fanSnapshot: [FanInfo] = []
 
                 // Full read every cycle when visible; every 15th cycle (~30s) when hidden
                 // to keep diagnostic samples accurate without constant IOKit overhead
                 self.backgroundPollCount += 1
-                let needsFullRead = self.isPopoverVisible || (!self.isPopoverVisible && self.backgroundPollCount % 15 == 0)
+                let needsFullRead = popoverVisible || (!popoverVisible && self.backgroundPollCount % 15 == 0)
 
                 for i in 0..<fanCount {
                     let current = self.clampRPM((try? smc.readFanSpeed(index: i)) ?? 0)
@@ -332,8 +348,8 @@ final class FanMonitor: ObservableObject {
                         target = self.clampRPM((try? smc.readFanTargetSpeed(index: i)) ?? 0)
                         isManual = (try? smc.readFanMode(index: i)) ?? false
                     } else {
-                        target = self.targetOverrides[i] ?? 0
-                        isManual = self.manualOverrides[i] ?? false
+                        target = targetOverridesSnapshot[i] ?? 0
+                        isManual = manualOverridesSnapshot[i] ?? false
                     }
 
                     let name: String
@@ -347,7 +363,7 @@ final class FanMonitor: ObservableObject {
                         name = "Fan \(i + 1)"
                     }
 
-                    updatedFans.append(FanInfo(
+                    fanSnapshot.append(FanInfo(
                         id: i,
                         name: name,
                         currentRPM: current,
@@ -358,18 +374,9 @@ final class FanMonitor: ObservableObject {
                     ))
                 }
 
-                DispatchQueue.main.async {
-                    // Only publish when popover is visible or performance mode needs fan data,
-                    // to avoid unnecessary SwiftUI view diffs while the popover is hidden
-                    if (self.isPopoverVisible || AppSettings.shared.performanceMode),
-                       self.fans != updatedFans {
-                        self.fans = updatedFans
-                    }
-                }
+                updatedFans = fanSnapshot
             } catch {
-                DispatchQueue.main.async {
-                    self.smcError = error.localizedDescription
-                }
+                pollError = error.localizedDescription
             }
 
             // Read temperature sensors — after 5 full discovery passes, only poll active keys
@@ -407,8 +414,29 @@ final class FanMonitor: ObservableObject {
             let cpuPeak = zonePeak(.cpu)
             let gpuPeak = zonePeak(.gpu)
             let ssdPeak = zonePeak(.ssd)
+            let sensorsByKey = self.discoveredSensors
+            let batterySaverShouldSuppress = performanceMode && helperReadySnapshot
+                ? self.checkBatterySaver(policy: batterySaverPolicy)
+                : false
 
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                defer { self.pollInFlight = false }
+
+                if let pollError {
+                    self.smcError = pollError
+                } else if self.smcError != nil {
+                    self.smcError = nil
+                }
+
+                // Only publish when popover is visible or performance mode needs fan data,
+                // to avoid unnecessary SwiftUI view diffs while the popover is hidden.
+                if let updatedFans,
+                   (self.isPopoverVisible || performanceMode),
+                   self.fans != updatedFans {
+                    self.fans = updatedFans
+                }
+
                 // Threshold @Published updates — EMA produces hundredths-of-a-degree noise that
                 // would otherwise fire SwiftUI invalidations every 2s for the entire 24/7 lifetime
                 // of the app, even with the popover closed (NSHostingController retains the view tree).
@@ -435,7 +463,7 @@ final class FanMonitor: ObservableObject {
                     }
                 }
                 // Performance mode: zone-aware fan curve based on per-zone temperatures
-                self.applyPerformanceCurve(sensors: self.discoveredSensors)
+                self.applyPerformanceCurve(sensors: sensorsByKey, batterySaverShouldSuppress: batterySaverShouldSuppress)
             }
         }
     }
@@ -507,7 +535,7 @@ final class FanMonitor: ObservableObject {
         }
     }
 
-    private func applyPerformanceCurve(sensors: [String: TemperatureSensor]) {
+    private func applyPerformanceCurve(sensors: [String: TemperatureSensor], batterySaverShouldSuppress: Bool) {
         // Skip fan commands while system is asleep or performance is suspended (screen lock/sleep)
         guard !systemAsleep, !performanceSuspended else { return }
 
@@ -519,7 +547,7 @@ final class FanMonitor: ObservableObject {
         }
 
         // Battery saver: suppress performance mode when on battery below threshold
-        let batterySaving = performanceEnabled && checkBatterySaver()
+        let batterySaving = performanceEnabled && batterySaverShouldSuppress
         let isActive = performanceEnabled && !batterySaving
         batterySaverActive = batterySaving
 
