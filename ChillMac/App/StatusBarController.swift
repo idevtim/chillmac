@@ -20,6 +20,7 @@ final class StatusBarController: NSObject {
     private let fanMonitor: FanMonitor
     private let fpsMonitor: DisplayFPSMonitor
     private let updateChecker: UpdateChecker
+    private let helper: HelperConnection
 
     init(fanMonitor: FanMonitor, helper: HelperConnection, systemInfo: SystemInfo, memoryInfo: MemoryInfo, batteryInfo: BatteryInfo, cpuInfo: CpuInfo, updateChecker: UpdateChecker) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -31,47 +32,18 @@ final class StatusBarController: NSObject {
         self.fanMonitor = fanMonitor
         self.fpsMonitor = DisplayFPSMonitor()
         self.updateChecker = updateChecker
+        self.helper = helper
 
         super.init()
 
         // Secondary monitors start when popover opens, stop when it closes.
+        // The SwiftUI hosting controller is built on open and dropped on close
+        // so AttributeGraph doesn't accumulate tracked state across days of uptime.
 
         popover.behavior = .applicationDefined
         popover.animates = false
         popover.appearance = AppSettings.shared.nsAppearance
-
-        let hostingController = NSHostingController(
-            rootView: PopoverView(
-                monitor: fanMonitor,
-                settings: AppSettings.shared,
-                systemInfo: systemInfo,
-                batteryInfo: batteryInfo,
-                cpuInfo: cpuInfo,
-                memoryInfo: memoryInfo,
-                fpsMonitor: fpsMonitor,
-                updateChecker: updateChecker,
-                helper: helper,
-                onMemoryTap: { [weak self] in
-                    self?.toggleMemoryPanel()
-                },
-                onDiskTap: { [weak self] in
-                    self?.toggleDiskPanel()
-                },
-                onBatteryTap: { [weak self] in
-                    self?.toggleBatteryPanel()
-                },
-                onCpuTap: { [weak self] in
-                    self?.toggleCpuPanel()
-                },
-                onTemperatureTap: { [weak self] in
-                    self?.toggleTemperaturePanel()
-                }
-            )
-        )
-        let initialHeight = CGFloat(AppSettings.shared.popoverHeight)
-        hostingController.view.frame = NSRect(x: 0, y: 0, width: 420, height: initialHeight)
-        popover.contentSize = NSSize(width: 420, height: initialHeight)
-        popover.contentViewController = hostingController
+        popover.contentSize = NSSize(width: 420, height: CGFloat(AppSettings.shared.popoverHeight))
 
         if let button = statusItem.button {
             button.image = NSImage(systemSymbolName: "fan.fill", accessibilityDescription: "ChillMac")
@@ -91,6 +63,7 @@ final class StatusBarController: NSObject {
             self.detailPanel.close()
             NotificationCenter.default.post(name: .popoverDidClose, object: nil)
             self.popover.performClose(nil)
+            self.popover.contentViewController = nil
             // Pause secondary monitors and clear visibility flags when popover closes
             self.cpuInfo.isDetailVisible = false
             self.memoryInfo.isDetailVisible = false
@@ -163,6 +136,7 @@ final class StatusBarController: NSObject {
             detailPanel.close()
             NotificationCenter.default.post(name: .popoverDidClose, object: nil)
             popover.performClose(sender)
+            popover.contentViewController = nil
             // Pause secondary monitors and clear visibility flags when popover closes
             cpuInfo.isDetailVisible = false
             memoryInfo.isDetailVisible = false
@@ -183,11 +157,38 @@ final class StatusBarController: NSObject {
             fanMonitor.isPopoverVisible = true
             AppSettings.shared.syncLaunchAtLogin()
             NotificationCenter.default.post(name: .popoverDidClose, object: nil)
+            popover.contentViewController = makeHostingController()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             NSApp.activate(ignoringOtherApps: true)
             popover.contentViewController?.view.window?.makeKeyAndOrderFront(nil)
             NotificationCenter.default.post(name: .popoverDidShow, object: nil)
         }
+    }
+
+    private func makeHostingController() -> NSHostingController<PopoverView> {
+        let hosting = NSHostingController(
+            rootView: PopoverView(
+                monitor: fanMonitor,
+                settings: AppSettings.shared,
+                systemInfo: systemInfo,
+                batteryInfo: batteryInfo,
+                cpuInfo: cpuInfo,
+                memoryInfo: memoryInfo,
+                fpsMonitor: fpsMonitor,
+                updateChecker: updateChecker,
+                helper: helper,
+                onMemoryTap: { [weak self] in self?.toggleMemoryPanel() },
+                onDiskTap: { [weak self] in self?.toggleDiskPanel() },
+                onBatteryTap: { [weak self] in self?.toggleBatteryPanel() },
+                onCpuTap: { [weak self] in self?.toggleCpuPanel() },
+                onTemperatureTap: { [weak self] in self?.toggleTemperaturePanel() }
+            )
+        )
+        let height = CGFloat(AppSettings.shared.popoverHeight)
+        hosting.view.frame = NSRect(x: 0, y: 0, width: 420, height: height)
+        hosting.view.appearance = AppSettings.shared.nsAppearance
+        popover.contentSize = NSSize(width: 420, height: height)
+        return hosting
     }
 
     private func toggleMemoryPanel() {
