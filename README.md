@@ -1,8 +1,22 @@
+<p align="center">
+  <img src="assets/icon.svg" alt="ChillMac icon" width="128" height="128">
+</p>
+
 # ChillMac
 
 A free, open-source macOS menu bar app for monitoring your system and controlling fan speeds. Keep your Mac chilly.
 
 **[Download the latest release](https://github.com/idevtim/chillmac/releases/latest)**
+
+## Screenshots
+
+<p align="center">
+  <img src="assets/screenshots/popover.png" alt="ChillMac menu bar popover with system temperature, hardware stats, performance mode, and per-fan RPM controls" width="420">
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/panels.png" alt="ChillMac detail panels showing CPU usage graph, top consumers, and full system dashboard" width="640">
+</p>
 
 ## Features
 

@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <!-- Background gradient matching the app's dark blue-green theme -->
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a3a4a"/>
+      <stop offset="50%" stop-color="#0f2b3c"/>
+      <stop offset="100%" stop-color="#0a1e2e"/>
+    </linearGradient>
+    <!-- Icon gradient - icy blue -->
+    <linearGradient id="ice" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7dd3fc"/>
+      <stop offset="50%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0ea5e9"/>
+    </linearGradient>
+    <!-- Glow effect -->
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Shadow for depth -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="12" flood-color="#000" flood-opacity="0.4"/>
+    </filter>
+    <filter id="innerGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur"/>
+      <feComposite in="blur" in2="SourceGraphic" operator="atop"/>
+    </filter>
+  </defs>
+
+  <!-- macOS rounded rect shape -->
+  <rect x="40" y="40" width="944" height="944" rx="220" ry="220" fill="url(#bg)"/>
+  <!-- Subtle border -->
+  <rect x="40" y="40" width="944" height="944" rx="220" ry="220" fill="none" stroke="#2a5a6a" stroke-width="2" opacity="0.5"/>
+  <!-- Center glow -->
+  <circle cx="512" cy="512" r="320" fill="url(#glow)"/>
+
+  <!-- Fan/snowflake hybrid - 6 blades with crystalline tips -->
+  <g transform="translate(512, 512)" filter="url(#shadow)">
+    <!-- 6 main arms -->
+    <!-- Arm 1 - up -->
+    <g transform="rotate(0)">
+      <line x1="0" y1="-60" x2="0" y2="-280" stroke="url(#ice)" stroke-width="28" stroke-linecap="round"/>
+      <!-- Fan blade curve -->
+      <path d="M 0,-80 Q 80,-160 30,-260" stroke="url(#ice)" stroke-width="20" fill="none" stroke-linecap="round"/>
+      <!-- Crystal branches -->
+      <line x1="0" y1="-180" x2="-45" y2="-230" stroke="url(#ice)" stroke-width="12" stroke-linecap="round"/>
+      <line x1="0" y1="-180" x2="45" y2="-230" stroke="url(#ice)" stroke-width="12" stroke-linecap="round"/>
+      <!-- Tip dot -->
+      <circle cx="0" cy="-285" r="14" fill="#bae6fd"/>
+    </g>
+    <!-- Arm 2 -->
+    <g transform="rotate(60)">
+      <line x1="0" y1="-60" x2="0" y2="-280" stroke="url(#ice)" stroke-width="28" stroke-linecap="round"/>
+      <path d="M 0,-80 Q 80,-160 30,-260" stroke="url(#ice)" stroke-width="20" fill="none" stroke-linecap="round"/>
+      <line x1="0" y1="-180" x2="-45" y2="-230" stroke="url(#ice)" stroke-width="12" stroke-linecap="round"/>
+      <line x1="0" y1="-180" x2="45" y2="-230" stroke="url(#ice)" stroke-width="12" stroke-linecap="round"/>
+      <circle cx="0" cy="-285" r="14" fill="#bae6fd"/>
+    </g>
+    <!-- Arm 3 -->
+    <g transform="rotate(120)">
+      <line x1="0" y1="-60" x2="0" y2="-280" stroke="url(#ice)" stroke-width="28" stroke-linecap="round"/>
+      <path d="M 0,-80 Q 80,-160 30,-260" stroke="url(#ice)" stroke-width="20" fill="none" stroke-linecap="round"/>
+      <line x1="0" y1="-180" x2="-45" y2="-230" stroke="url(#ice)" stroke-width="12" stroke-linecap="round"/>
+      <line x1="0" y1="-180" x2="45" y2="-230" stroke="url(#ice)" stroke-width="12" stroke-linecap="round"/>
+      <circle cx="0" cy="-285" r="14" fill="#bae6fd"/>
+    </g>
+    <!-- Arm 4 -->
+    <g transform="rotate(180)">
+      <line x1="0" y1="-60" x2="0" y2="-280" stroke="url(#ice)" stroke-width="28" stroke-linecap="round"/>
+      <path d="M 0,-80 Q 80,-160 30,-260" stroke="url(#ice)" stroke-width="20" fill="none" stroke-linecap="round"/>
+      <line x1="0" y1="-180" x2="-45" y2="-230" stroke="url(#ice)" stroke-width="12" stroke-linecap="round"/>
+      <line x1="0" y1="-180" x2="45" y2="-230" stroke="url(#ice)" stroke-width="12" stroke-linecap="round"/>
+      <circle cx="0" cy="-285" r="14" fill="#bae6fd"/>
+    </g>
+    <!-- Arm 5 -->
+    <g transform="rotate(240)">
+      <line x1="0" y1="-60" x2="0" y2="-280" stroke="url(#ice)" stroke-width="28" stroke-linecap="round"/>
+      <path d="M 0,-80 Q 80,-160 30,-260" stroke="url(#ice)" stroke-width="20" fill="none" stroke-linecap="round"/>
+      <line x1="0" y1="-180" x2="-45" y2="-230" stroke="url(#ice)" stroke-width="12" stroke-linecap="round"/>
+      <line x1="0" y1="-180" x2="45" y2="-230" stroke="url(#ice)" stroke-width="12" stroke-linecap="round"/>
+      <circle cx="0" cy="-285" r="14" fill="#bae6fd"/>
+    </g>
+    <!-- Arm 6 -->
+    <g transform="rotate(300)">
+      <line x1="0" y1="-60" x2="0" y2="-280" stroke="url(#ice)" stroke-width="28" stroke-linecap="round"/>
+      <path d="M 0,-80 Q 80,-160 30,-260" stroke="url(#ice)" stroke-width="20" fill="none" stroke-linecap="round"/>
+      <line x1="0" y1="-180" x2="-45" y2="-230" stroke="url(#ice)" stroke-width="12" stroke-linecap="round"/>
+      <line x1="0" y1="-180" x2="45" y2="-230" stroke="url(#ice)" stroke-width="12" stroke-linecap="round"/>
+      <circle cx="0" cy="-285" r="14" fill="#bae6fd"/>
+    </g>
+
+    <!-- Center hub -->
+    <circle cx="0" cy="0" r="50" fill="#0f2b3c" stroke="url(#ice)" stroke-width="10"/>
+    <circle cx="0" cy="0" r="22" fill="url(#ice)"/>
+    <!-- Inner sparkle -->
+    <circle cx="0" cy="0" r="8" fill="#e0f2fe"/>
+  </g>
+</svg>
