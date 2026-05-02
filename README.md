@@ -11,11 +11,14 @@ A free, open-source macOS menu bar app for monitoring your system and controllin
 ## Screenshots
 
 <p align="center">
-  <img src="assets/screenshots/popover.png" alt="ChillMac menu bar popover with system temperature, hardware stats, performance mode, and per-fan RPM controls" width="420">
+  <img src="assets/screenshots/popover-main.png" alt="ChillMac menu bar popover with system temperature, hardware stats, performance mode, and per-fan RPM controls" width="420">
+  <img src="assets/screenshots/popover-settings.png" alt="ChillMac settings view with preferences and configuration options" width="420">
 </p>
 
 <p align="center">
-  <img src="assets/screenshots/panels.png" alt="ChillMac detail panels showing CPU usage graph, top consumers, and full system dashboard" width="640">
+  <img src="assets/screenshots/panel-memory.png" alt="ChillMac memory detail panel showing usage breakdown, pressure, swap, and top consumers" width="370">
+  <img src="assets/screenshots/panel-battery.png" alt="ChillMac battery detail panel showing charge, health, cycles, and temperature" width="370">
+  <img src="assets/screenshots/panel-temperatures.png" alt="ChillMac temperature sensors panel showing CPU, GPU, memory, and SSD readings" width="370">
 </p>
 
 ## Features
