@@ -315,9 +315,9 @@ struct PopoverView: View {
                             Image(systemName: "fan.fill")
                                 .font(.system(size: 11))
                                 .foregroundColor(perfAccentColor)
-                            Text(monitor.performanceCurvePercent > 0
+                            Text(monitor.performanceCurvePercent >= 1
                                  ? String(format: "%.0f%%", monitor.performanceCurvePercent)
-                                 : "Auto")
+                                 : "Min")
                                 .font(.system(size: 12, weight: .semibold, design: .monospaced))
                                 .foregroundColor(perfAccentColor)
                         }

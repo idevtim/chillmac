@@ -18,10 +18,10 @@ enum PerformanceLevel: String, CaseIterable {
 
     var description: String {
         switch self {
-        case .low: return "Gentle cooling, minimal noise"
-        case .medium: return "Balanced cooling and noise"
-        case .high: return "Aggressive cooling, louder"
-        case .max: return "Maximum fans at all times"
+        case .low: return "Whisper baseline, slow ramp"
+        case .medium: return "Balanced baseline and ramp"
+        case .high: return "Aggressive baseline, fast ramp"
+        case .max: return "Smart max — full speed before throttle"
         }
     }
 
