@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/icon.svg" alt="ChillMac icon" width="128" height="128">
+  <img src="assets/hero.svg" alt="ChillMac — Stay cool, stay fast." width="860">
 </p>
 
 # ChillMac
