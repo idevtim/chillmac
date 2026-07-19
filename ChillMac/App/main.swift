@@ -12,9 +12,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let updateChecker = UpdateChecker()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Only start FanMonitor at launch — it runs continuously for menu bar + performance mode.
-        // Secondary monitors (CPU, Memory, Battery, System) start when the popover opens
-        // and stop when it closes, managed by StatusBarController.
+        // Only start FanMonitor at launch — it runs continuously for menu bar + Cool.
+        // Detail-panel monitors (CPU, Memory, Battery, System) are unused from the Cool menu path.
         fanMonitor.startMonitoring()
 
         DiagnosticLogger.shared.fanMonitor = fanMonitor
@@ -22,11 +21,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         statusBarController = StatusBarController(
             fanMonitor: fanMonitor,
-            helper: helperConnection,
             systemInfo: systemInfo,
-            memoryInfo: memoryInfo,
-            batteryInfo: batteryInfo,
-            cpuInfo: cpuInfo,
             updateChecker: updateChecker
         )
         updateChecker.startPeriodicChecks()

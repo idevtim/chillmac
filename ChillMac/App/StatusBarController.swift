@@ -8,44 +8,30 @@ final class StatusBarController: NSObject {
     private var eventMonitor: Any?
     private var settingsSub: AnyCancellable?
     private var statusItemSubs = Set<AnyCancellable>()
-    private var heightObserver: Any?
-    private var detailResetObserver: Any?
-    private var detailPanelObserver: Any?
-    private var lastPopoverHeight: CGFloat = 0
     private var lastStatusItemSignature: String?
 
-    private let detailPanel = DetailPanelController()
-    private let memoryInfo: MemoryInfo
-    private let systemInfo: SystemInfo
-    private let batteryInfo: BatteryInfo
-    private let cpuInfo: CpuInfo
-    private let fanMonitor: FanMonitor
-    private let fpsMonitor: DisplayFPSMonitor
-    private let updateChecker: UpdateChecker
-    private let helper: HelperConnection
+    private var settingsWindow: NSWindow?
 
-    init(fanMonitor: FanMonitor, helper: HelperConnection, systemInfo: SystemInfo, memoryInfo: MemoryInfo, batteryInfo: BatteryInfo, cpuInfo: CpuInfo, updateChecker: UpdateChecker) {
+    private let systemInfo: SystemInfo
+    private let fanMonitor: FanMonitor
+    private let updateChecker: UpdateChecker
+
+    init(fanMonitor: FanMonitor, systemInfo: SystemInfo, updateChecker: UpdateChecker) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         popover = NSPopover()
-        self.memoryInfo = memoryInfo
         self.systemInfo = systemInfo
-        self.batteryInfo = batteryInfo
-        self.cpuInfo = cpuInfo
         self.fanMonitor = fanMonitor
-        self.fpsMonitor = DisplayFPSMonitor()
         self.updateChecker = updateChecker
-        self.helper = helper
 
         super.init()
-
-        // Secondary monitors start when popover opens, stop when it closes.
-        // The SwiftUI hosting controller is built on open and dropped on close
-        // so AttributeGraph doesn't accumulate tracked state across days of uptime.
 
         popover.behavior = .applicationDefined
         popover.animates = false
         popover.appearance = AppSettings.shared.nsAppearance
-        popover.contentSize = NSSize(width: 420, height: CGFloat(AppSettings.shared.popoverHeight))
+        popover.contentSize = NSSize(
+            width: AppSettings.popoverWidth,
+            height: CGFloat(AppSettings.shared.popoverHeight)
+        )
 
         if let button = statusItem.button {
             button.imagePosition = .imageLeft
@@ -54,47 +40,18 @@ final class StatusBarController: NSObject {
         }
         updateStatusItem()
 
-        // Close popover when clicking outside both the popover and detail panel
         eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             guard let self, self.popover.isShown else { return }
-
-            // Don't close if clicking inside the detail panel
-            if self.detailPanel.isShown, self.detailPanel.containsMouse {
-                return
-            }
-
-            self.detailPanel.close()
-            NotificationCenter.default.post(name: .popoverDidClose, object: nil)
-            self.popover.performClose(nil)
-            self.popover.contentViewController = nil
-            // Pause secondary monitors and clear visibility flags when popover closes
-            self.cpuInfo.isDetailVisible = false
-            self.memoryInfo.isDetailVisible = false
-            self.systemInfo.isDetailVisible = false
-            self.cpuInfo.stopMonitoring()
-            self.memoryInfo.stopMonitoring()
-            self.batteryInfo.stopMonitoring()
-            self.systemInfo.stopMonitoring()
-            self.fpsMonitor.stopMonitoring()
-            self.fanMonitor.isPopoverVisible = false
+            self.closePopover()
         }
 
-        // Update popover appearance and size when settings change
-        lastPopoverHeight = CGFloat(AppSettings.shared.popoverHeight)
         settingsSub = AppSettings.shared.objectWillChange.sink { [weak self] _ in
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.popover.appearance = AppSettings.shared.nsAppearance
                 self.popover.contentViewController?.view.appearance = AppSettings.shared.nsAppearance
+                self.settingsWindow?.contentView?.appearance = AppSettings.shared.nsAppearance
                 self.updateStatusItem()
-
-                // Handle height changes from settings (e.g. Reset button), not during live drag
-                let newHeight = CGFloat(AppSettings.shared.popoverHeight)
-                if self.popover.isShown && abs(newHeight - self.lastPopoverHeight) >= 1 {
-                    let clamped = min(max(newHeight, AppSettings.popoverMinHeight), AppSettings.popoverMaxHeight)
-                    self.popover.contentSize = NSSize(width: 420, height: clamped)
-                    self.lastPopoverHeight = clamped
-                }
             }
         }
 
@@ -102,27 +59,6 @@ final class StatusBarController: NSObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateStatusItem() }
             .store(in: &statusItemSubs)
-
-        // Live resize during drag — bypasses AppSettings for smooth performance
-        heightObserver = NotificationCenter.default.addObserver(forName: .popoverHeightChanged, object: nil, queue: .main) { [weak self] notification in
-            guard let self, let height = notification.userInfo?["height"] as? CGFloat else { return }
-            self.popover.contentSize = NSSize(width: 420, height: height)
-            self.lastPopoverHeight = height
-        }
-
-        // Close detail panel when height is reset from settings
-        detailResetObserver = NotificationCenter.default.addObserver(forName: .detailPanelHeightReset, object: nil, queue: .main) { [weak self] _ in
-            self?.detailPanel.close()
-        }
-
-        // Gate expensive polling to only run when the relevant detail panel is visible
-        detailPanelObserver = NotificationCenter.default.addObserver(forName: .detailPanelChanged, object: nil, queue: .main) { [weak self] notification in
-            guard let self else { return }
-            let panelID = notification.userInfo?["panelID"] as? String
-            self.cpuInfo.isDetailVisible = (panelID == "cpu")
-            self.memoryInfo.isDetailVisible = (panelID == "memory")
-            self.systemInfo.isDetailVisible = (panelID == "disk")
-        }
     }
 
     /// Template fan always; compact temp title only when setting is on and status is Warm/Hot.
@@ -153,54 +89,28 @@ final class StatusBarController: NSObject {
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
         }
-        if let observer = heightObserver {
-            NotificationCenter.default.removeObserver(observer)
-        }
-        if let observer = detailResetObserver {
-            NotificationCenter.default.removeObserver(observer)
-        }
-        if let observer = detailPanelObserver {
-            NotificationCenter.default.removeObserver(observer)
-        }
     }
 
     @objc private func togglePopover(_ sender: AnyObject?) {
         if popover.isShown {
-            detailPanel.close()
-            NotificationCenter.default.post(name: .popoverDidClose, object: nil)
-            popover.performClose(sender)
-            popover.contentViewController = nil
-            // Pause secondary monitors and clear visibility flags when popover closes
-            cpuInfo.isDetailVisible = false
-            memoryInfo.isDetailVisible = false
-            systemInfo.isDetailVisible = false
-            cpuInfo.stopMonitoring()
-            memoryInfo.stopMonitoring()
-            batteryInfo.stopMonitoring()
-            systemInfo.stopMonitoring()
-            fpsMonitor.stopMonitoring()
-            fanMonitor.isPopoverVisible = false
+            closePopover()
         } else if let button = statusItem.button {
-            // Sync settings and show the hosting view first, then start monitors on the
-            // next turn — otherwise their @Published writes land mid-body and spam
-            // "Publishing changes from within view updates".
             fanMonitor.isPopoverVisible = true
             AppSettings.shared.syncLaunchAtLogin()
-            NotificationCenter.default.post(name: .popoverDidClose, object: nil)
             popover.contentViewController = makeHostingController()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             NSApp.activate(ignoringOtherApps: true)
             popover.contentViewController?.view.window?.makeKeyAndOrderFront(nil)
             NotificationCenter.default.post(name: .popoverDidShow, object: nil)
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                self.cpuInfo.startMonitoring()
-                self.memoryInfo.startMonitoring()
-                self.batteryInfo.startMonitoring()
-                self.systemInfo.startMonitoring()
-                self.fpsMonitor.startMonitoring()
-            }
         }
+    }
+
+    private func closePopover() {
+        guard popover.isShown else { return }
+        NotificationCenter.default.post(name: .popoverDidClose, object: nil)
+        popover.performClose(nil)
+        popover.contentViewController = nil
+        fanMonitor.isPopoverVisible = false
     }
 
     private func makeHostingController() -> NSHostingController<PopoverView> {
@@ -208,64 +118,47 @@ final class StatusBarController: NSObject {
             rootView: PopoverView(
                 monitor: fanMonitor,
                 settings: AppSettings.shared,
-                systemInfo: systemInfo,
-                batteryInfo: batteryInfo,
-                cpuInfo: cpuInfo,
-                memoryInfo: memoryInfo,
-                fpsMonitor: fpsMonitor,
                 updateChecker: updateChecker,
-                helper: helper,
-                onMemoryTap: { [weak self] in self?.toggleMemoryPanel() },
-                onDiskTap: { [weak self] in self?.toggleDiskPanel() },
-                onBatteryTap: { [weak self] in self?.toggleBatteryPanel() },
-                onCpuTap: { [weak self] in self?.toggleCpuPanel() },
-                onTemperatureTap: { [weak self] in self?.toggleTemperaturePanel() }
+                onOpenSettings: { [weak self] in
+                    self?.closePopover()
+                    self?.showSettingsWindow()
+                }
             )
         )
         let height = CGFloat(AppSettings.shared.popoverHeight)
-        hosting.view.frame = NSRect(x: 0, y: 0, width: 420, height: height)
+        hosting.view.frame = NSRect(x: 0, y: 0, width: AppSettings.popoverWidth, height: height)
         hosting.view.appearance = AppSettings.shared.nsAppearance
-        popover.contentSize = NSSize(width: 420, height: height)
+        popover.contentSize = NSSize(width: AppSettings.popoverWidth, height: height)
         return hosting
     }
 
-    private func toggleMemoryPanel() {
-        detailPanel.toggle(
-            id: "memory",
-            content: AppearanceHost(content: MemoryDetailView(memoryInfo: memoryInfo)),
-            relativeTo: popover
-        )
-    }
+    // MARK: - Settings window
 
-    private func toggleDiskPanel() {
-        detailPanel.toggle(
-            id: "disk",
-            content: AppearanceHost(content: DiskDetailView(systemInfo: systemInfo, monitor: fanMonitor, settings: AppSettings.shared)),
-            relativeTo: popover
-        )
-    }
+    func showSettingsWindow() {
+        if settingsWindow == nil {
+            let root = SettingsView(
+                settings: AppSettings.shared,
+                updateChecker: updateChecker,
+                fanMonitor: fanMonitor,
+                systemInfo: systemInfo
+            )
+            let hosting = NSHostingController(rootView: AppearanceHost(content: root))
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 380, height: 560),
+                styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                backing: .buffered,
+                defer: false
+            )
+            window.title = "ChillMac Settings"
+            window.contentViewController = hosting
+            window.isReleasedWhenClosed = false
+            window.setContentSize(NSSize(width: 380, height: 560))
+            window.center()
+            settingsWindow = window
+        }
 
-    private func toggleBatteryPanel() {
-        detailPanel.toggle(
-            id: "battery",
-            content: AppearanceHost(content: BatteryDetailView(batteryInfo: batteryInfo, settings: AppSettings.shared)),
-            relativeTo: popover
-        )
-    }
-
-    private func toggleCpuPanel() {
-        detailPanel.toggle(
-            id: "cpu",
-            content: AppearanceHost(content: CpuDetailView(cpuInfo: cpuInfo, systemInfo: systemInfo, monitor: fanMonitor, settings: AppSettings.shared)),
-            relativeTo: popover
-        )
-    }
-
-    private func toggleTemperaturePanel() {
-        detailPanel.toggle(
-            id: "temperature",
-            content: AppearanceHost(content: TemperatureDetailView(monitor: fanMonitor, settings: AppSettings.shared)),
-            relativeTo: popover
-        )
+        settingsWindow?.contentView?.appearance = AppSettings.shared.nsAppearance
+        NSApp.activate(ignoringOtherApps: true)
+        settingsWindow?.makeKeyAndOrderFront(nil)
     }
 }

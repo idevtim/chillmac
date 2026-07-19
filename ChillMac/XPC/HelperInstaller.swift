@@ -49,9 +49,14 @@ enum HelperInstaller {
         let service = SMAppService.daemon(plistName: "com.idevtim.ChillMac.Helper.plist")
         if service.status == .requiresApproval {
             NSLog("HelperInstaller: daemon requires approval — opening System Settings")
-            if #available(macOS 13.0, *) {
-                SMAppService.openSystemSettingsLoginItems()
-            }
+            openLoginItemsSettings()
+        }
+    }
+
+    /// Always open System Settings → Login Items (Settings Helper row).
+    static func openLoginItemsSettings() {
+        if #available(macOS 13.0, *) {
+            SMAppService.openSystemSettingsLoginItems()
         }
     }
 

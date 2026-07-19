@@ -30,10 +30,10 @@ final class AppSettings: ObservableObject {
 
     @AppStorage("useFahrenheit") var useFahrenheit = false
     @AppStorage("appearanceMode") var appearanceMode: AppearanceMode = .dark
-    /// Cool master switch (formerly Performance Mode).
+    /// Cool engaged (Balanced / Performance). Native sets this false.
     @AppStorage("performanceMode") var performanceMode = false
     @AppStorage("coolIntent") private var coolIntentRaw: String = CoolIntent.balanced.rawValue
-    @AppStorage("popoverHeight") var popoverHeight: Double = 500
+    @AppStorage("popoverHeight") var popoverHeight: Double = 320
     @AppStorage("showScrollIndicators") var showScrollIndicators = true
 
     @AppStorage("detailPanelHeight") var detailPanelHeight: Double = 560
@@ -46,16 +46,38 @@ final class AppSettings: ObservableObject {
     @AppStorage("showFPS") var showFPS = false
     @AppStorage("showMenuBarTemp") var showMenuBarTemp = true
 
-    static let popoverMinHeight: CGFloat = 400
-    static let popoverMaxHeight: CGFloat = 900
-    static let popoverDefaultHeight: CGFloat = 500
+    static let popoverWidth: CGFloat = 300
+    static let popoverMinHeight: CGFloat = 280
+    static let popoverMaxHeight: CGFloat = 480
+    static let popoverDefaultHeight: CGFloat = 320
     static let detailPanelMinHeight: CGFloat = 350
     static let detailPanelMaxHeight: CGFloat = 800
     static let detailPanelDefaultHeight: CGFloat = 560
 
+    /// Intent used by the engagement curve while Cool is on (Balanced / Performance).
     var coolIntent: CoolIntent {
-        get { CoolIntent(rawValue: coolIntentRaw) ?? .balanced }
+        get { CoolIntent.migrated(fromLegacyRaw: coolIntentRaw) }
         set { coolIntentRaw = newValue.rawValue }
+    }
+
+    /// Single source of truth for the Cool menu: Native · Balanced · Performance.
+    var coolMode: CoolIntent {
+        guard performanceMode else { return .native }
+        let intent = coolIntent
+        return intent == .native ? .native : intent
+    }
+
+    /// Selects a Cool menu mode, collapsing the old Cool on/off toggle.
+    func setCoolMode(_ mode: CoolIntent) {
+        switch mode {
+        case .native:
+            performanceMode = false
+            coolIntentRaw = CoolIntent.native.rawValue
+        case .balanced, .performance:
+            performanceMode = true
+            coolIntentRaw = mode.rawValue
+        }
+        objectWillChange.send()
     }
 
     var preferredColorScheme: ColorScheme? {
@@ -83,6 +105,7 @@ final class AppSettings: ObservableObject {
 
     private init() {
         migrateCoolIntentIfNeeded()
+        migratePopoverSizeIfNeeded()
         syncLaunchAtLogin()
     }
 
@@ -91,6 +114,22 @@ final class AppSettings: ObservableObject {
         if defaults.object(forKey: "coolIntent") == nil,
            let legacy = defaults.string(forKey: "performanceLevel") {
             coolIntentRaw = CoolIntent.migrated(fromLegacyRaw: legacy).rawValue
+        }
+
+        // Quiet / low → Native; Native means macOS owns fans.
+        let migrated = CoolIntent.migrated(fromLegacyRaw: coolIntentRaw)
+        if coolIntentRaw != migrated.rawValue {
+            coolIntentRaw = migrated.rawValue
+        }
+        if migrated == .native, performanceMode {
+            performanceMode = false
+        }
+    }
+
+    private func migratePopoverSizeIfNeeded() {
+        if popoverHeight > Double(Self.popoverMaxHeight)
+            || popoverHeight < Double(Self.popoverMinHeight) {
+            popoverHeight = Double(Self.popoverDefaultHeight)
         }
     }
 

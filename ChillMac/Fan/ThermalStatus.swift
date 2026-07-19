@@ -7,7 +7,7 @@ enum ThermalStatus: Equatable {
     case warm
     case hot
 
-    /// Same thresholds as the popover header: Warm ≥ 75°C, Hot ≥ 90°C.
+    /// Same thresholds as the Cool zone track: Warm ≥ 75°C, Hot ≥ 90°C.
     static func from(peakCelsius: Double) -> ThermalStatus {
         guard peakCelsius > 0 else { return .unknown }
         if peakCelsius >= 90 { return .hot }
@@ -43,6 +43,23 @@ enum ThermalStatus: Equatable {
         case .unknown, .good: return .green
         case .warm: return .orange
         case .hot: return .red
+        }
+    }
+
+    /// Marker position 0…1 on the Cool zone track (prototype: 30–100°C mapped).
+    static func zoneTrackPosition(peakCelsius: Double) -> Double {
+        let x = max(30.0, min(100.0, peakCelsius))
+        if x <= 75 { return ((x - 30) / 45) * 0.55 }
+        if x <= 90 { return 0.55 + ((x - 75) / 15) * 0.20 }
+        return 0.75 + ((x - 90) / 10) * 0.25
+    }
+
+    /// Appends Limited / Throttled from ProcessInfo thermal state when not nominal.
+    static func severitySuffix(thermalState: ProcessInfo.ThermalState) -> String? {
+        switch thermalState {
+        case .fair: return "Limited"
+        case .serious, .critical: return "Throttled"
+        default: return nil
         }
     }
 

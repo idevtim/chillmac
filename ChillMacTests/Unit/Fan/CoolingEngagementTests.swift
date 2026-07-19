@@ -56,7 +56,7 @@ struct CoolingEngagementTests {
         let next = CoolingEngagement.nextState(
             currentlyEngaged: false,
             peakCelsius: 30,
-            intent: .quiet,
+            intent: .native,
             thermalForceEngage: true,
             secondsInBand: 0
         )

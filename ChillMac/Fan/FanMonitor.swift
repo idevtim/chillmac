@@ -24,6 +24,8 @@ final class FanMonitor: ObservableObject {
     @Published var batterySaverActive = false
     /// True when Cool is on and hysteresis engagement is active (driving fans)
     @Published var coolingEngaged = false
+    /// Live ProcessInfo thermal state for Cool throttle cue (Fair / Serious / Critical).
+    @Published var processThermalState: ProcessInfo.ThermalState = .nominal
 
     /// User overrides that persist across poll cycles
     @Published var manualOverrides: [Int: Bool] = [:]   // fanIndex → manual on/off
@@ -139,6 +141,9 @@ final class FanMonitor: ObservableObject {
 
     private func refreshThermalForceEngage() {
         let state = ProcessInfo.processInfo.thermalState
+        if processThermalState != state {
+            processThermalState = state
+        }
         thermalForceEngage = (state == .serious || state == .critical)
     }
 

@@ -1,42 +1,47 @@
 import Foundation
 
-/// Closed cooling intensity — Quiet / Balanced / Performance (replaces Low→Ultra soup).
+/// Closed cooling intensity — Native / Balanced / Performance.
 enum CoolIntent: String, CaseIterable {
-    case quiet
+    case native
     case balanced
     case performance
 
     var label: String {
         switch self {
-        case .quiet: return "Quiet"
+        case .native: return "Native"
         case .balanced: return "Balanced"
         case .performance: return "Performance"
         }
     }
 
     var fullLabel: String {
-        switch self {
-        case .quiet: return "Quiet"
-        case .balanced: return "Balanced"
-        case .performance: return "Performance"
-        }
+        label
     }
 
     var description: String {
         switch self {
-        case .quiet: return "Silent until Warm — gentle when cooling"
+        case .native: return "macOS owns fans"
         case .balanced: return "Silent until needed — responsive when hot"
         case .performance: return "Earlier cooling — still silent when cool"
         }
     }
 
-    /// Migrate legacy PerformanceLevel raw values stored in UserDefaults.
+    /// Glyph shown in the Cool mode list (Battery-style).
+    var modeGlyph: String {
+        switch self {
+        case .native: return "○"
+        case .balanced: return "◎"
+        case .performance: return "◉"
+        }
+    }
+
+    /// Migrate legacy PerformanceLevel / Quiet raw values stored in UserDefaults.
     static func migrated(fromLegacyRaw raw: String?) -> CoolIntent {
         switch raw {
-        case "low": return .quiet
+        case "low", "quiet": return .native
         case "medium", "high", nil: return .balanced
         case "max", "ultra": return .performance
-        case "quiet": return .quiet
+        case "native": return .native
         case "balanced": return .balanced
         case "performance": return .performance
         default: return .balanced
@@ -53,7 +58,7 @@ enum CoolingEngagementState: Equatable {
 enum CoolingEngagement {
     static func engageCelsius(intent: CoolIntent) -> Double {
         switch intent {
-        case .quiet: return 70
+        case .native: return 70
         case .balanced: return 65
         case .performance: return 55
         }
@@ -61,7 +66,7 @@ enum CoolingEngagement {
 
     static func releaseCelsius(intent: CoolIntent) -> Double {
         switch intent {
-        case .quiet: return 60
+        case .native: return 60
         case .balanced: return 55
         case .performance: return 45
         }
@@ -69,7 +74,7 @@ enum CoolingEngagement {
 
     static func dwellSeconds(intent: CoolIntent) -> TimeInterval {
         switch intent {
-        case .quiet: return 25
+        case .native: return 25
         case .balanced: return 18
         case .performance: return 12
         }
@@ -78,7 +83,7 @@ enum CoolingEngagement {
     /// Soft floor only while engaged — never while idle.
     static func softFloorWhileEngaged(intent: CoolIntent) -> Double {
         switch intent {
-        case .quiet: return 0.05
+        case .native: return 0.05
         case .balanced: return 0.15
         case .performance: return 0.25
         }

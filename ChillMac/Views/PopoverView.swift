@@ -1,236 +1,298 @@
-import Combine
 import SwiftUI
 
 struct PopoverView: View {
     @ObservedObject var monitor: FanMonitor
     @ObservedObject var settings: AppSettings
-    @ObservedObject var systemInfo: SystemInfo
-    @ObservedObject var batteryInfo: BatteryInfo
-    @ObservedObject var cpuInfo: CpuInfo
-    @ObservedObject var memoryInfo: MemoryInfo
-    @ObservedObject var fpsMonitor: DisplayFPSMonitor
     @ObservedObject var updateChecker: UpdateChecker
-    let helper: HelperConnection
-    var onMemoryTap: (() -> Void)?
-    var onDiskTap: (() -> Void)?
-    var onBatteryTap: (() -> Void)?
-    var onCpuTap: (() -> Void)?
-    var onTemperatureTap: (() -> Void)?
-
-    @State private var showingSettings = false
-    @State private var liveHeight: CGFloat = 0
-    @State private var dragStartHeight: CGFloat = 0
-    @State private var activePanelID: String?
+    var onOpenSettings: (() -> Void)?
 
     var body: some View {
         ZStack {
             Rectangle().fill(.regularMaterial)
 
-            if showingSettings {
-                SettingsView(
-                    settings: settings,
-                    updateChecker: updateChecker,
-                    systemInfo: systemInfo,
-                    fanMonitor: monitor,
-                    cpuInfo: cpuInfo,
-                    memoryInfo: memoryInfo,
-                    batteryInfo: batteryInfo
-                ) {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        showingSettings = false
-                    }
-                }
-                .transition(.move(edge: .trailing).combined(with: .opacity))
-            } else {
-                mainContent
-                    .transition(.move(edge: .leading).combined(with: .opacity))
-            }
-        }
-        .frame(width: 420, height: liveHeight > 0 ? liveHeight : CGFloat(settings.popoverHeight))
-        .preferredColorScheme(settings.preferredColorScheme)
-        .onReceive(NotificationCenter.default.publisher(for: .popoverDidShow)) { _ in
-            showingSettings = false
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .popoverDidClose)) { _ in
-            activePanelID = nil
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .detailPanelChanged)) { notification in
-            activePanelID = notification.userInfo?["panelID"] as? String
-        }
-    }
-
-    private var mainContent: some View {
-        VStack(spacing: 0) {
             if let error = monitor.smcError {
                 errorSection(error)
             } else {
-                VStack(alignment: .leading, spacing: 0) {
-                    statusHeader
-                        .padding(.horizontal, 20)
-                        .padding(.top, 14)
-                        .padding(.bottom, 4)
-
-                    Form {
-                        coolSection
-                        fansSection
-                        systemSection
-                    }
-                    .formStyle(.grouped)
-                    .scrollContentBackground(.hidden)
-                    .scrollIndicators(settings.showScrollIndicators ? .automatic : .hidden)
-                }
+                coolMenu
             }
-
-            footerSection
         }
+        .frame(width: AppSettings.popoverWidth, height: CGFloat(settings.popoverHeight))
+        .preferredColorScheme(settings.preferredColorScheme)
     }
 
-    // MARK: - Quiet status (unboxed section header)
+    // MARK: - Cool menu (Battery-style)
 
-    private var statusHeader: some View {
-        HStack(spacing: 0) {
-            Text(currentThermalStatus.label)
-                .foregroundStyle(currentThermalStatus.emphasisColor)
-            Text(" · ")
+    private var coolMenu: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            header
+                .padding(.horizontal, 14)
+                .padding(.top, 14)
+                .padding(.bottom, 6)
+
+            zoneTrack
+                .padding(.horizontal, 14)
+                .padding(.bottom, 12)
+
+            Divider()
+
+            Text("Mode")
+                .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
-            Text(systemInfo.machineModel)
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 0)
+                .padding(.horizontal, 14)
+                .padding(.top, 8)
+                .padding(.bottom, 2)
+
+            ForEach(CoolIntent.allCases, id: \.self) { mode in
+                modeRow(mode)
+            }
+
+            if showsHelperCTA {
+                helperCTA
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+            }
+
+            if monitor.batterySaverActive, settings.coolMode != .native {
+                batterySaverCaption
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 6)
+            }
+
+            Divider()
+
+            footerLink("Settings…", badge: updateChecker.updateAvailable) {
+                onOpenSettings?()
+            }
+
+            Divider()
+
+            footerLink("Quit ChillMac") {
+                NSApp.terminate(nil)
+            }
         }
-        .font(.subheadline)
-        .textCase(nil)
     }
 
-    private var currentThermalStatus: ThermalStatus {
-        guard !monitor.sensors.isEmpty,
-              let maxTemp = monitor.sensors.map(\.temperature).max() else {
-            return .unknown
-        }
-        return ThermalStatus.from(peakCelsius: maxTemp)
-    }
-
-    // MARK: - Cool
-
-    @ViewBuilder
-    private var coolSection: some View {
-        Section {
-            Toggle(isOn: $settings.performanceMode) {
+    private var header: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text("Cool")
-            }
-            .disabled(!monitor.helperReady)
-
-            if !monitor.helperReady {
-                Text("Approve ChillMac in Login Items, then install the helper.")
-                    .font(.caption)
+                    .font(.system(size: 13, weight: .semibold))
+                Text(statusSubline)
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Button("Install Helper") { installHelper() }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-            } else if settings.performanceMode {
-                Picker("Intent", selection: coolIntentBinding) {
-                    ForEach(CoolIntent.allCases, id: \.self) { intent in
-                        Text(intent.label).tag(intent)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-
-                if monitor.batterySaverActive {
-                    HStack {
-                        Text("Battery saver — fans on Auto")
-                            .foregroundStyle(.orange)
-                        Spacer()
-                        Button("Override") { settings.forcePerformanceOnBattery = true }
-                            .buttonStyle(.link)
-                    }
-                    .font(.caption)
-                }
             }
-        } footer: {
-            Text(coolStatusLine)
-                .foregroundStyle(.secondary)
+
+            Spacer(minLength: 8)
+
+            VStack(alignment: .trailing, spacing: 4) {
+                if showsThrottleCue {
+                    throttleCue
+                }
+                Text(peakTempDisplay)
+                    .font(.system(size: 13, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(currentThermalStatus.emphasisColor)
+            }
         }
     }
 
-    private var coolIntentBinding: Binding<CoolIntent> {
-        Binding(
-            get: { settings.coolIntent },
-            set: { settings.coolIntent = $0 }
+    private var statusSubline: String {
+        var line = currentThermalStatus.label
+        if let suffix = ThermalStatus.severitySuffix(thermalState: monitor.processThermalState) {
+            line += " · \(suffix)"
+        }
+        return line
+    }
+
+    private var peakTempDisplay: String {
+        guard monitor.peakTemperature > 0 else { return "--" }
+        return ThermalStatus.menuBarTemperatureText(
+            celsius: monitor.peakTemperature,
+            useFahrenheit: settings.useFahrenheit
         )
     }
 
-    private var coolStatusLine: String {
-        if !monitor.helperReady {
-            return "Helper required to control fans"
-        }
-        if !settings.performanceMode {
-            return "macOS controls fans"
-        }
-        if monitor.coolingEngaged {
-            return "Cooling · \(settings.formatTemperature(monitor.peakTemperature)) · \(settings.coolIntent.fullLabel)"
-        }
-        return "Fans on Auto"
+    private var currentThermalStatus: ThermalStatus {
+        ThermalStatus.from(peakCelsius: monitor.peakTemperature)
     }
 
-    // MARK: - Fans
+    private var showsThrottleCue: Bool {
+        switch monitor.processThermalState {
+        case .fair, .serious, .critical: return true
+        default: return false
+        }
+    }
 
-    @ViewBuilder
-    private var fansSection: some View {
-        Section("Fans") {
-            if monitor.fans.isEmpty {
-                Text("No fans detected")
-                    .foregroundStyle(.tertiary)
-            } else {
-                ForEach(monitor.fans, id: \.id) { fan in
-                    FanRowView(fan: fan, helper: helper, monitor: monitor)
+    private var throttleCue: some View {
+        let state = monitor.processThermalState
+        let filled: Int = {
+            switch state {
+            case .fair: return 2
+            case .serious: return 3
+            case .critical: return 4
+            default: return 0
+            }
+        }()
+        let label: String = {
+            switch state {
+            case .fair: return "Fair"
+            case .serious: return "Serious"
+            case .critical: return "Critical"
+            default: return ""
+            }
+        }()
+        let hot = state == .serious || state == .critical
+
+        return HStack(spacing: 5) {
+            HStack(alignment: .bottom, spacing: 2) {
+                ForEach(0..<4, id: \.self) { index in
+                    RoundedRectangle(cornerRadius: 1, style: .continuous)
+                        .fill(index < filled ? (hot ? Color.red : Color.orange) : Color.primary.opacity(0.12))
+                        .frame(width: 3, height: CGFloat([4, 5, 7, 8][index]))
                 }
             }
+            .frame(height: 8)
+
+            Text(label)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(hot ? Color.red : Color.orange)
         }
     }
 
-    // MARK: - System (Form rows — Settings kinship)
+    private var zoneTrack: some View {
+        let status = currentThermalStatus
+        let position = ThermalStatus.zoneTrackPosition(peakCelsius: monitor.peakTemperature)
 
-    @ViewBuilder
-    private var systemSection: some View {
-        Section("System") {
-            systemRow("Memory", value: String(format: "%.0f%%", memoryInfo.pressurePercent), active: activePanelID == "memory", action: onMemoryTap)
-            systemRow("CPU", value: String(format: "%.0f%%", cpuInfo.totalUsage), active: activePanelID == "cpu", action: onCpuTap)
-            systemRow("Battery", value: "\(batteryInfo.currentCharge)%", active: activePanelID == "battery", action: onBatteryTap)
-            systemRow("Disk", value: systemInfo.diskUsage, active: activePanelID == "disk", action: onDiskTap)
-            systemRow("Temp", value: maxTempDisplay, active: activePanelID == "temperature", action: onTemperatureTap)
+        return VStack(spacing: 5) {
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.green,
+                                    Color.green,
+                                    Color.orange,
+                                    Color.red,
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(height: 7)
+
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 12, height: 12)
+                        .overlay(
+                            Circle()
+                                .stroke(status.color, lineWidth: 2)
+                        )
+                        .shadow(color: .black.opacity(0.2), radius: 1.5, y: 1)
+                        .offset(x: max(0, min(geo.size.width, geo.size.width * position) - 6))
+                }
+                .frame(maxHeight: .infinity, alignment: .center)
+            }
+            .frame(height: 12)
+
+            HStack {
+                Text("Good")
+                Spacer()
+                Text("Warm")
+                Spacer()
+                Text("Hot")
+            }
+            .font(.system(size: 9, weight: .medium))
+            .foregroundStyle(.tertiary)
         }
     }
 
-    private func systemRow(_ title: String, value: String, active: Bool, action: (() -> Void)?) -> some View {
-        Button {
-            action?()
+    private func modeRow(_ mode: CoolIntent) -> some View {
+        let selected = settings.coolMode == mode
+        return Button {
+            selectMode(mode)
         } label: {
-            LabeledContent(title) {
-                HStack(spacing: 6) {
-                    Text(value)
-                        .font(.body.monospacedDigit())
-                        .foregroundStyle(.primary)
-                    if action != nil {
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.tertiary)
-                    }
+            HStack(spacing: 8) {
+                Text(mode.modeGlyph)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(selected ? Color.white : Color.secondary)
+                    .frame(width: 22, height: 22)
+                    .background(
+                        Circle()
+                            .fill(selected ? Color.accentColor : Color.primary.opacity(0.06))
+                    )
+
+                Text(mode.label)
+                    .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                    .foregroundStyle(.primary)
+
+                Spacer(minLength: 4)
+
+                if mode == .native {
+                    Text(mode.description)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
                 }
             }
-            .foregroundStyle(.primary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .listRowBackground(active ? Color.accentColor.opacity(0.12) : nil)
-        .disabled(action == nil)
     }
 
-    private var maxTempDisplay: String {
-        guard !monitor.sensors.isEmpty,
-              let maxTemp = monitor.sensors.map(\.temperature).max() else {
-            return "--"
+    private var showsHelperCTA: Bool {
+        settings.coolMode != .native && !monitor.helperReady
+    }
+
+    private var helperCTA: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Approve ChillMac in Login Items, then install the helper.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("Install Helper") { installHelper() }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
         }
-        return settings.formatTemperature(maxTemp)
+    }
+
+    private var batterySaverCaption: some View {
+        HStack {
+            Text("Battery saver — fans on Auto")
+                .foregroundStyle(.orange)
+            Spacer()
+            Button("Override") { settings.forcePerformanceOnBattery = true }
+                .buttonStyle(.link)
+        }
+        .font(.caption)
+    }
+
+    private func footerLink(_ title: String, badge: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.primary)
+                Spacer()
+                if badge {
+                    Circle()
+                        .fill(Color.accentColor)
+                        .frame(width: 7, height: 7)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func selectMode(_ mode: CoolIntent) {
+        if mode != .native, !monitor.helperReady {
+            settings.setCoolMode(mode)
+            return
+        }
+        settings.setCoolMode(mode)
     }
 
     private func installHelper() {
@@ -264,104 +326,17 @@ struct PopoverView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(DesignSystem.Space.xxl)
     }
-
-    private var footerSection: some View {
-        VStack(spacing: 0) {
-            resizeHandle
-            HStack {
-                Button { NSApp.terminate(nil) } label: {
-                    Image(systemName: "power")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-
-                Spacer()
-
-                if settings.showFPS {
-                    Text("\(fpsMonitor.fps) FPS")
-                        .font(.system(size: 13, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.tertiary)
-                } else {
-                    Text("ChillMac")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.tertiary)
-                }
-
-                Spacer()
-
-                Button {
-                    NotificationCenter.default.post(name: .detailPanelHeightReset, object: nil)
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        showingSettings = true
-                    }
-                } label: {
-                    ZStack(alignment: .topTrailing) {
-                        Image(systemName: "gearshape")
-                            .foregroundStyle(.secondary)
-                        if updateChecker.updateAvailable {
-                            Circle()
-                                .fill(Color.accentColor)
-                                .frame(width: 7, height: 7)
-                                .offset(x: 2, y: -2)
-                        }
-                    }
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, DesignSystem.Space.xl)
-            .padding(.vertical, DesignSystem.Space.md)
-        }
-        .background(.bar)
-    }
-
-    private var resizeHandle: some View {
-        Capsule()
-            .fill(.quaternary)
-            .frame(width: 36, height: 4)
-            .padding(.top, 6)
-            .padding(.bottom, 4)
-            .frame(maxWidth: .infinity)
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(coordinateSpace: .global)
-                    .onChanged { value in
-                        if liveHeight == 0 {
-                            liveHeight = CGFloat(settings.popoverHeight)
-                            dragStartHeight = liveHeight
-                        }
-                        let delta = value.location.y - value.startLocation.y
-                        let newHeight = min(max(dragStartHeight + delta, AppSettings.popoverMinHeight), AppSettings.popoverMaxHeight)
-                        liveHeight = newHeight
-                        NotificationCenter.default.post(name: .popoverHeightChanged, object: nil, userInfo: ["height": newHeight])
-                    }
-                    .onEnded { _ in
-                        settings.popoverHeight = Double(liveHeight)
-                        liveHeight = 0
-                        dragStartHeight = 0
-                    }
-            )
-            .onHover { hovering in
-                if hovering { NSCursor.resizeUpDown.push() }
-                else { NSCursor.pop() }
-            }
-    }
 }
 
 #if DEBUG
 #Preview("Popover Cool") {
     AppSettings.shared.appearanceMode = .dark
-    AppSettings.shared.performanceMode = true
-    AppSettings.shared.coolIntent = .balanced
+    AppSettings.shared.setCoolMode(.balanced)
     return PopoverView(
         monitor: PreviewSupport.fanMonitorPerformanceActive,
         settings: AppSettings.shared,
-        systemInfo: PreviewSupport.systemInfo,
-        batteryInfo: PreviewSupport.batteryInfo,
-        cpuInfo: PreviewSupport.cpuInfo,
-        memoryInfo: PreviewSupport.memoryInfo,
-        fpsMonitor: PreviewSupport.fpsMonitor,
         updateChecker: PreviewSupport.updateChecker,
-        helper: PreviewSupport.helper
+        onOpenSettings: {}
     )
     .previewHost(scheme: .dark)
 }

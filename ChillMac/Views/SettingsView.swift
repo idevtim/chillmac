@@ -3,33 +3,13 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var updateChecker: UpdateChecker
+    @ObservedObject var fanMonitor: FanMonitor
     let systemInfo: SystemInfo
-    let fanMonitor: FanMonitor
-    let cpuInfo: CpuInfo
-    let memoryInfo: MemoryInfo
-    let batteryInfo: BatteryInfo
-    let onDismiss: () -> Void
 
     @State private var showAdvanced = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("Settings")
-                    .font(DesignSystem.TypeScale.title)
-                    .foregroundStyle(.primary)
-                Spacer()
-                Button(action: onDismiss) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.tertiary)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, DesignSystem.Space.xl)
-            .padding(.top, 18)
-            .padding(.bottom, DesignSystem.Space.md)
-
             Form {
                 Section("General") {
                     Toggle(isOn: Binding(
@@ -38,6 +18,69 @@ struct SettingsView: View {
                     )) {
                         Label("Launch at Login", systemImage: "sunrise")
                     }
+
+                    Toggle("Show Temp in Menu Bar", isOn: $settings.showMenuBarTemp)
+
+                    Picker("Temperature", selection: $settings.useFahrenheit) {
+                        Text("°C").tag(false)
+                        Text("°F").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+
+                    Picker("Appearance", selection: appearanceBinding) {
+                        ForEach(AppearanceMode.allCases, id: \.self) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                Section("Cool") {
+                    LabeledContent("Default mode") {
+                        Text(settings.coolMode.label)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Toggle("Keep Cool When Closed on AC", isOn: $settings.keepFansClosedOnPower)
+                }
+
+                Section("Battery Saver") {
+                    Toggle("Enable Battery Saver", isOn: $settings.batterySaverEnabled)
+                    if settings.batterySaverEnabled {
+                        HStack {
+                            Text("Threshold")
+                            Spacer()
+                            Text("\(settings.batterySaverThreshold)%")
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+                        Slider(
+                            value: Binding(
+                                get: { Double(settings.batterySaverThreshold) },
+                                set: { settings.batterySaverThreshold = Int($0) }
+                            ),
+                            in: 5...50,
+                            step: 5
+                        )
+                    }
+                }
+
+                Section {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Fan control helper")
+                        Text("Not needed for Native. Required for Balanced & Performance.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    LabeledContent("Status") {
+                        Text(helperStatusLabel)
+                            .foregroundStyle(fanMonitor.helperReady ? .green : .orange)
+                    }
+                    Button("Manage in Login Items…") {
+                        HelperInstaller.openLoginItemsSettings()
+                    }
+                } header: {
+                    Text("Helper")
                 }
 
                 Section("Updates") {
@@ -68,63 +111,12 @@ struct SettingsView: View {
                     }
                 }
 
-                Section("Appearance") {
-                    Picker("Appearance", selection: appearanceBinding) {
-                        ForEach(AppearanceMode.allCases, id: \.self) { mode in
-                            Text(mode.label).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                }
-
-                Section("Temperature") {
-                    Picker("Unit", selection: $settings.useFahrenheit) {
-                        Text("°C").tag(false)
-                        Text("°F").tag(true)
-                    }
-                    .pickerStyle(.segmented)
-                }
-
-                Section("Battery Saver") {
-                    Toggle("Enable Battery Saver", isOn: $settings.batterySaverEnabled)
-                    if settings.batterySaverEnabled {
-                        HStack {
-                            Text("Threshold")
-                            Spacer()
-                            Text("\(settings.batterySaverThreshold)%")
-                                .foregroundStyle(.secondary)
-                                .monospacedDigit()
-                        }
-                        Slider(
-                            value: Binding(
-                                get: { Double(settings.batterySaverThreshold) },
-                                set: { settings.batterySaverThreshold = Int($0) }
-                            ),
-                            in: 5...50,
-                            step: 5
-                        )
-                    }
-                }
-
-                Section("Display") {
-                    Toggle("Show Temp in Menu Bar", isOn: $settings.showMenuBarTemp)
-                }
-
                 Section {
                     DisclosureGroup("Advanced", isExpanded: $showAdvanced) {
                         Toggle("Force Cool on Battery", isOn: $settings.forcePerformanceOnBattery)
                         Toggle("Keep Fans on Screen Sleep", isOn: $settings.keepFansOnScreenSleep)
-                        Toggle("Keep Fans When Closed on Power", isOn: $settings.keepFansClosedOnPower)
                         Toggle("Show Scrollbars", isOn: $settings.showScrollIndicators)
                         Toggle("Show FPS", isOn: $settings.showFPS)
-                        Button("Reset Window Height") {
-                            settings.popoverHeight = Double(AppSettings.popoverDefaultHeight)
-                            settings.detailPanelHeight = Double(AppSettings.detailPanelDefaultHeight)
-                            NotificationCenter.default.post(name: .popoverHeightChanged, object: nil, userInfo: [
-                                "height": CGFloat(AppSettings.popoverDefaultHeight)
-                            ])
-                            NotificationCenter.default.post(name: .detailPanelHeightReset, object: nil)
-                        }
                     }
                 }
 
@@ -149,7 +141,12 @@ struct SettingsView: View {
             }
             .padding(.bottom, DesignSystem.Space.md)
         }
+        .frame(minWidth: 360, idealWidth: 380, minHeight: 420)
         .onAppear { updateChecker.performCheck() }
+    }
+
+    private var helperStatusLabel: String {
+        fanMonitor.helperReady ? "Ready" : "Not ready"
     }
 
     private var appearanceBinding: Binding<AppearanceMode> {
@@ -165,12 +162,8 @@ struct SettingsView: View {
     SettingsView(
         settings: AppSettings.shared,
         updateChecker: PreviewSupport.updateChecker,
-        systemInfo: PreviewSupport.systemInfo,
         fanMonitor: PreviewSupport.fanMonitor,
-        cpuInfo: PreviewSupport.cpuInfo,
-        memoryInfo: PreviewSupport.memoryInfo,
-        batteryInfo: PreviewSupport.batteryInfo,
-        onDismiss: {}
+        systemInfo: PreviewSupport.systemInfo
     )
     .previewHost(scheme: .dark)
 }

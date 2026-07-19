@@ -11,7 +11,7 @@ enum PerformanceCurve {
 
     static func rampUpRate(intent: CoolIntent) -> Double {
         switch intent {
-        case .quiet: return 400
+        case .native: return 400
         case .balanced: return 1200
         case .performance: return 3500
         }
@@ -19,7 +19,7 @@ enum PerformanceCurve {
 
     static func rampDownRate(intent: CoolIntent) -> Double {
         switch intent {
-        case .quiet: return 150
+        case .native: return 150
         case .balanced: return 400
         case .performance: return 800
         }
@@ -27,7 +27,7 @@ enum PerformanceCurve {
 
     static func smoothingFactor(intent: CoolIntent) -> Double {
         switch intent {
-        case .quiet: return 0.15
+        case .native: return 0.15
         case .balanced: return 0.35
         case .performance: return 0.70
         }
@@ -38,7 +38,8 @@ enum PerformanceCurve {
     static func speedPercent(intent: CoolIntent, temperature temp: Double) -> Double {
         let floor = CoolingEngagement.softFloorWhileEngaged(intent: intent)
         switch intent {
-        case .quiet:
+        case .native:
+            // Former Quiet curve — kept for Native intent math; Native mode itself leaves fans to macOS.
             switch temp {
             case ...70: return floor
             case 70..<85: return floor + (temp - 70) / 15.0 * (0.30 - floor)
