@@ -10,6 +10,7 @@ enum PerformanceCurve {
         case .medium: return 0.10
         case .high: return 0.25
         case .max: return 0.50     // proactive baseline; never need to spin up from cold
+        case .ultra: return 0.70   // pure performance — cool early, hold clocks
         }
     }
 
@@ -20,6 +21,7 @@ enum PerformanceCurve {
         case .medium: return 700
         case .high: return 1200
         case .max: return 2000
+        case .ultra: return 3500
         }
     }
 
@@ -30,6 +32,7 @@ enum PerformanceCurve {
         case .medium: return 250
         case .high: return 400
         case .max: return 500
+        case .ultra: return 800
         }
     }
 
@@ -40,6 +43,7 @@ enum PerformanceCurve {
         case .medium: return 0.25
         case .high: return 0.35
         case .max: return 0.50
+        case .ultra: return 0.70
         }
     }
 
@@ -82,6 +86,15 @@ enum PerformanceCurve {
             case ...40: return 0.50
             case 40..<55: return 0.50 + (temp - 40) / 15.0 * 0.20   // 50 → 70%
             case 55..<68: return 0.70 + (temp - 55) / 13.0 * 0.30   // 70 → 100%
+            default: return 1.0
+            }
+        case .ultra:
+            // Pure performance: higher floor (70%), 100% by ~60°C — still temp-responsive,
+            // not constant blast.
+            switch temp {
+            case ...35: return 0.70
+            case 35..<48: return 0.70 + (temp - 35) / 13.0 * 0.15   // 70 → 85%
+            case 48..<60: return 0.85 + (temp - 48) / 12.0 * 0.15   // 85 → 100%
             default: return 1.0
             }
         }

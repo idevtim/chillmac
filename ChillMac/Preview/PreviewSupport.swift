@@ -65,6 +65,26 @@ enum PreviewSupport {
         return monitor
     }
 
+    /// Fan monitor seeded for Performance Mode Ultra under mild load (~55°C → mid-high curve %, not 100%).
+    static var fanMonitorUltra: FanMonitor {
+        let peak: Double = 55
+        let monitor = fanMonitor
+        monitor.peakTemperature = peak
+        monitor.peakTemperatureLabel = "CPU Die"
+        monitor.peakCpuTemperature = peak
+        monitor.peakGpuTemperature = 48.0
+        monitor.peakSsdTemperature = 38.0
+        monitor.sensors = [
+            TemperatureSensor(id: "Tp09", label: "CPU Die", temperature: peak),
+            TemperatureSensor(id: "TG0P", label: "GPU", temperature: 48.0),
+            TemperatureSensor(id: "TH0x", label: "SSD", temperature: 38.0),
+            TemperatureSensor(id: "TB0T", label: "Battery", temperature: 32.0),
+        ]
+        monitor.performanceCurvePercent =
+            PerformanceCurve.speedPercent(level: .ultra, temperature: peak) * 100
+        return monitor
+    }
+
     /// Posts the same notification StatusBarController sends when the popover opens,
     /// so `@State appeared` fades content in during canvas previews.
     static func triggerPopoverAppeared() {
