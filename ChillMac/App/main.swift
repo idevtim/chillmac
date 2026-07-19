@@ -34,7 +34,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Install/load the privileged helper in the background so the UI appears immediately
         DispatchQueue.global(qos: .userInitiated).async { [self] in
             if HelperInstaller.isRegistered() {
-                // Daemon is registered — check if it's the right version
                 let status = HelperInstaller.checkHelperStatus()
                 switch status {
                 case .runningCorrectVersion:
@@ -44,22 +43,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     HelperInstaller.unregister()
                     _ = HelperInstaller.register()
                 case .notRunning:
-                    // Registered but not responding — likely just needs a moment after launch
-                    NSLog("AppDelegate: helper registered but not responding")
+                    NSLog("AppDelegate: helper registered but not responding — re-registering")
+                    _ = HelperInstaller.register()
                 }
             } else {
-                // Not registered at all — first install, prompt is expected
                 NSLog("AppDelegate: helper not registered — installing")
                 _ = HelperInstaller.register()
             }
 
-            // Reset all fans to auto on startup
-            self.resetFansToAuto()
+            HelperInstaller.openApprovalSettingsIfNeeded()
+
+            // Brief settle after registration before probing XPC
+            Thread.sleep(forTimeInterval: 0.5)
+            let liveStatus = HelperInstaller.checkHelperStatus()
+            let ready = HelperReadiness.isReady(liveStatus)
+
+            if ready {
+                self.resetFansToAuto()
+            }
 
             DispatchQueue.main.async {
                 self.fanMonitor.helper = self.helperConnection
-                self.fanMonitor.helperReady = true
-                self.fanMonitor.setupSystemObservers()
+                // Only advertise helper control when XPC actually answers
+                self.fanMonitor.helperReady = ready
+                if ready {
+                    self.fanMonitor.setupSystemObservers()
+                }
             }
         }
     }

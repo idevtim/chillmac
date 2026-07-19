@@ -66,9 +66,9 @@ struct FanRowView: View {
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(theme.textPrimary)
 
-                    Text(settings.performanceMode ? "Performance" : (isManual.wrappedValue ? "Manual" : "Auto"))
+                    Text(PerformanceControl.isActivelyControlling(performanceMode: settings.performanceMode, helperReady: monitor.helperReady) ? "Performance" : (isManual.wrappedValue ? "Manual" : "Auto"))
                         .font(.system(size: 12))
-                        .foregroundColor(settings.performanceMode ? .orange : theme.textQuaternary)
+                        .foregroundColor(PerformanceControl.isActivelyControlling(performanceMode: settings.performanceMode, helperReady: monitor.helperReady) ? .orange : theme.textQuaternary)
                 }
 
                 Spacer()
@@ -85,7 +85,7 @@ struct FanRowView: View {
             }
 
             // Manual/Auto toggle
-            if settings.performanceMode {
+            if PerformanceControl.isActivelyControlling(performanceMode: settings.performanceMode, helperReady: monitor.helperReady) {
                 HStack(spacing: 6) {
                     Image(systemName: "bolt.fill")
                         .font(.system(size: 12))

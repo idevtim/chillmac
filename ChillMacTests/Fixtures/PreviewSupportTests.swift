@@ -1,7 +1,7 @@
 import Testing
 @testable import ChillMac
 
-@Suite("PreviewSupport", .serialized)
+@Suite("PreviewSupport", .serialized, .tags(.unit, .fixtures))
 struct PreviewSupportTests {
     @Test("fanMonitor seeds fans and never needs helper for display state")
     func fanMonitorSeeded() {

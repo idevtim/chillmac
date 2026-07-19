@@ -1,5 +1,6 @@
 import Testing
 
-@Test func harnessSmoke() {
+@Test(.tags(.unit))
+func harnessSmoke() {
     #expect(true)
 }
