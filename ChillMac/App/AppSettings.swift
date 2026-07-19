@@ -80,6 +80,8 @@ final class AppSettings: ObservableObject {
     @AppStorage("batterySaverThreshold") var batterySaverThreshold = 20  // percent
     @AppStorage("forcePerformanceOnBattery") var forcePerformanceOnBattery = false
     @AppStorage("keepFansOnScreenSleep") var keepFansOnScreenSleep = false
+    /// When on AC, keep fans through display sleep / lock (clamshell while awake). Does not keep the Mac awake.
+    @AppStorage("keepFansClosedOnPower") var keepFansClosedOnPower = false
     @AppStorage("showFPS") var showFPS = false
     /// When on, the menu bar shows a compact temp next to the fan only while Warm/Hot.
     @AppStorage("showMenuBarTemp") var showMenuBarTemp = true

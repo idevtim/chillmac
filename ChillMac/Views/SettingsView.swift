@@ -285,6 +285,32 @@ struct SettingsView: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
+
+                Divider().padding(.leading, 52)
+
+                HStack {
+                    Image(systemName: "laptopcomputer.and.arrow.down")
+                        .font(.system(size: 16))
+                        .foregroundColor(theme.textTertiary)
+                        .frame(width: 24)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Keep Fans When Closed on Power")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(theme.textPrimary)
+                        Text("On AC only — for clamshell while awake. Does not force the Mac to stay awake.")
+                            .font(.system(size: 11))
+                            .foregroundColor(theme.textQuaternary)
+                    }
+                    Spacer()
+                    Toggle(isOn: $settings.keepFansClosedOnPower) {
+                        EmptyView()
+                    }
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .tint(.orange)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
             }
             .background(theme.cardBg)
             .cornerRadius(12)
