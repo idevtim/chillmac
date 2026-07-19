@@ -42,6 +42,26 @@ struct FanTargetCommitTests {
         #expect(targets[0] == nil)
         #expect(lastSent[0] == nil)
     }
+
+    @Test("identical successful reply does not rewrite caches")
+    func successIsIdempotent() {
+        var manual: [Int: Bool] = [0: true]
+        var targets: [Int: Double] = [0: 5300]
+        var lastSent: [Int: Double] = [0: 5300]
+
+        FanTargetCommit.apply(
+            ok: true,
+            fanId: 0,
+            rpm: 5300,
+            manualOverrides: &manual,
+            targetOverrides: &targets,
+            lastSentRPM: &lastSent
+        )
+
+        #expect(manual[0] == true)
+        #expect(targets[0] == 5300)
+        #expect(lastSent[0] == 5300)
+    }
 }
 
 @Suite("PerformanceControl", .tags(.unit, .fan))

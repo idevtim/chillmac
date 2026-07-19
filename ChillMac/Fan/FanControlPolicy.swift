@@ -11,14 +11,16 @@ enum FanTargetCommit {
         lastSentRPM: inout [Int: Double]
     ) {
         if ok {
-            lastSentRPM[fanId] = rpm
-            targetOverrides[fanId] = rpm
-            manualOverrides[fanId] = true
+            // Skip no-op writes — subscript assignment on @Published dictionaries
+            // republishes every time and trips "Publishing changes from within view updates".
+            if lastSentRPM[fanId] != rpm { lastSentRPM[fanId] = rpm }
+            if targetOverrides[fanId] != rpm { targetOverrides[fanId] = rpm }
+            if manualOverrides[fanId] != true { manualOverrides[fanId] = true }
         } else {
             // Do not cache a fake target — allow retries next poll
-            manualOverrides[fanId] = false
-            targetOverrides.removeValue(forKey: fanId)
-            lastSentRPM.removeValue(forKey: fanId)
+            if manualOverrides[fanId] != false { manualOverrides[fanId] = false }
+            if targetOverrides[fanId] != nil { targetOverrides.removeValue(forKey: fanId) }
+            if lastSentRPM[fanId] != nil { lastSentRPM.removeValue(forKey: fanId) }
         }
     }
 }

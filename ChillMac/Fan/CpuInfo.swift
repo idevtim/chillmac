@@ -60,26 +60,47 @@ final class CpuInfo: ObservableObject {
 
         previousInfo = current
 
+        let newUser: Double
+        let newSystem: Double
+        let newIdle: Double
+        let newTotal: Double
         if totalDiff > 0 {
-            userPercent = (userDiff + niceDiff) / totalDiff * 100
-            systemPercent = sysDiff / totalDiff * 100
-            idlePercent = idleDiff / totalDiff * 100
-            totalUsage = 100 - idlePercent
+            newUser = (userDiff + niceDiff) / totalDiff * 100
+            newSystem = sysDiff / totalDiff * 100
+            newIdle = idleDiff / totalDiff * 100
+            newTotal = 100 - newIdle
+        } else {
+            newUser = userPercent
+            newSystem = systemPercent
+            newIdle = idlePercent
+            newTotal = totalUsage
         }
 
-        history.append(totalUsage)
-        if history.count > maxHistory {
-            history.removeFirst(history.count - maxHistory)
-        }
+        // Defer publishes so Timer callbacks don't write mid-body while the popover is rendering.
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            if abs(self.userPercent - newUser) >= 0.1 { self.userPercent = newUser }
+            if abs(self.systemPercent - newSystem) >= 0.1 { self.systemPercent = newSystem }
+            if abs(self.idlePercent - newIdle) >= 0.1 { self.idlePercent = newIdle }
+            if abs(self.totalUsage - newTotal) >= 0.1 { self.totalUsage = newTotal }
 
-        userHistory.append(userPercent)
-        if userHistory.count > maxHistory {
-            userHistory.removeFirst(userHistory.count - maxHistory)
-        }
+            // History charts only matter with the CPU detail panel open.
+            guard self.isDetailVisible else { return }
 
-        systemHistory.append(systemPercent)
-        if systemHistory.count > maxHistory {
-            systemHistory.removeFirst(systemHistory.count - maxHistory)
+            self.history.append(newTotal)
+            if self.history.count > self.maxHistory {
+                self.history.removeFirst(self.history.count - self.maxHistory)
+            }
+
+            self.userHistory.append(newUser)
+            if self.userHistory.count > self.maxHistory {
+                self.userHistory.removeFirst(self.userHistory.count - self.maxHistory)
+            }
+
+            self.systemHistory.append(newSystem)
+            if self.systemHistory.count > self.maxHistory {
+                self.systemHistory.removeFirst(self.systemHistory.count - self.maxHistory)
+            }
         }
 
         // Fetch top processes every 5th poll, only when detail panel is visible.
