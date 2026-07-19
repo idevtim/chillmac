@@ -8,668 +8,170 @@ struct SettingsView: View {
     let cpuInfo: CpuInfo
     let memoryInfo: MemoryInfo
     let batteryInfo: BatteryInfo
-    @Environment(\.theme) private var theme
     let onDismiss: () -> Void
+
+    @State private var showAdvanced = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header
             HStack {
                 Text("Settings")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(theme.textPrimary)
-
+                    .font(DesignSystem.TypeScale.title)
+                    .foregroundStyle(.primary)
                 Spacer()
-
                 Button(action: onDismiss) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 20))
-                        .foregroundColor(theme.textQuaternary)
+                        .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, DesignSystem.Space.xl)
             .padding(.top, 18)
-            .padding(.bottom, 14)
+            .padding(.bottom, DesignSystem.Space.md)
 
-            ScrollView(.vertical, showsIndicators: settings.showScrollIndicators) {
-                VStack(spacing: 16) {
-                    generalSection
-                    updatesSection
-                    appearanceSection
-                    temperatureSection
-                    batterySaverSection
-                    fanControlSection
-                    displaySection
-                    diagnosticsSection
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 16)
-            }
-
-            Spacer()
-
-            // Version
-            HStack {
-                Spacer()
-                Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?")")
-                    .font(.system(size: 11))
-                    .foregroundColor(theme.textQuaternary)
-                Spacer()
-            }
-            .padding(.bottom, 12)
-        }
-        .onAppear {
-            updateChecker.performCheck()
-        }
-    }
-
-    // MARK: - Updates
-
-    private var updatesSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("UPDATES")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(theme.textTertiary)
-                .tracking(1.2)
-                .padding(.leading, 4)
-
-            VStack(spacing: 0) {
-                HStack {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 16))
-                        .foregroundColor(theme.textTertiary)
-                        .frame(width: 24)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Current Version")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(theme.textPrimary)
-                        Text("v\(updateChecker.currentVersion)")
-                            .font(.system(size: 11))
-                            .foregroundColor(theme.textQuaternary)
-                    }
-                    Spacer()
-                    Button(action: {
-                        updateChecker.performCheck()
-                    }) {
-                        if updateChecker.isChecking {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            Text("Check")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.teal)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(updateChecker.isChecking)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-
-                if updateChecker.updateAvailable, let version = updateChecker.latestVersion {
-                    Divider()
-                        .background(theme.dividerSubtle)
-
-                    HStack {
-                        Image(systemName: "gift.fill")
-                            .font(.system(size: 16))
-                            .foregroundColor(.teal)
-                            .frame(width: 24)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("v\(version) Available")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(theme.textPrimary)
-                            Text("A new version is ready to download")
-                                .font(.system(size: 11))
-                                .foregroundColor(theme.textQuaternary)
-                        }
-                        Spacer()
-                        if let url = updateChecker.downloadURL ?? updateChecker.releaseURL {
-                            Button(action: { NSWorkspace.shared.open(url) }) {
-                                Text("Download")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 5)
-                                    .background(Color.teal)
-                                    .cornerRadius(8)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                } else if updateChecker.hasChecked && !updateChecker.updateAvailable {
-                    Divider()
-                        .background(theme.dividerSubtle)
-
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 16))
-                            .foregroundColor(.green)
-                            .frame(width: 24)
-                        Text("You're up to date")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(theme.textPrimary)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                }
-            }
-            .background(theme.cardBg)
-            .cornerRadius(12)
-        }
-    }
-
-    // MARK: - General
-
-    private var generalSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("GENERAL")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(theme.textTertiary)
-                .tracking(1.2)
-                .padding(.leading, 4)
-
-            VStack(spacing: 0) {
-                HStack {
-                    Image(systemName: "sunrise")
-                        .font(.system(size: 16))
-                        .foregroundColor(theme.textTertiary)
-                        .frame(width: 24)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Launch at Login")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(theme.textPrimary)
-                        Text("Start ChillMac when you log in")
-                            .font(.system(size: 11))
-                            .foregroundColor(theme.textQuaternary)
-                    }
-                    Spacer()
+            Form {
+                Section("General") {
                     Toggle(isOn: Binding(
                         get: { settings.launchAtLogin },
                         set: { settings.setLaunchAtLogin($0) }
                     )) {
-                        EmptyView()
+                        Label("Launch at Login", systemImage: "sunrise")
                     }
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .tint(.teal)
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-            }
-            .background(theme.cardBg)
-            .cornerRadius(12)
-        }
-    }
 
-    // MARK: - Appearance
-
-    private var appearanceSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("APPEARANCE")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(theme.textTertiary)
-                .tracking(1.2)
-                .padding(.leading, 4)
-
-            HStack(spacing: 8) {
-                ForEach(AppearanceMode.allCases, id: \.self) { mode in
-                    Button(action: { settings.setAppearanceMode(mode) }) {
-                        VStack(spacing: 8) {
-                            Image(systemName: mode.icon)
-                                .font(.system(size: 20))
-                                .foregroundColor(settings.appearanceMode == mode ? modeAccent(mode) : theme.textQuaternary)
-
-                            Text(mode.label)
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(settings.appearanceMode == mode ? theme.textPrimary : theme.textTertiary)
+                Section("Updates") {
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text("Current Version")
+                            Text("v\(updateChecker.currentVersion)")
+                                .foregroundStyle(.secondary)
+                                .font(DesignSystem.TypeScale.caption)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(settings.appearanceMode == mode ? theme.cardBgHover : theme.cardBg)
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(settings.appearanceMode == mode ? modeAccent(mode).opacity(0.5) : Color.clear, lineWidth: 1)
+                        Spacer()
+                        Button("Check") { updateChecker.performCheck() }
+                            .disabled(updateChecker.isChecking)
+                    }
+                    if updateChecker.updateAvailable, let version = updateChecker.latestVersion {
+                        HStack {
+                            Text("v\(version) Available")
+                            Spacer()
+                            if let url = updateChecker.downloadURL ?? updateChecker.releaseURL {
+                                Button("Download") { NSWorkspace.shared.open(url) }
+                                    .buttonStyle(.borderedProminent)
+                                    .controlSize(.small)
+                            }
+                        }
+                    } else if updateChecker.hasChecked && !updateChecker.updateAvailable {
+                        Label("You're up to date", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    }
+                }
+
+                Section("Appearance") {
+                    Picker("Appearance", selection: appearanceBinding) {
+                        ForEach(AppearanceMode.allCases, id: \.self) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                Section("Temperature") {
+                    Picker("Unit", selection: $settings.useFahrenheit) {
+                        Text("°C").tag(false)
+                        Text("°F").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                Section("Battery Saver") {
+                    Toggle("Enable Battery Saver", isOn: $settings.batterySaverEnabled)
+                    if settings.batterySaverEnabled {
+                        HStack {
+                            Text("Threshold")
+                            Spacer()
+                            Text("\(settings.batterySaverThreshold)%")
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+                        Slider(
+                            value: Binding(
+                                get: { Double(settings.batterySaverThreshold) },
+                                set: { settings.batterySaverThreshold = Int($0) }
+                            ),
+                            in: 5...50,
+                            step: 5
                         )
                     }
-                    .buttonStyle(.plain)
                 }
-            }
-        }
-    }
 
-    private func modeAccent(_ mode: AppearanceMode) -> Color {
-        switch mode {
-        case .system: return .teal
-        case .light: return .orange
-        case .dark: return .blue
-        }
-    }
-
-    // MARK: - Fan Control
-
-    private var fanControlSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("FAN CONTROL")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(theme.textTertiary)
-                .tracking(1.2)
-                .padding(.leading, 4)
-
-            VStack(spacing: 0) {
-                HStack {
-                    Image(systemName: "display")
-                        .font(.system(size: 16))
-                        .foregroundColor(theme.textTertiary)
-                        .frame(width: 24)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Keep Fans on Screen Sleep")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(theme.textPrimary)
-                        Text("Don't reset fans when display sleeps")
-                            .font(.system(size: 11))
-                            .foregroundColor(theme.textQuaternary)
-                    }
-                    Spacer()
-                    Toggle(isOn: $settings.keepFansOnScreenSleep) {
-                        EmptyView()
-                    }
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .tint(.orange)
+                Section("Display") {
+                    Toggle("Show Temp in Menu Bar", isOn: $settings.showMenuBarTemp)
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
 
-                Divider().padding(.leading, 52)
-
-                HStack {
-                    Image(systemName: "laptopcomputer.and.arrow.down")
-                        .font(.system(size: 16))
-                        .foregroundColor(theme.textTertiary)
-                        .frame(width: 24)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Keep Fans When Closed on Power")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(theme.textPrimary)
-                        Text("On AC only — for clamshell while awake. Does not force the Mac to stay awake.")
-                            .font(.system(size: 11))
-                            .foregroundColor(theme.textQuaternary)
-                    }
-                    Spacer()
-                    Toggle(isOn: $settings.keepFansClosedOnPower) {
-                        EmptyView()
-                    }
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .tint(.orange)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-            }
-            .background(theme.cardBg)
-            .cornerRadius(12)
-        }
-    }
-
-    // MARK: - Display
-
-    private var displaySection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("DISPLAY")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(theme.textTertiary)
-                .tracking(1.2)
-                .padding(.leading, 4)
-
-            VStack(spacing: 0) {
-                // Scrollbar toggle
-                HStack {
-                    Image(systemName: "scroll")
-                        .font(.system(size: 16))
-                        .foregroundColor(theme.textTertiary)
-                        .frame(width: 24)
-                    Text("Show Scrollbars")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(theme.textPrimary)
-                    Spacer()
-                    Toggle(isOn: $settings.showScrollIndicators) {
-                        EmptyView()
-                    }
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .tint(.teal)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-
-                Divider()
-                    .background(theme.dividerSubtle)
-
-                // FPS counter toggle
-                HStack {
-                    Image(systemName: "gauge.open.with.cells.fill")
-                        .font(.system(size: 16))
-                        .foregroundColor(theme.textTertiary)
-                        .frame(width: 24)
-                    Text("Show FPS Counter")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(theme.textPrimary)
-                    Spacer()
-                    Toggle(isOn: $settings.showFPS) {
-                        EmptyView()
-                    }
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .tint(.teal)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-
-                Divider()
-                    .background(theme.dividerSubtle)
-
-                // Menu bar temperature (Warm/Hot only)
-                HStack {
-                    Image(systemName: "menubar.arrow.up.rectangle")
-                        .font(.system(size: 16))
-                        .foregroundColor(theme.textTertiary)
-                        .frame(width: 24)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Show Temp in Menu Bar")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(theme.textPrimary)
-                        Text("Only when Warm or Hot — stays quiet when Good")
-                            .font(.system(size: 11))
-                            .foregroundColor(theme.textQuaternary)
-                    }
-                    Spacer()
-                    Toggle(isOn: $settings.showMenuBarTemp) {
-                        EmptyView()
-                    }
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .tint(.teal)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-
-                Divider()
-                    .background(theme.dividerSubtle)
-
-                // Reset popover height
-                HStack {
-                    Image(systemName: "arrow.up.and.down.square")
-                        .font(.system(size: 16))
-                        .foregroundColor(theme.textTertiary)
-                        .frame(width: 24)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Window Height")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(theme.textPrimary)
-                        Text("Drag the handle at the bottom to resize")
-                            .font(.system(size: 11))
-                            .foregroundColor(theme.textQuaternary)
-                    }
-                    Spacer()
-                    if abs(settings.popoverHeight - Double(AppSettings.popoverDefaultHeight)) > 10
-                        || abs(settings.detailPanelHeight - Double(AppSettings.detailPanelDefaultHeight)) > 10 {
-                        Button("Reset") {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                settings.popoverHeight = Double(AppSettings.popoverDefaultHeight)
-                                settings.detailPanelHeight = Double(AppSettings.detailPanelDefaultHeight)
-                            }
+                Section {
+                    DisclosureGroup("Advanced", isExpanded: $showAdvanced) {
+                        Toggle("Force Cool on Battery", isOn: $settings.forcePerformanceOnBattery)
+                        Toggle("Keep Fans on Screen Sleep", isOn: $settings.keepFansOnScreenSleep)
+                        Toggle("Keep Fans When Closed on Power", isOn: $settings.keepFansClosedOnPower)
+                        Toggle("Show Scrollbars", isOn: $settings.showScrollIndicators)
+                        Toggle("Show FPS", isOn: $settings.showFPS)
+                        Button("Reset Window Height") {
+                            settings.popoverHeight = Double(AppSettings.popoverDefaultHeight)
+                            settings.detailPanelHeight = Double(AppSettings.detailPanelDefaultHeight)
+                            NotificationCenter.default.post(name: .popoverHeightChanged, object: nil, userInfo: [
+                                "height": CGFloat(AppSettings.popoverDefaultHeight)
+                            ])
                             NotificationCenter.default.post(name: .detailPanelHeightReset, object: nil)
                         }
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.teal)
-                        .buttonStyle(.plain)
                     }
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-            }
-            .background(theme.cardBg)
-            .cornerRadius(12)
-        }
-    }
 
-    // MARK: - Battery Saver
-
-    private var batterySaverSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("BATTERY SAVER")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(theme.textTertiary)
-                .tracking(1.2)
-                .padding(.leading, 4)
-
-            VStack(spacing: 0) {
-                // Enable toggle
-                HStack {
-                    Image(systemName: "battery.25")
-                        .font(.system(size: 16))
-                        .foregroundColor(theme.textTertiary)
-                        .frame(width: 24)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Battery Saver")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(theme.textPrimary)
-                        Text("Disable fan control on low battery")
-                            .font(.system(size: 11))
-                            .foregroundColor(theme.textQuaternary)
-                    }
-                    Spacer()
-                    Toggle(isOn: $settings.batterySaverEnabled) {
-                        EmptyView()
-                    }
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .tint(.yellow)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-
-                if settings.batterySaverEnabled {
-                    Divider()
-                        .background(theme.dividerSubtle)
-
-                    // Threshold slider
-                    HStack {
-                        Image(systemName: "gauge.low")
-                            .font(.system(size: 16))
-                            .foregroundColor(theme.textTertiary)
-                            .frame(width: 24)
-                        Text("Threshold")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(theme.textPrimary)
-                        Spacer()
-                        Text("\(settings.batterySaverThreshold)%")
-                            .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                            .foregroundColor(.yellow)
-                            .frame(width: 40, alignment: .trailing)
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.top, 10)
-                    .padding(.bottom, 4)
-
-                    Slider(
-                        value: Binding(
-                            get: { Double(settings.batterySaverThreshold) },
-                            set: { settings.batterySaverThreshold = Int($0) }
-                        ),
-                        in: 5...50,
-                        step: 5
-                    )
-                    .tint(.yellow)
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 10)
-
-                    Divider()
-                        .background(theme.dividerSubtle)
-
-                    // Force performance toggle
-                    HStack {
-                        Image(systemName: "bolt.batteryblock.fill")
-                            .font(.system(size: 16))
-                            .foregroundColor(theme.textTertiary)
-                            .frame(width: 24)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Force Performance")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(theme.textPrimary)
-                            Text("Keep fan control on low battery")
-                                .font(.system(size: 11))
-                                .foregroundColor(theme.textQuaternary)
-                        }
-                        Spacer()
-                        Toggle(isOn: $settings.forcePerformanceOnBattery) {
-                            EmptyView()
-                        }
-                        .toggleStyle(.switch)
-                        .controlSize(.small)
-                        .tint(.orange)
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                }
-            }
-            .background(theme.cardBg)
-            .cornerRadius(12)
-            .animation(.easeInOut(duration: 0.2), value: settings.batterySaverEnabled)
-        }
-    }
-
-    // MARK: - Temperature
-
-    private var temperatureSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("TEMPERATURE")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(theme.textTertiary)
-                .tracking(1.2)
-                .padding(.leading, 4)
-
-            HStack(spacing: 8) {
-                Button(action: { settings.useFahrenheit = false }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "thermometer.medium")
-                            .font(.system(size: 16))
-                        Text("Celsius (°C)")
-                            .font(.system(size: 13, weight: .medium))
-                    }
-                    .foregroundColor(!settings.useFahrenheit ? theme.textPrimary : theme.textTertiary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(!settings.useFahrenheit ? theme.cardBgHover : theme.cardBg)
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(!settings.useFahrenheit ? Color.green.opacity(0.5) : Color.clear, lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.plain)
-
-                Button(action: { settings.useFahrenheit = true }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "thermometer.medium")
-                            .font(.system(size: 16))
-                        Text("Fahrenheit (°F)")
-                            .font(.system(size: 13, weight: .medium))
-                    }
-                    .foregroundColor(settings.useFahrenheit ? theme.textPrimary : theme.textTertiary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(settings.useFahrenheit ? theme.cardBgHover : theme.cardBg)
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(settings.useFahrenheit ? Color.orange.opacity(0.5) : Color.clear, lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-
-    // MARK: - Diagnostics
-
-    private var diagnosticsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("DIAGNOSTICS")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(theme.textTertiary)
-                .tracking(1.2)
-                .padding(.leading, 4)
-
-            VStack(spacing: 0) {
-                HStack {
-                    Image(systemName: "doc.text.magnifyingglass")
-                        .font(.system(size: 16))
-                        .foregroundColor(theme.textTertiary)
-                        .frame(width: 24)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Export Diagnostics")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(theme.textPrimary)
-                        Text("Save system metrics log for troubleshooting")
-                            .font(.system(size: 11))
-                            .foregroundColor(theme.textQuaternary)
-                    }
-                    Spacer()
-                    Button("Export") {
+                Section("Diagnostics") {
+                    Button("Export Diagnostics…") {
                         DiagnosticExporter.export(
                             logger: DiagnosticLogger.shared,
                             systemInfo: systemInfo
                         )
                     }
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.teal)
-                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
             }
-            .background(theme.cardBg)
-            .cornerRadius(12)
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+
+            HStack {
+                Spacer()
+                Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?")")
+                    .font(DesignSystem.TypeScale.caption)
+                    .foregroundStyle(.tertiary)
+                Spacer()
+            }
+            .padding(.bottom, DesignSystem.Space.md)
         }
+        .onAppear { updateChecker.performCheck() }
+    }
+
+    private var appearanceBinding: Binding<AppearanceMode> {
+        Binding(
+            get: { settings.appearanceMode },
+            set: { settings.setAppearanceMode($0) }
+        )
     }
 }
 
 #if DEBUG
-#Preview("Settings Dark") {
-    return PreviewSupport.previewHost(theme: .dark, frame: .popover) {
-        SettingsView(
-            settings: AppSettings.shared,
-            updateChecker: PreviewSupport.updateChecker,
-            systemInfo: PreviewSupport.systemInfo,
-            fanMonitor: PreviewSupport.fanMonitor,
-            cpuInfo: PreviewSupport.cpuInfo,
-            memoryInfo: PreviewSupport.memoryInfo,
-            batteryInfo: PreviewSupport.batteryInfo,
-            onDismiss: {}
-        )
-    }
-}
-
-#Preview("Settings Light") {
-    return PreviewSupport.previewHost(theme: .light, frame: .popover) {
-        SettingsView(
-            settings: AppSettings.shared,
-            updateChecker: PreviewSupport.updateChecker,
-            systemInfo: PreviewSupport.systemInfo,
-            fanMonitor: PreviewSupport.fanMonitor,
-            cpuInfo: PreviewSupport.cpuInfo,
-            memoryInfo: PreviewSupport.memoryInfo,
-            batteryInfo: PreviewSupport.batteryInfo,
-            onDismiss: {}
-        )
-    }
+#Preview("Settings") {
+    SettingsView(
+        settings: AppSettings.shared,
+        updateChecker: PreviewSupport.updateChecker,
+        systemInfo: PreviewSupport.systemInfo,
+        fanMonitor: PreviewSupport.fanMonitor,
+        cpuInfo: PreviewSupport.cpuInfo,
+        memoryInfo: PreviewSupport.memoryInfo,
+        batteryInfo: PreviewSupport.batteryInfo,
+        onDismiss: {}
+    )
+    .previewHost(scheme: .dark)
 }
 #endif
-

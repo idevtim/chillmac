@@ -53,7 +53,7 @@ enum DiagnosticExporter {
             ),
             settings: SettingsSnapshot(
                 performanceMode: settings.performanceMode,
-                performanceLevel: settings.performanceLevel.rawValue,
+                performanceLevel: settings.coolIntent.rawValue,
                 batterySaverEnabled: settings.batterySaverEnabled,
                 batterySaverThreshold: settings.batterySaverThreshold,
                 useFahrenheit: settings.useFahrenheit,

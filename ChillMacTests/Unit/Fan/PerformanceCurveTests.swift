@@ -3,28 +3,43 @@ import Testing
 
 @Suite("PerformanceCurve", .tags(.unit, .fan))
 struct PerformanceCurveTests {
-    @Test("Ultra at cool temp holds high floor, not full blast")
-    func ultraCoolNotFullBlast() {
-        let p = PerformanceCurve.speedPercent(level: .ultra, temperature: 30)
-        #expect(p == 0.70)
-        #expect(p < 1.0)
+    @Test("Performance intent idle has zero floor")
+    func performanceIdleNoFloor() {
+        #expect(PerformanceCurve.minFloor(intent: .performance, engaged: false) == 0)
     }
 
-    @Test("Ultra reaches 100% by ~60C")
-    func ultraHotFull() {
-        #expect(PerformanceCurve.speedPercent(level: .ultra, temperature: 60) == 1.0)
+    @Test("Performance intent engaged has soft floor only")
+    func performanceEngagedSoftFloor() {
+        let floor = PerformanceCurve.minFloor(intent: .performance, engaged: true)
+        #expect(floor == 0.25)
+        #expect(floor < 0.70)
     }
 
-    @Test("Max at 30C stays ~0.50 — Ultra is more aggressive")
-    func maxRegressionCool() {
-        let maxP = PerformanceCurve.speedPercent(level: .max, temperature: 30)
-        let ultraP = PerformanceCurve.speedPercent(level: .ultra, temperature: 30)
-        #expect(abs(maxP - 0.50) < 0.001)
-        #expect(ultraP > maxP)
+    @Test("Performance curve reaches 100% by ~60C when engaged")
+    func performanceHotFull() {
+        #expect(PerformanceCurve.speedPercent(intent: .performance, temperature: 60) == 1.0)
     }
 
-    @Test("Ultra floor is 0.70")
-    func ultraFloor() {
-        #expect(PerformanceCurve.minFloor(level: .ultra) == 0.70)
+    @Test("Quiet curve is gentle at warm temps")
+    func quietGentle() {
+        let p = PerformanceCurve.speedPercent(intent: .quiet, temperature: 75)
+        #expect(p < 0.40)
+    }
+}
+
+@Suite("CoolIntent", .tags(.unit, .fan))
+struct CoolIntentTests {
+    @Test(arguments: [
+        ("low", CoolIntent.quiet),
+        ("medium", CoolIntent.balanced),
+        ("high", CoolIntent.balanced),
+        ("max", CoolIntent.performance),
+        ("ultra", CoolIntent.performance),
+        ("quiet", CoolIntent.quiet),
+        ("balanced", CoolIntent.balanced),
+        ("performance", CoolIntent.performance),
+    ])
+    func migratesLegacy(raw: String, expected: CoolIntent) {
+        #expect(CoolIntent.migrated(fromLegacyRaw: raw) == expected)
     }
 }

@@ -66,9 +66,10 @@ struct FanTargetCommitTests {
 
 @Suite("PerformanceControl", .tags(.unit, .fan))
 struct PerformanceControlTests {
-    @Test("actively controlling requires both preference and live helper")
+    @Test("actively controlling requires preference, helper, and engagement")
     func requiresHelperReady() {
-        #expect(PerformanceControl.isActivelyControlling(performanceMode: true, helperReady: true))
+        #expect(PerformanceControl.isActivelyControlling(performanceMode: true, helperReady: true, coolingEngaged: true))
+        #expect(!PerformanceControl.isActivelyControlling(performanceMode: true, helperReady: true, coolingEngaged: false))
         #expect(!PerformanceControl.isActivelyControlling(performanceMode: true, helperReady: false))
         #expect(!PerformanceControl.isActivelyControlling(performanceMode: false, helperReady: true))
         #expect(!PerformanceControl.isActivelyControlling(performanceMode: false, helperReady: false))

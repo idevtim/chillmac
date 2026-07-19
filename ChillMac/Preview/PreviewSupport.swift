@@ -62,10 +62,11 @@ enum PreviewSupport {
         monitor.peakTemperatureLabel = "CPU Die"
         monitor.peakCpuTemperature = 92.2
         monitor.performanceCurvePercent = 100
+        monitor.coolingEngaged = true
         return monitor
     }
 
-    /// Fan monitor seeded for Performance Mode Ultra under mild load (~55°C → mid-high curve %, not 100%).
+    /// Fan monitor seeded for Cool Performance under mild load (~55°C → engaged curve).
     static var fanMonitorUltra: FanMonitor {
         let peak: Double = 55
         let monitor = fanMonitor
@@ -74,6 +75,7 @@ enum PreviewSupport {
         monitor.peakCpuTemperature = peak
         monitor.peakGpuTemperature = 48.0
         monitor.peakSsdTemperature = 38.0
+        monitor.coolingEngaged = true
         monitor.sensors = [
             TemperatureSensor(id: "Tp09", label: "CPU Die", temperature: peak),
             TemperatureSensor(id: "TG0P", label: "GPU", temperature: 48.0),
@@ -81,7 +83,7 @@ enum PreviewSupport {
             TemperatureSensor(id: "TB0T", label: "Battery", temperature: 32.0),
         ]
         monitor.performanceCurvePercent =
-            PerformanceCurve.speedPercent(level: .ultra, temperature: peak) * 100
+            PerformanceCurve.speedPercent(intent: .performance, temperature: peak) * 100
         return monitor
     }
 
@@ -170,7 +172,7 @@ enum PreviewSupport {
     }
 
     static func previewHost<Content: View>(
-        theme: AppTheme = .dark,
+        scheme: ColorScheme = .dark,
         frame: PreviewFrame = .popover,
         @ViewBuilder content: () -> Content
     ) -> some View {
@@ -181,19 +183,16 @@ enum PreviewSupport {
             }
         }()
         return content()
-            .environment(\.theme, theme)
-            .preferredColorScheme(themeIsDark(theme) ? .dark : .light)
+            .preferredColorScheme(scheme)
             .frame(width: size.width, height: size.height)
     }
 
-    private static func themeIsDark(_ theme: AppTheme) -> Bool {
-        theme.bgGradientTop == AppTheme.dark.bgGradientTop
-    }
+    
 }
 
 extension View {
-    func previewHost(theme: AppTheme = .dark, frame: PreviewSupport.PreviewFrame = .popover) -> some View {
-        PreviewSupport.previewHost(theme: theme, frame: frame) { self }
+    func previewHost(scheme: ColorScheme = .dark, frame: PreviewSupport.PreviewFrame = .popover) -> some View {
+        PreviewSupport.previewHost(scheme: scheme, frame: frame) { self }
     }
 }
 #endif

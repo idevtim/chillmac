@@ -18,10 +18,12 @@ final class FanMonitor: ObservableObject {
     @Published var peakGpuTemperature: Double = 0
     /// Peak temperature for the SSD zone
     @Published var peakSsdTemperature: Double = 0
-    /// The target RPM % that performance mode is currently requesting (0–100)
+    /// The target RPM % that Cool is currently requesting while engaged (0–100); 0 when idle
     @Published var performanceCurvePercent: Double = 0
-    /// True when battery saver has suppressed performance mode
+    /// True when battery saver has suppressed Cool
     @Published var batterySaverActive = false
+    /// True when Cool is on and hysteresis engagement is active (driving fans)
+    @Published var coolingEngaged = false
 
     /// User overrides that persist across poll cycles
     @Published var manualOverrides: [Int: Bool] = [:]   // fanIndex → manual on/off
@@ -99,6 +101,12 @@ final class FanMonitor: ObservableObject {
     private var observersInstalled = false
     /// Track whether performance curve is suspended (screen sleep/lock)
     private var performanceSuspended = false
+    /// Hysteresis: seconds spent in current engage/release temperature band
+    private var engagementBandSeconds: TimeInterval = 0
+    private var lastEngagementEval: Date?
+    /// Cached ProcessInfo thermal gate
+    private var thermalForceEngage = false
+    private var thermalObserver: NSObjectProtocol?
 
     // MARK: - System Event Observers
 
@@ -118,6 +126,20 @@ final class FanMonitor: ObservableObject {
         let dnc = DistributedNotificationCenter.default()
         dnc.addObserver(self, selector: #selector(handleScreenLocked), name: NSNotification.Name("com.apple.screenIsLocked"), object: nil)
         dnc.addObserver(self, selector: #selector(handleScreenUnlocked), name: NSNotification.Name("com.apple.screenIsUnlocked"), object: nil)
+
+        refreshThermalForceEngage()
+        thermalObserver = NotificationCenter.default.addObserver(
+            forName: ProcessInfo.thermalStateDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.refreshThermalForceEngage()
+        }
+    }
+
+    private func refreshThermalForceEngage() {
+        let state = ProcessInfo.processInfo.thermalState
+        thermalForceEngage = (state == .serious || state == .critical)
     }
 
     @objc private func handleSleep() {
@@ -491,56 +513,104 @@ final class FanMonitor: ObservableObject {
             updatePollInterval()
         }
 
-        // Battery saver: suppress performance mode when on battery below threshold
+        // Battery saver: suppress Cool when on battery below threshold
         let batterySaving = performanceEnabled && batterySaverShouldSuppress
-        let isActive = performanceEnabled && !batterySaving
+        let coolOn = performanceEnabled && !batterySaving
         if batterySaverActive != batterySaving {
             batterySaverActive = batterySaving
         }
 
         guard let helper = helper else { return }
 
-        // If performance mode was just turned off (or suppressed by battery saver), hand fans
-        // back to macOS auto. This is the ONLY path that returns fans to auto — while perf
-        // mode is engaged, fans stay in manual mode (at the level's floor at minimum).
-        if wasPerformanceModeActive && !isActive {
+        // Cool turned off (or battery saver) → hand fans back to macOS auto
+        if wasPerformanceModeActive && !coolOn {
             wasPerformanceModeActive = false
-            for fan in fans {
-                helper.setFanMode(fanIndex: fan.id, isAuto: true) { _, _ in }
-            }
-            manualOverrides.removeAll()
-            targetOverrides.removeAll()
-            if performanceCurvePercent != 0 {
-                performanceCurvePercent = 0
-            }
-            smoothedZoneTemps.removeAll()
-            lastSentRPM.removeAll()
+            coolingEngaged = false
+            engagementBandSeconds = 0
+            lastEngagementEval = nil
+            handFansToAuto(helper: helper)
             return
         }
 
-        guard isActive else { return }
+        guard coolOn else {
+            if coolingEngaged { coolingEngaged = false }
+            return
+        }
         wasPerformanceModeActive = true
 
-        let level = AppSettings.shared.performanceLevel
-        let floor = PerformanceCurve.minFloor(level: level)
-        let smoothFactor = PerformanceCurve.smoothingFactor(level: level)
-        let upRate = PerformanceCurve.rampUpRate(level: level)
-        let downRate = PerformanceCurve.rampDownRate(level: level)
+        let intent = AppSettings.shared.coolIntent
+        let peak = sensors.values.map(\.temperature).max() ?? peakTemperature
+
+        // Track time in engage/release band for hysteresis
+        let now = Date()
+        let dt: TimeInterval
+        if let last = lastEngagementEval {
+            dt = min(now.timeIntervalSince(last), 5)
+        } else {
+            dt = 2
+        }
+        lastEngagementEval = now
+
+        let engageAt = CoolingEngagement.engageCelsius(intent: intent)
+        let releaseAt = CoolingEngagement.releaseCelsius(intent: intent)
+        if coolingEngaged {
+            if peak <= releaseAt {
+                engagementBandSeconds += dt
+            } else {
+                engagementBandSeconds = 0
+            }
+        } else {
+            if peak >= engageAt {
+                engagementBandSeconds += dt
+            } else {
+                engagementBandSeconds = 0
+            }
+        }
+
+        let next = CoolingEngagement.nextState(
+            currentlyEngaged: coolingEngaged,
+            peakCelsius: peak,
+            intent: intent,
+            thermalForceEngage: thermalForceEngage,
+            secondsInBand: engagementBandSeconds
+        )
+
+        if next == .idle {
+            if coolingEngaged {
+                coolingEngaged = false
+                engagementBandSeconds = 0
+                handFansToAuto(helper: helper)
+            }
+            if performanceCurvePercent != 0 {
+                performanceCurvePercent = 0
+            }
+            return
+        }
+
+        if !coolingEngaged {
+            coolingEngaged = true
+            engagementBandSeconds = 0
+        }
+
+        let floor = PerformanceCurve.minFloor(intent: intent, engaged: true)
+        let smoothFactor = PerformanceCurve.smoothingFactor(intent: intent)
+        let upRate = PerformanceCurve.rampUpRate(intent: intent)
+        let downRate = PerformanceCurve.rampDownRate(intent: intent)
 
         // Per-zone smoothed temp → curve % contribution
         var zonePcts: [ThermalZone: Double] = [:]
         for zone in ThermalZone.allCases {
             guard let zoneKeys = Self.zoneSensorKeys[zone] else { continue }
             let zonePeak = zoneKeys.compactMap { sensors[$0]?.temperature }.max()
-            guard let peak = zonePeak, peak > 0 else { continue }
+            guard let zoneTemp = zonePeak, zoneTemp > 0 else { continue }
 
             if let prev = smoothedZoneTemps[zone] {
-                smoothedZoneTemps[zone] = prev + smoothFactor * (peak - prev)
+                smoothedZoneTemps[zone] = prev + smoothFactor * (zoneTemp - prev)
             } else {
-                smoothedZoneTemps[zone] = peak
+                smoothedZoneTemps[zone] = zoneTemp
             }
             zonePcts[zone] = PerformanceCurve.speedPercent(
-                level: level,
+                intent: intent,
                 temperature: smoothedZoneTemps[zone]!
             )
         }
@@ -563,20 +633,17 @@ final class FanMonitor: ObservableObject {
             }
         }
 
-        // Floor: every fan sits at >= floor while perf mode is on. This is what kills
-        // the audible on/off/on/off cycling — fans never drop to "auto" mid-session.
+        // Soft floor only while engaged
         for fan in fans {
             fanPcts[fan.id] = max(fanPcts[fan.id] ?? 0, floor)
         }
 
-        // UI shows the highest fan percentage
         let maxPct = fanPcts.values.max() ?? floor
         let curvePercent = maxPct * 100
         if abs(performanceCurvePercent - curvePercent) >= 0.5 {
             performanceCurvePercent = curvePercent
         }
 
-        // Send each fan to its target with per-level rate limiting
         for fan in fans {
             let pct = fanPcts[fan.id] ?? floor
             let desiredRPM = fan.minRPM + pct * (fan.maxRPM - fan.minRPM)
@@ -593,7 +660,6 @@ final class FanMonitor: ObservableObject {
 
             let rounded = (rampedRPM / 100).rounded() * 100
 
-            // Suppress XPC spam unless the target moved or we don't yet own the fan
             let currentTarget = targetOverrides[fan.id] ?? -1
             let alreadyManual = manualOverrides[fan.id] == true
             guard abs(rounded - currentTarget) >= 100 || !alreadyManual else { continue }
@@ -614,6 +680,19 @@ final class FanMonitor: ObservableObject {
                 }
             }
         }
+    }
+
+    private func handFansToAuto(helper: HelperConnection) {
+        for fan in fans {
+            helper.setFanMode(fanIndex: fan.id, isAuto: true) { _, _ in }
+        }
+        manualOverrides.removeAll()
+        targetOverrides.removeAll()
+        if performanceCurvePercent != 0 {
+            performanceCurvePercent = 0
+        }
+        smoothedZoneTemps.removeAll()
+        lastSentRPM.removeAll()
     }
 
     /// Clamp RPM to a sane range — guards against bad float/fpe2 decoding

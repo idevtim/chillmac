@@ -53,8 +53,8 @@ final class DetailPanelController {
         panel.titlebarAppearsTransparent = true
         panel.isMovable = false
 
-        // Wrap content with a close button overlay, inside ThemedView for correct theme
-        let wrappedContent = ThemedView(content:
+        // Wrap content with a close button overlay, inside AppearanceHost for correct theme
+        let wrappedContent = AppearanceHost(content:
             ZStack(alignment: .topTrailing) {
                 content
                 DetailPanelCloseButton { [weak self] in
@@ -155,13 +155,12 @@ final class DetailPanelController {
 
 struct DetailPanelCloseButton: View {
     let action: () -> Void
-    @Environment(\.theme) private var theme
 
     var body: some View {
         Button(action: action) {
             Image(systemName: "xmark.circle.fill")
                 .font(.system(size: 20))
-                .foregroundColor(theme.textQuaternary)
+                .foregroundStyle(.tertiary)
         }
         .buttonStyle(.plain)
     }
@@ -169,7 +168,7 @@ struct DetailPanelCloseButton: View {
 
 #if DEBUG
 #Preview("Detail Panel Close Button") {
-    return PreviewSupport.previewHost(theme: .dark, frame: .detail) {
+    return PreviewSupport.previewHost(scheme: .dark, frame: .detail) {
         DetailPanelCloseButton(action: {})
             .padding()
     }

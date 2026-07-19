@@ -17,11 +17,10 @@ struct PanelResizeHandle: View {
 
     @State private var hostWindow: NSWindow?
     @State private var dragStartHeight: CGFloat = 0
-    @Environment(\.theme) private var theme
 
     var body: some View {
         Capsule()
-            .fill(theme.textQuaternary.opacity(0.5))
+            .fill(Color.secondary.opacity(0.5))
             .frame(width: 36, height: 4)
             .padding(.top, 6)
             .padding(.bottom, 4)
@@ -64,7 +63,7 @@ struct PanelResizeHandle: View {
 
 #if DEBUG
 #Preview("Panel Resize Handle") {
-    return PreviewSupport.previewHost(theme: .dark, frame: .detail) {
+    return PreviewSupport.previewHost(scheme: .dark, frame: .detail) {
         VStack {
             Spacer()
             PanelResizeHandle(panelHeight: .constant(560))

@@ -25,10 +25,14 @@ enum FanTargetCommit {
     }
 }
 
-/// UI / control gating for Performance Mode vs live helper availability.
+/// UI / control gating: Cool is on, helper ready, and engagement hysteresis is active.
 enum PerformanceControl {
-    static func isActivelyControlling(performanceMode: Bool, helperReady: Bool) -> Bool {
-        performanceMode && helperReady
+    static func isActivelyControlling(
+        performanceMode: Bool,
+        helperReady: Bool,
+        coolingEngaged: Bool = true
+    ) -> Bool {
+        performanceMode && helperReady && coolingEngaged
     }
 }
 

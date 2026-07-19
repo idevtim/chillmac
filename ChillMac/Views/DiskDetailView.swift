@@ -4,17 +4,16 @@ struct DiskDetailView: View {
     @ObservedObject var systemInfo: SystemInfo
     @ObservedObject var monitor: FanMonitor
     @ObservedObject var settings: AppSettings
-    @Environment(\.theme) private var theme
     @State private var panelHeight: CGFloat = CGFloat(AppSettings.shared.detailPanelHeight)
 
     var body: some View {
         ZStack {
-            theme.backgroundGradient
+            Rectangle().fill(.regularMaterial)
 
             VStack(alignment: .leading, spacing: 0) {
                 Text("Macintosh HD")
                     .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(theme.textPrimary)
+                    .foregroundStyle(.primary)
                     .padding(.horizontal, 20)
                     .padding(.top, 18)
                     .padding(.bottom, 14)
@@ -51,7 +50,7 @@ struct DiskDetailView: View {
             HStack(spacing: 14) {
                 ZStack {
                     Circle()
-                        .stroke(theme.ringTrack, lineWidth: 20)
+                        .stroke(Color.secondary.opacity(0.2), lineWidth: 20)
 
                     if categoriesLoaded {
                         // Draw category arcs
@@ -67,10 +66,10 @@ struct DiskDetailView: View {
                         if categoriesLoaded {
                             Text(SystemInfo.formatDiskBytes(systemInfo.diskAvailableBytes))
                                 .font(.system(size: 18, weight: .bold, design: .rounded))
-                                .foregroundColor(theme.textPrimary)
+                                .foregroundStyle(.primary)
                             Text("of \(SystemInfo.formatDiskBytes(systemInfo.diskTotalBytes)) available")
                                 .font(.system(size: 9))
-                                .foregroundColor(theme.textTertiary)
+                                .foregroundStyle(.tertiary)
                         } else {
                             ProgressView()
                                 .controlSize(.small)
@@ -94,7 +93,7 @@ struct DiskDetailView: View {
                         VStack(spacing: 6) {
                             Text("Calculating disk usage…")
                                 .font(.system(size: 12))
-                                .foregroundColor(theme.textQuaternary)
+                                .foregroundStyle(.tertiary)
                         }
                         .frame(maxHeight: .infinity)
                     }
@@ -119,10 +118,10 @@ struct DiskDetailView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Limited access")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(theme.textPrimary)
+                    .foregroundStyle(.primary)
                 Text("\(systemInfo.deniedFolders.sorted().joined(separator: ", ")) need permission.")
                     .font(.system(size: 11))
-                    .foregroundColor(theme.textQuaternary)
+                    .foregroundStyle(.tertiary)
                     .lineLimit(2)
             }
 
@@ -140,8 +139,7 @@ struct DiskDetailView: View {
             .buttonStyle(.plain)
         }
         .padding(12)
-        .background(theme.cardBg)
-        .cornerRadius(12)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private func openPrivacySettings() {
@@ -184,7 +182,7 @@ struct DiskDetailView: View {
                         .foregroundColor(usageColor)
                     Text("Usage")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(theme.textPrimary)
+                        .foregroundStyle(.primary)
                     Spacer()
                 }
 
@@ -194,7 +192,7 @@ struct DiskDetailView: View {
 
                 Text(usageDescription)
                     .font(.system(size: 11))
-                    .foregroundColor(theme.textQuaternary)
+                    .foregroundStyle(.tertiary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -202,8 +200,7 @@ struct DiskDetailView: View {
             }
             .padding(14)
             .frame(maxHeight: .infinity)
-            .background(theme.cardBg)
-            .cornerRadius(12)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
@@ -212,7 +209,7 @@ struct DiskDetailView: View {
                         .foregroundColor(diskTempColor)
                     Text("SSD Temp")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(theme.textPrimary)
+                        .foregroundStyle(.primary)
                     Spacer()
                 }
 
@@ -222,7 +219,7 @@ struct DiskDetailView: View {
 
                 Text(diskTempDescription)
                     .font(.system(size: 11))
-                    .foregroundColor(theme.textQuaternary)
+                    .foregroundStyle(.tertiary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -230,8 +227,7 @@ struct DiskDetailView: View {
             }
             .padding(14)
             .frame(maxHeight: .infinity)
-            .background(theme.cardBg)
-            .cornerRadius(12)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .fixedSize(horizontal: false, vertical: true)
     }
@@ -292,7 +288,6 @@ private struct DiskLegendRow: View {
     let label: String
     let value: String
     var denied: Bool = false
-    @Environment(\.theme) private var theme
 
     var body: some View {
         HStack(spacing: 8) {
@@ -302,7 +297,7 @@ private struct DiskLegendRow: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(label)
                     .font(.system(size: 12))
-                    .foregroundColor(denied ? theme.textQuaternary : theme.textSecondary)
+                    .foregroundColor(denied ? Color.secondary : Color.secondary)
                 HStack(spacing: 4) {
                     if denied {
                         Image(systemName: "lock.fill")
@@ -311,7 +306,7 @@ private struct DiskLegendRow: View {
                     }
                     Text(value)
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(denied ? .orange : theme.textPrimary)
+                        .foregroundColor(denied ? Color.orange : Color.primary)
                 }
             }
         }
@@ -325,7 +320,7 @@ private struct DiskLegendRow: View {
         monitor: PreviewSupport.fanMonitor,
         settings: AppSettings.shared
     )
-    .previewHost(theme: .dark, frame: .detail)
+    .previewHost(scheme: .dark, frame: .detail)
 }
 
 #Preview("Disk Detail — Light") {
@@ -334,7 +329,7 @@ private struct DiskLegendRow: View {
         monitor: PreviewSupport.fanMonitor,
         settings: AppSettings.shared
     )
-    .previewHost(theme: .light, frame: .detail)
+    .previewHost(scheme: .light, frame: .detail)
 }
 
 #Preview("Disk Legend Row") {
@@ -345,6 +340,6 @@ private struct DiskLegendRow: View {
         value: SystemInfo.formatDiskBytes(cat.bytes)
     )
     .padding()
-    .previewHost(theme: .dark, frame: .detail)
+    .previewHost(scheme: .dark, frame: .detail)
 }
 #endif

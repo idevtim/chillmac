@@ -6,7 +6,14 @@ struct FanRowView: View {
     @ObservedObject var monitor: FanMonitor
     @ObservedObject private var settings = AppSettings.shared
     @State private var errorMessage: String?
-    @Environment(\.theme) private var theme
+
+    private var activelyCooling: Bool {
+        PerformanceControl.isActivelyControlling(
+            performanceMode: settings.performanceMode,
+            helperReady: monitor.helperReady,
+            coolingEngaged: monitor.coolingEngaged
+        )
+    }
 
     private var isManual: Binding<Bool> {
         Binding(
@@ -46,17 +53,22 @@ struct FanRowView: View {
         return .green
     }
 
+    private var modeLabel: String {
+        if activelyCooling { return "Cooling" }
+        if isManual.wrappedValue { return "Manual" }
+        return "Auto"
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Top row: icon, name, RPM
+        VStack(alignment: .leading, spacing: DesignSystem.Space.sm) {
             HStack {
                 Image(systemName: "fan.fill")
                     .font(.system(size: 20))
-                    .foregroundColor(fan.currentRPM > 0 ? .green : theme.textSubtle)
+                    .foregroundStyle(fan.currentRPM > 0 ? Color.green : Color.secondary)
                     .rotationEffect(.degrees(fan.currentRPM > 0 ? 360 : 0))
                     .animation(
                         fan.currentRPM > 0
-                            ? .linear(duration: max(0.5, 3000 / fan.currentRPM)).repeatForever(autoreverses: false)
+                            ? .linear(duration: max(0.5, 3000 / max(fan.currentRPM, 1))).repeatForever(autoreverses: false)
                             : .default,
                         value: fan.currentRPM > 0
                     )
@@ -64,11 +76,10 @@ struct FanRowView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(fan.name)
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(theme.textPrimary)
-
-                    Text(PerformanceControl.isActivelyControlling(performanceMode: settings.performanceMode, helperReady: monitor.helperReady) ? "Performance" : (isManual.wrappedValue ? "Manual" : "Auto"))
+                        .foregroundStyle(.primary)
+                    Text(modeLabel)
                         .font(.system(size: 12))
-                        .foregroundColor(PerformanceControl.isActivelyControlling(performanceMode: settings.performanceMode, helperReady: monitor.helperReady) ? .orange : theme.textQuaternary)
+                        .foregroundStyle(activelyCooling ? Color.accentColor : Color.secondary)
                 }
 
                 Spacer()
@@ -76,84 +87,60 @@ struct FanRowView: View {
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
                     Text("\(Int(fan.currentRPM.rounded()))")
                         .font(.system(size: 24, weight: .bold, design: .rounded))
-                        .foregroundColor(rpmColor)
+                        .foregroundStyle(rpmColor)
                     Text("RPM")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(theme.textTertiary)
+                        .foregroundStyle(.tertiary)
                 }
                 .frame(width: 110, alignment: .trailing)
             }
 
-            // Manual/Auto toggle
-            if PerformanceControl.isActivelyControlling(performanceMode: settings.performanceMode, helperReady: monitor.helperReady) {
-                HStack(spacing: 6) {
-                    Image(systemName: "bolt.fill")
-                        .font(.system(size: 12))
-                        .foregroundColor(.orange)
-                    Text("Controlled by Performance Mode")
-                        .font(.system(size: 13))
-                        .foregroundColor(theme.textQuaternary)
-                    Spacer()
-                }
+            if activelyCooling {
+                Label("Controlled by Cool", systemImage: "snowflake")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
             } else if monitor.helperReady {
                 HStack {
-                    Toggle(isOn: isManual) {
-                        EmptyView()
-                    }
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .tint(.green)
-                    .animation(monitor.manualOverrides[fan.id] != nil ? .default : nil, value: isManual.wrappedValue)
-
+                    Toggle(isOn: isManual) { EmptyView() }
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
                     Text(isManual.wrappedValue ? "Manual Control" : "Automatic")
                         .font(.system(size: 13))
-                        .foregroundColor(theme.textTertiary)
-
+                        .foregroundStyle(.secondary)
                     Spacer()
                 }
             } else {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .controlSize(.small)
+                HStack(spacing: DesignSystem.Space.sm) {
+                    ProgressView().controlSize(.small)
                     Text("Connecting to helper…")
                         .font(.system(size: 13))
-                        .foregroundColor(theme.textQuaternary)
+                        .foregroundStyle(.tertiary)
                     Spacer()
                 }
             }
 
-            // Speed slider (only in manual mode, not during performance mode)
             if !settings.performanceMode, monitor.helperReady, isManual.wrappedValue, sliderRange.upperBound > sliderRange.lowerBound {
                 VStack(spacing: 6) {
-                    Slider(
-                        value: targetRPM,
-                        in: sliderRange,
-                        step: 100
-                    )
-                    .tint(.green)
-
+                    Slider(value: targetRPM, in: sliderRange, step: 100)
                     HStack {
                         Text("\(Int(fan.minRPM))")
                         Spacer()
-                        Text("Target: \(Int(targetRPM.wrappedValue)) RPM")
-                            .fontWeight(.medium)
+                        Text("Target: \(Int(targetRPM.wrappedValue)) RPM").fontWeight(.medium)
                         Spacer()
                         Text("\(Int(fan.maxRPM))")
                     }
                     .font(.system(size: 11))
-                    .foregroundColor(theme.textQuaternary)
+                    .foregroundStyle(.tertiary)
                 }
             }
 
             if let error = errorMessage {
                 Text(error)
                     .font(.system(size: 12))
-                    .foregroundColor(.red)
+                    .foregroundStyle(.red)
             }
         }
-        .padding(14)
-        .background(theme.cardBg)
-        .cornerRadius(12)
+        .chillCard()
     }
 
     private func setFanMode(manual: Bool) {
@@ -165,10 +152,8 @@ struct FanRowView: View {
                 } else {
                     errorMessage = nil
                     if manual {
-                        // Initialize slider to current RPM (or minRPM if fans aren't spinning)
                         let initialRPM = fan.currentRPM > fan.minRPM ? fan.currentRPM : fan.minRPM
                         monitor.targetOverrides[fan.id] = initialRPM
-                        // Immediately send the target so the fan actually spins
                         setFanSpeed(rpm: Int(initialRPM))
                     }
                 }
@@ -190,25 +175,12 @@ struct FanRowView: View {
 }
 
 #if DEBUG
-#Preview("FanRowView Auto") {
-    let monitor = PreviewSupport.fanMonitor
-    return FanRowView(
+#Preview("FanRowView") {
+    FanRowView(
         fan: PreviewSupport.sampleFans[0],
         helper: PreviewSupport.helper,
-        monitor: monitor
+        monitor: PreviewSupport.fanMonitor
     )
-    .previewHost(theme: .dark)
-}
-
-#Preview("FanRowView Manual") {
-    let monitor = PreviewSupport.fanMonitor
-    monitor.manualOverrides[1] = true
-    monitor.targetOverrides[1] = PreviewSupport.sampleFans[1].targetRPM
-    return FanRowView(
-        fan: PreviewSupport.sampleFans[1],
-        helper: PreviewSupport.helper,
-        monitor: monitor
-    )
-    .previewHost(theme: .dark)
+    .previewHost(scheme: .dark)
 }
 #endif

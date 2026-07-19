@@ -232,7 +232,7 @@ final class StatusBarController: NSObject {
     private func toggleMemoryPanel() {
         detailPanel.toggle(
             id: "memory",
-            content: ThemedView(content: MemoryDetailView(memoryInfo: memoryInfo)),
+            content: AppearanceHost(content: MemoryDetailView(memoryInfo: memoryInfo)),
             relativeTo: popover
         )
     }
@@ -240,7 +240,7 @@ final class StatusBarController: NSObject {
     private func toggleDiskPanel() {
         detailPanel.toggle(
             id: "disk",
-            content: ThemedView(content: DiskDetailView(systemInfo: systemInfo, monitor: fanMonitor, settings: AppSettings.shared)),
+            content: AppearanceHost(content: DiskDetailView(systemInfo: systemInfo, monitor: fanMonitor, settings: AppSettings.shared)),
             relativeTo: popover
         )
     }
@@ -248,7 +248,7 @@ final class StatusBarController: NSObject {
     private func toggleBatteryPanel() {
         detailPanel.toggle(
             id: "battery",
-            content: ThemedView(content: BatteryDetailView(batteryInfo: batteryInfo, settings: AppSettings.shared)),
+            content: AppearanceHost(content: BatteryDetailView(batteryInfo: batteryInfo, settings: AppSettings.shared)),
             relativeTo: popover
         )
     }
@@ -256,7 +256,7 @@ final class StatusBarController: NSObject {
     private func toggleCpuPanel() {
         detailPanel.toggle(
             id: "cpu",
-            content: ThemedView(content: CpuDetailView(cpuInfo: cpuInfo, systemInfo: systemInfo, monitor: fanMonitor, settings: AppSettings.shared)),
+            content: AppearanceHost(content: CpuDetailView(cpuInfo: cpuInfo, systemInfo: systemInfo, monitor: fanMonitor, settings: AppSettings.shared)),
             relativeTo: popover
         )
     }
@@ -264,7 +264,7 @@ final class StatusBarController: NSObject {
     private func toggleTemperaturePanel() {
         detailPanel.toggle(
             id: "temperature",
-            content: ThemedView(content: TemperatureDetailView(monitor: fanMonitor, settings: AppSettings.shared)),
+            content: AppearanceHost(content: TemperatureDetailView(monitor: fanMonitor, settings: AppSettings.shared)),
             relativeTo: popover
         )
     }

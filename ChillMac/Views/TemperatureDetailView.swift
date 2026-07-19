@@ -3,18 +3,17 @@ import SwiftUI
 struct TemperatureDetailView: View {
     @ObservedObject var monitor: FanMonitor
     @ObservedObject var settings: AppSettings
-    @Environment(\.theme) private var theme
     @Environment(\.colorScheme) private var colorScheme
     @State private var panelHeight: CGFloat = CGFloat(AppSettings.shared.detailPanelHeight)
 
     var body: some View {
         ZStack {
-            theme.backgroundGradient
+            Rectangle().fill(.regularMaterial)
 
             VStack(alignment: .leading, spacing: 0) {
                 Text("Temperatures")
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(theme.textPrimary)
+                    .foregroundStyle(.primary)
                     .padding(.horizontal, 20)
                     .padding(.top, 18)
                     .padding(.bottom, 14)
@@ -59,60 +58,60 @@ struct TemperatureDetailView: View {
             VStack(spacing: 4) {
                 Text("Hottest")
                     .font(.system(size: 10))
-                    .foregroundColor(theme.textTertiary)
+                    .foregroundStyle(.tertiary)
                 if let hottest = monitor.sensors.max(by: { $0.temperature < $1.temperature }) {
                     Text(settings.formatTemperature(hottest.temperature))
                         .font(.system(size: 18, weight: .bold, design: .monospaced))
                         .foregroundColor(colorForTemp(hottest.temperature))
                     Text(hottest.label)
                         .font(.system(size: 10))
-                        .foregroundColor(theme.textTertiary)
+                        .foregroundStyle(.tertiary)
                         .lineLimit(1)
                 }
             }
             .frame(maxWidth: .infinity)
 
             Divider()
-                .background(theme.divider)
+                .background(Color.secondary.opacity(0.3))
                 .frame(height: 50)
 
             // Average temp
             VStack(spacing: 4) {
                 Text("Average")
                     .font(.system(size: 10))
-                    .foregroundColor(theme.textTertiary)
+                    .foregroundStyle(.tertiary)
                 Text(settings.formatTemperature(averageTemp))
                     .font(.system(size: 18, weight: .bold, design: .monospaced))
                     .foregroundColor(colorForTemp(averageTemp))
                 Text("\(monitor.sensors.count) sensors")
                     .font(.system(size: 10))
-                    .foregroundColor(theme.textTertiary)
+                    .foregroundStyle(.tertiary)
             }
             .frame(maxWidth: .infinity)
 
             Divider()
-                .background(theme.divider)
+                .background(Color.secondary.opacity(0.3))
                 .frame(height: 50)
 
             // Coolest temp
             VStack(spacing: 4) {
                 Text("Coolest")
                     .font(.system(size: 10))
-                    .foregroundColor(theme.textTertiary)
+                    .foregroundStyle(.tertiary)
                 if let coolest = monitor.sensors.min(by: { $0.temperature < $1.temperature }) {
                     Text(settings.formatTemperature(coolest.temperature))
                         .font(.system(size: 18, weight: .bold, design: .monospaced))
                         .foregroundColor(colorForTemp(coolest.temperature))
                     Text(coolest.label)
                         .font(.system(size: 10))
-                        .foregroundColor(theme.textTertiary)
+                        .foregroundStyle(.tertiary)
                         .lineLimit(1)
                 }
             }
             .frame(maxWidth: .infinity)
         }
         .padding(16)
-        .background(theme.cardBg)
+        .background(Color.clear)
         .cornerRadius(14)
     }
 
@@ -122,7 +121,7 @@ struct TemperatureDetailView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title.uppercased())
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(theme.textTertiary)
+                .foregroundStyle(.tertiary)
                 .tracking(1.2)
                 .padding(.leading, 4)
 
@@ -135,7 +134,7 @@ struct TemperatureDetailView: View {
 
                         Text(sensor.label)
                             .font(.system(size: 12))
-                            .foregroundColor(theme.textSecondary)
+                            .foregroundStyle(.secondary)
                             .lineLimit(1)
 
                         Spacer()
@@ -164,13 +163,12 @@ struct TemperatureDetailView: View {
 
                     if index < sensors.count - 1 {
                         Divider()
-                            .background(theme.dividerSubtle)
+                            .background(Color.secondary.opacity(0.2))
                             .padding(.horizontal, 14)
                     }
                 }
             }
-            .background(theme.cardBgSecondary)
-            .cornerRadius(12)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 
@@ -219,13 +217,7 @@ struct TemperatureDetailView: View {
     }
 
     private func colorForTemp(_ temp: Double) -> Color {
-        let isLight = (settings.preferredColorScheme ?? colorScheme) == .light
-        switch temp {
-        case ..<50: return .green
-        case 50..<75: return isLight ? Color(red: 0.75, green: 0.55, blue: 0.0) : .yellow
-        case 75..<90: return isLight ? Color(red: 0.80, green: 0.45, blue: 0.0) : .orange
-        default: return .red
-        }
+        ThermalStatus.color(forCelsius: temp)
     }
 }
 
@@ -235,7 +227,7 @@ struct TemperatureDetailView: View {
         monitor: PreviewSupport.fanMonitor,
         settings: AppSettings.shared
     )
-    .previewHost(theme: .dark, frame: .detail)
+    .previewHost(scheme: .dark, frame: .detail)
 }
 
 #Preview("TemperatureDetailView Light") {
@@ -243,6 +235,6 @@ struct TemperatureDetailView: View {
         monitor: PreviewSupport.fanMonitor,
         settings: AppSettings.shared
     )
-    .previewHost(theme: .light, frame: .detail)
+    .previewHost(scheme: .light, frame: .detail)
 }
 #endif

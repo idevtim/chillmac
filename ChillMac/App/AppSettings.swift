@@ -1,44 +1,6 @@
 import ServiceManagement
 import SwiftUI
 
-enum PerformanceLevel: String, CaseIterable {
-    case low
-    case medium
-    case high
-    case max
-    case ultra
-
-    var label: String {
-        switch self {
-        case .low: return "Low"
-        case .medium: return "Medium"
-        case .high: return "High"
-        case .max: return "Max"
-        case .ultra: return "Ultra"
-        }
-    }
-
-    var description: String {
-        switch self {
-        case .low: return "Whisper baseline, slow ramp"
-        case .medium: return "Balanced baseline and ramp"
-        case .high: return "Aggressive baseline, fast ramp"
-        case .max: return "Smart max — full speed before throttle"
-        case .ultra: return "Pure performance — louder earlier, holds peak clocks"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .low: return "wind"
-        case .medium: return "fan"
-        case .high: return "fan.fill"
-        case .max: return "flame.fill"
-        case .ultra: return "gauge.with.dots.needle.67percent"
-        }
-    }
-}
-
 enum AppearanceMode: String, CaseIterable {
     case system
     case light
@@ -68,22 +30,20 @@ final class AppSettings: ObservableObject {
 
     @AppStorage("useFahrenheit") var useFahrenheit = false
     @AppStorage("appearanceMode") var appearanceMode: AppearanceMode = .dark
+    /// Cool master switch (formerly Performance Mode).
     @AppStorage("performanceMode") var performanceMode = false
-    @AppStorage("performanceLevel") var performanceLevel: PerformanceLevel = .high
+    @AppStorage("coolIntent") private var coolIntentRaw: String = CoolIntent.balanced.rawValue
     @AppStorage("popoverHeight") var popoverHeight: Double = 640
     @AppStorage("showScrollIndicators") var showScrollIndicators = true
 
     @AppStorage("detailPanelHeight") var detailPanelHeight: Double = 560
 
-    // Battery saver — disable performance mode when battery is low
     @AppStorage("batterySaverEnabled") var batterySaverEnabled = true
-    @AppStorage("batterySaverThreshold") var batterySaverThreshold = 20  // percent
+    @AppStorage("batterySaverThreshold") var batterySaverThreshold = 20
     @AppStorage("forcePerformanceOnBattery") var forcePerformanceOnBattery = false
     @AppStorage("keepFansOnScreenSleep") var keepFansOnScreenSleep = false
-    /// When on AC, keep fans through display sleep / lock (clamshell while awake). Does not keep the Mac awake.
     @AppStorage("keepFansClosedOnPower") var keepFansClosedOnPower = false
     @AppStorage("showFPS") var showFPS = false
-    /// When on, the menu bar shows a compact temp next to the fan only while Warm/Hot.
     @AppStorage("showMenuBarTemp") var showMenuBarTemp = true
 
     static let popoverMinHeight: CGFloat = 400
@@ -92,6 +52,11 @@ final class AppSettings: ObservableObject {
     static let detailPanelMinHeight: CGFloat = 350
     static let detailPanelMaxHeight: CGFloat = 800
     static let detailPanelDefaultHeight: CGFloat = 560
+
+    var coolIntent: CoolIntent {
+        get { CoolIntent(rawValue: coolIntentRaw) ?? .balanced }
+        set { coolIntentRaw = newValue.rawValue }
+    }
 
     var preferredColorScheme: ColorScheme? {
         switch appearanceMode {
@@ -109,10 +74,6 @@ final class AppSettings: ObservableObject {
         }
     }
 
-    // Manually notify SwiftUI observers after appearance changes.
-    // @AppStorage sends objectWillChange *before* the value is written,
-    // so SwiftUI can read the stale value. This ensures a second update fires
-    // after UserDefaults has committed the new value.
     func setAppearanceMode(_ mode: AppearanceMode) {
         appearanceMode = mode
         DispatchQueue.main.async {
@@ -121,7 +82,16 @@ final class AppSettings: ObservableObject {
     }
 
     private init() {
+        migrateCoolIntentIfNeeded()
         syncLaunchAtLogin()
+    }
+
+    private func migrateCoolIntentIfNeeded() {
+        let defaults = UserDefaults.standard
+        if defaults.object(forKey: "coolIntent") == nil,
+           let legacy = defaults.string(forKey: "performanceLevel") {
+            coolIntentRaw = CoolIntent.migrated(fromLegacyRaw: legacy).rawValue
+        }
     }
 
     func syncLaunchAtLogin() {

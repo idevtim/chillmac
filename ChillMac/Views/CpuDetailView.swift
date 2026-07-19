@@ -5,17 +5,16 @@ struct CpuDetailView: View {
     @ObservedObject var systemInfo: SystemInfo
     @ObservedObject var monitor: FanMonitor
     @ObservedObject var settings: AppSettings
-    @Environment(\.theme) private var theme
     @State private var panelHeight: CGFloat = CGFloat(AppSettings.shared.detailPanelHeight)
 
     var body: some View {
         ZStack {
-            theme.backgroundGradient
+            Rectangle().fill(.regularMaterial)
 
             VStack(alignment: .leading, spacing: 0) {
                 Text(systemInfo.chipName)
                     .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(theme.textPrimary)
+                    .foregroundStyle(.primary)
                     .padding(.horizontal, 20)
                     .padding(.top, 18)
                     .padding(.bottom, 14)
@@ -70,7 +69,7 @@ struct CpuDetailView: View {
             .frame(width: 100)
         }
         .padding(16)
-        .background(theme.cardBg)
+        .background(Color.clear)
         .cornerRadius(14)
     }
 
@@ -86,7 +85,7 @@ struct CpuDetailView: View {
                         .foregroundColor(.mint)
                     Text("Uptime")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(theme.textPrimary)
+                        .foregroundStyle(.primary)
                     Spacer()
                 }
 
@@ -96,7 +95,7 @@ struct CpuDetailView: View {
 
                 Text(uptimeDescription)
                     .font(.system(size: 11))
-                    .foregroundColor(theme.textQuaternary)
+                    .foregroundStyle(.tertiary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -104,8 +103,7 @@ struct CpuDetailView: View {
             }
             .padding(14)
             .frame(maxHeight: .infinity)
-            .background(theme.cardBg)
-            .cornerRadius(12)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
             // CPU Temperature
             VStack(alignment: .leading, spacing: 8) {
@@ -115,7 +113,7 @@ struct CpuDetailView: View {
                         .foregroundColor(cpuTempColor)
                     Text("CPU Temp")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(theme.textPrimary)
+                        .foregroundStyle(.primary)
                     Spacer()
                 }
 
@@ -125,7 +123,7 @@ struct CpuDetailView: View {
 
                 Text(cpuTempDescription)
                     .font(.system(size: 11))
-                    .foregroundColor(theme.textQuaternary)
+                    .foregroundStyle(.tertiary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -133,8 +131,7 @@ struct CpuDetailView: View {
             }
             .padding(14)
             .frame(maxHeight: .infinity)
-            .background(theme.cardBg)
-            .cornerRadius(12)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .fixedSize(horizontal: false, vertical: true)
     }
@@ -176,7 +173,7 @@ struct CpuDetailView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("TOP CONSUMERS")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(theme.textTertiary)
+                .foregroundStyle(.tertiary)
                 .tracking(1.2)
                 .padding(.leading, 4)
                 .padding(.top, 4)
@@ -185,11 +182,11 @@ struct CpuDetailView: View {
                 HStack {
                     Text("Application")
                         .font(.system(size: 12))
-                        .foregroundColor(theme.textQuaternary)
+                        .foregroundStyle(.tertiary)
                     Spacer()
                     Text("CPU %")
                         .font(.system(size: 12))
-                        .foregroundColor(theme.textQuaternary)
+                        .foregroundStyle(.tertiary)
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
@@ -210,7 +207,7 @@ struct CpuDetailView: View {
 
                         Text(proc.name)
                             .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(theme.textPrimary)
+                            .foregroundStyle(.primary)
                             .lineLimit(1)
 
                         Spacer()
@@ -223,8 +220,7 @@ struct CpuDetailView: View {
                     .padding(.vertical, 6)
                 }
             }
-            .background(theme.cardBgSecondary)
-            .cornerRadius(12)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 }
@@ -235,7 +231,6 @@ private struct UsageRow: View {
     let color: Color
     let value: String
     let label: String
-    @Environment(\.theme) private var theme
 
     var body: some View {
         HStack(spacing: 6) {
@@ -245,10 +240,10 @@ private struct UsageRow: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(value)
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(theme.textPrimary)
+                    .foregroundStyle(.primary)
                 Text(label)
                     .font(.system(size: 11))
-                    .foregroundColor(theme.textTertiary)
+                    .foregroundStyle(.tertiary)
             }
         }
     }
@@ -258,7 +253,6 @@ struct CpuGraphView: View {
     let history: [Double]
     let userHistory: [Double]
     let systemHistory: [Double]
-    @Environment(\.theme) private var theme
 
     var body: some View {
         GeometryReader { geo in
@@ -273,7 +267,7 @@ struct CpuGraphView: View {
                         path.move(to: CGPoint(x: 0, y: y))
                         path.addLine(to: CGPoint(x: w, y: y))
                     }
-                    .stroke(theme.gridLine, lineWidth: 0.5)
+                    .stroke(Color.secondary.opacity(0.15), lineWidth: 0.5)
                 }
 
                 // User fill + line
@@ -376,7 +370,7 @@ struct CpuGraphView: View {
         monitor: PreviewSupport.fanMonitor,
         settings: AppSettings.shared
     )
-    .previewHost(theme: .dark, frame: .detail)
+    .previewHost(scheme: .dark, frame: .detail)
 }
 
 #Preview("CpuDetailView Light") {
@@ -386,7 +380,7 @@ struct CpuGraphView: View {
         monitor: PreviewSupport.fanMonitor,
         settings: AppSettings.shared
     )
-    .previewHost(theme: .light, frame: .detail)
+    .previewHost(scheme: .light, frame: .detail)
 }
 
 #Preview("CpuGraphView") {
@@ -396,7 +390,7 @@ struct CpuGraphView: View {
         userHistory: cpu.userHistory,
         systemHistory: cpu.systemHistory
     )
-    .previewHost(theme: .dark, frame: .detail)
+    .previewHost(scheme: .dark, frame: .detail)
 }
 
 #Preview("UsageRow") {
@@ -407,6 +401,6 @@ struct CpuGraphView: View {
         label: "Available"
     )
     .padding()
-    .previewHost(theme: .dark, frame: .detail)
+    .previewHost(scheme: .dark, frame: .detail)
 }
 #endif

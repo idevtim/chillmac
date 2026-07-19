@@ -1,4 +1,4 @@
-import Foundation
+import SwiftUI
 
 /// Shared Good / Warm / Hot vocabulary for popover + menu bar.
 enum ThermalStatus: Equatable {
@@ -28,6 +28,15 @@ enum ThermalStatus: Equatable {
         self == .warm || self == .hot
     }
 
+    /// Closed semantic color mapping — system colors only, no RGB bags.
+    var color: Color {
+        switch self {
+        case .unknown, .good: return .green
+        case .warm: return .orange
+        case .hot: return .red
+        }
+    }
+
     /// Compact monochrome readout for the status item (integer degrees).
     static func menuBarTemperatureText(celsius: Double, useFahrenheit: Bool) -> String {
         if useFahrenheit {
@@ -35,5 +44,10 @@ enum ThermalStatus: Equatable {
             return "\(Int(f.rounded()))°"
         }
         return "\(Int(celsius.rounded()))°"
+    }
+
+    /// Closed mapper for arbitrary peak temps (detail rows).
+    static func color(forCelsius celsius: Double) -> Color {
+        from(peakCelsius: celsius).color
     }
 }
