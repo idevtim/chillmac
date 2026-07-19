@@ -102,3 +102,14 @@ struct ThemedView<Content: View>: View {
             .preferredColorScheme(settings.preferredColorScheme)
     }
 }
+
+#if DEBUG
+#Preview("ThemedView") {
+    return ThemedView(content:
+        Text("Sample")
+            .padding(20)
+    )
+    .frame(width: 200, height: 100)
+}
+#endif
+

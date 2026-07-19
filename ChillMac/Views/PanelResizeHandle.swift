@@ -61,3 +61,15 @@ struct PanelResizeHandle: View {
             }
     }
 }
+
+#if DEBUG
+#Preview("Panel Resize Handle") {
+    return PreviewSupport.previewHost(theme: .dark, frame: .detail) {
+        VStack {
+            Spacer()
+            PanelResizeHandle(panelHeight: .constant(560))
+        }
+    }
+}
+#endif
+

@@ -188,3 +188,27 @@ struct FanRowView: View {
         }
     }
 }
+
+#if DEBUG
+#Preview("FanRowView Auto") {
+    let monitor = PreviewSupport.fanMonitor
+    return FanRowView(
+        fan: PreviewSupport.sampleFans[0],
+        helper: PreviewSupport.helper,
+        monitor: monitor
+    )
+    .previewHost(theme: .dark)
+}
+
+#Preview("FanRowView Manual") {
+    let monitor = PreviewSupport.fanMonitor
+    monitor.manualOverrides[1] = true
+    monitor.targetOverrides[1] = PreviewSupport.sampleFans[1].targetRPM
+    return FanRowView(
+        fan: PreviewSupport.sampleFans[1],
+        helper: PreviewSupport.helper,
+        monitor: monitor
+    )
+    .previewHost(theme: .dark)
+}
+#endif

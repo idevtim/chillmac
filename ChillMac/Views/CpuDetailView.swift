@@ -367,3 +367,46 @@ struct CpuGraphView: View {
         }
     }
 }
+
+#if DEBUG
+#Preview("CpuDetailView Dark") {
+    CpuDetailView(
+        cpuInfo: PreviewSupport.cpuInfo,
+        systemInfo: PreviewSupport.systemInfo,
+        monitor: PreviewSupport.fanMonitor,
+        settings: AppSettings.shared
+    )
+    .previewHost(theme: .dark, frame: .detail)
+}
+
+#Preview("CpuDetailView Light") {
+    CpuDetailView(
+        cpuInfo: PreviewSupport.cpuInfo,
+        systemInfo: PreviewSupport.systemInfo,
+        monitor: PreviewSupport.fanMonitor,
+        settings: AppSettings.shared
+    )
+    .previewHost(theme: .light, frame: .detail)
+}
+
+#Preview("CpuGraphView") {
+    let cpu = PreviewSupport.cpuInfo
+    return CpuGraphView(
+        history: cpu.history,
+        userHistory: cpu.userHistory,
+        systemHistory: cpu.systemHistory
+    )
+    .previewHost(theme: .dark, frame: .detail)
+}
+
+#Preview("UsageRow") {
+    let cpu = PreviewSupport.cpuInfo
+    return UsageRow(
+        color: .teal,
+        value: String(format: "%.1f %%", 100 - cpu.totalUsage),
+        label: "Available"
+    )
+    .padding()
+    .previewHost(theme: .dark, frame: .detail)
+}
+#endif
