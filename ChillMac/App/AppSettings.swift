@@ -117,7 +117,10 @@ final class AppSettings: ObservableObject {
     }
 
     func syncLaunchAtLogin() {
-        launchAtLogin = (SMAppService.mainApp.status == .enabled)
+        let enabled = SMAppService.mainApp.status == .enabled
+        if launchAtLogin != enabled {
+            launchAtLogin = enabled
+        }
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {

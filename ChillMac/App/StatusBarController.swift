@@ -148,12 +148,9 @@ final class StatusBarController: NSObject {
             fpsMonitor.stopMonitoring()
             fanMonitor.isPopoverVisible = false
         } else if let button = statusItem.button {
-            // Resume secondary monitors when popover opens
-            cpuInfo.startMonitoring()
-            memoryInfo.startMonitoring()
-            batteryInfo.startMonitoring()
-            systemInfo.startMonitoring()
-            fpsMonitor.startMonitoring()
+            // Sync settings and show the hosting view first, then start monitors on the
+            // next turn — otherwise their @Published writes land mid-body and spam
+            // "Publishing changes from within view updates".
             fanMonitor.isPopoverVisible = true
             AppSettings.shared.syncLaunchAtLogin()
             NotificationCenter.default.post(name: .popoverDidClose, object: nil)
@@ -162,6 +159,14 @@ final class StatusBarController: NSObject {
             NSApp.activate(ignoringOtherApps: true)
             popover.contentViewController?.view.window?.makeKeyAndOrderFront(nil)
             NotificationCenter.default.post(name: .popoverDidShow, object: nil)
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.cpuInfo.startMonitoring()
+                self.memoryInfo.startMonitoring()
+                self.batteryInfo.startMonitoring()
+                self.systemInfo.startMonitoring()
+                self.fpsMonitor.startMonitoring()
+            }
         }
     }
 
