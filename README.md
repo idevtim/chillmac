@@ -24,7 +24,7 @@ A free, open-source macOS menu bar app for monitoring your system and controllin
 ## Features
 
 - **Fan Control** — Live RPM display in the menu bar with per-fan manual speed sliders
-- **Performance Mode** — Automatic fan curves with Low/Medium/High/Max presets
+- **Performance Mode** — Automatic fan curves with Low/Medium/High/Max/Ultra presets (Ultra = pure performance curve, not constant full blast)
 - **CPU Monitor** — Real-time usage graph, top consuming apps, temperature, and uptime
 - **Memory Monitor** — Usage breakdown with donut chart, pressure, swap, and top consumers
 - **Battery Monitor** — Charge gauge, health percentage, cycle count, and temperature

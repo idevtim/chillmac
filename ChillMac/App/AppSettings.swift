@@ -6,6 +6,7 @@ enum PerformanceLevel: String, CaseIterable {
     case medium
     case high
     case max
+    case ultra
 
     var label: String {
         switch self {
@@ -13,6 +14,7 @@ enum PerformanceLevel: String, CaseIterable {
         case .medium: return "Medium"
         case .high: return "High"
         case .max: return "Max"
+        case .ultra: return "Ultra"
         }
     }
 
@@ -22,6 +24,7 @@ enum PerformanceLevel: String, CaseIterable {
         case .medium: return "Balanced baseline and ramp"
         case .high: return "Aggressive baseline, fast ramp"
         case .max: return "Smart max — full speed before throttle"
+        case .ultra: return "Pure performance — louder earlier, holds peak clocks"
         }
     }
 
@@ -31,6 +34,7 @@ enum PerformanceLevel: String, CaseIterable {
         case .medium: return "fan"
         case .high: return "fan.fill"
         case .max: return "flame.fill"
+        case .ultra: return "gauge.with.dots.needle.67percent"
         }
     }
 }

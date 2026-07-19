@@ -657,6 +657,26 @@ struct SectionHeader: View {
     .onAppear { PreviewSupport.triggerPopoverAppeared() }
 }
 
+
+#Preview("PopoverView Ultra") {
+    AppSettings.shared.appearanceMode = .dark
+    AppSettings.shared.performanceMode = true
+    AppSettings.shared.performanceLevel = .ultra
+    return PopoverView(
+        monitor: PreviewSupport.fanMonitorUltra,
+        settings: AppSettings.shared,
+        systemInfo: PreviewSupport.systemInfo,
+        batteryInfo: PreviewSupport.batteryInfo,
+        cpuInfo: PreviewSupport.cpuInfo,
+        memoryInfo: PreviewSupport.memoryInfo,
+        fpsMonitor: PreviewSupport.fpsMonitor,
+        updateChecker: PreviewSupport.updateChecker,
+        helper: PreviewSupport.helper
+    )
+    .previewHost(theme: .dark)
+    .onAppear { PreviewSupport.triggerPopoverAppeared() }
+}
+
 #Preview("CardSectionHeader") {
     CardSectionHeader(title: "Fans")
         .previewHost(theme: .dark)
