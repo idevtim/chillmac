@@ -35,6 +35,14 @@ enum CoolIntent: String, CaseIterable {
         }
     }
 
+    /// SF Symbol inside the mode circle (nil = empty outline for Native).
+    var modeSystemImage: String? {
+        switch self {
+        case .native: return nil
+        case .balanced, .performance: return "fan"
+        }
+    }
+
     /// Migrate legacy PerformanceLevel / Quiet raw values stored in UserDefaults.
     static func migrated(fromLegacyRaw raw: String?) -> CoolIntent {
         switch raw {

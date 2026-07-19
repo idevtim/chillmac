@@ -55,13 +55,19 @@ enum CoolStatusMenuBuilder {
             return
         }
 
-        appendHeader(menu: menu, monitor: monitor, settings: settings)
+        // Color scale first — no Cool/status/temp header above it.
         appendZoneTrack(menu: menu, peakCelsius: monitor.peakTemperature)
         if let throttle = throttleCaption(for: monitor.processThermalState) {
             appendDisabledCaption(menu: menu, title: throttle)
         }
 
         menu.addItem(.separator())
+
+        if #available(macOS 14.0, *) {
+            menu.addItem(.sectionHeader(title: "Mode"))
+        } else {
+            appendDisabledCaption(menu: menu, title: "Mode")
+        }
 
         for mode in CoolIntent.allCases {
             menu.addItem(modeItem(mode, selected: settings.coolMode == mode, actions: actions))
@@ -104,68 +110,6 @@ enum CoolStatusMenuBuilder {
 
     // MARK: - Sections
 
-    private static func appendHeader(menu: NSMenu, monitor: FanMonitor, settings: AppSettings) {
-        let thermal = ThermalStatus.from(peakCelsius: monitor.peakTemperature)
-        let temp = monitor.peakTemperature > 0
-            ? ThermalStatus.menuBarTemperatureText(
-                celsius: monitor.peakTemperature,
-                useFahrenheit: settings.useFahrenheit
-            )
-            : "--"
-        let subline = "\(statusSubline(monitor: monitor))  ·  \(temp)"
-
-        let title = NSMenuItem(title: "Cool", action: nil, keyEquivalent: "")
-        title.isEnabled = false
-        if #available(macOS 14.4, *) {
-            title.title = "Cool"
-            title.subtitle = subline
-        } else {
-            title.attributedTitle = headerAttributedTitle(
-                primary: "Cool",
-                secondary: subline,
-                thermal: thermal
-            )
-        }
-        menu.addItem(title)
-    }
-
-    private static func statusSubline(monitor: FanMonitor) -> String {
-        var line = ThermalStatus.from(peakCelsius: monitor.peakTemperature).label
-        if let suffix = ThermalStatus.severitySuffix(thermalState: monitor.processThermalState) {
-            line += " · \(suffix)"
-        }
-        return line
-    }
-
-    private static func headerAttributedTitle(
-        primary: String,
-        secondary: String,
-        thermal: ThermalStatus
-    ) -> NSAttributedString {
-        let result = NSMutableAttributedString(
-            string: primary,
-            attributes: [
-                .font: NSFont.systemFont(ofSize: 13, weight: .semibold),
-                .foregroundColor: NSColor.labelColor,
-            ]
-        )
-        let secondaryColor: NSColor = {
-            switch thermal {
-            case .warm: return .systemOrange
-            case .hot: return .systemRed
-            default: return .secondaryLabelColor
-            }
-        }()
-        result.append(NSAttributedString(
-            string: "\n\(secondary)",
-            attributes: [
-                .font: NSFont.systemFont(ofSize: 11),
-                .foregroundColor: secondaryColor,
-            ]
-        ))
-        return result
-    }
-
     private static func appendZoneTrack(menu: NSMenu, peakCelsius: Double) {
         let item = NSMenuItem()
         item.isEnabled = false
@@ -203,15 +147,16 @@ enum CoolStatusMenuBuilder {
         )
         item.target = actions.target
         item.tag = tag(for: mode)
-        item.state = selected ? .on : .off
+        item.state = .off
         item.isEnabled = true
-        if mode == .native {
-            if #available(macOS 14.4, *) {
-                item.subtitle = mode.description
-            } else {
-                item.title = "\(mode.label) — \(mode.description)"
-            }
+
+        let row = CoolModeRowView(mode: mode, selected: selected) {
+            NSApp.sendAction(actions.selectMode, to: actions.target, from: item)
+            item.menu?.cancelTracking()
         }
+        let host = NSHostingView(rootView: row)
+        host.frame = NSRect(x: 0, y: 0, width: 260, height: 36)
+        item.view = host
         return item
     }
 
@@ -273,7 +218,56 @@ enum CoolStatusMenuBuilder {
     }
 }
 
-// MARK: - Zone track (only custom menu view)
+// MARK: - Custom menu views
+
+private struct CoolModeRowView: View {
+    let mode: CoolIntent
+    let selected: Bool
+    let onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(spacing: 8) {
+                ZStack {
+                    Circle()
+                        .fill(selected ? Color.accentColor : Color.primary.opacity(0.06))
+                        .frame(width: 22, height: 22)
+                    if let symbol = mode.modeSystemImage {
+                        Image(systemName: symbol)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(selected ? Color.white : Color.secondary)
+                    } else {
+                        Circle()
+                            .strokeBorder(
+                                selected ? Color.white.opacity(0.9) : Color.secondary.opacity(0.55),
+                                lineWidth: 1.5
+                            )
+                            .frame(width: 10, height: 10)
+                    }
+                }
+
+                Text(mode.label)
+                    .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                    .foregroundStyle(.primary)
+
+                Spacer(minLength: 4)
+
+                if mode == .native {
+                    Text(mode.description)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .frame(width: 260, height: 36, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Zone track
 
 private struct CoolZoneTrackStrip: View {
     let peakCelsius: Double
