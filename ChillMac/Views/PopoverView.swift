@@ -138,21 +138,25 @@ struct PopoverView: View {
         .animation(.easeOut(duration: 0.3), value: appeared)
     }
 
+    private var currentThermalStatus: ThermalStatus {
+        guard !monitor.sensors.isEmpty,
+              let maxTemp = monitor.sensors.map(\.temperature).max() else {
+            return .unknown
+        }
+        return ThermalStatus.from(peakCelsius: maxTemp)
+    }
+
     private var thermalStatus: String {
-        guard !monitor.sensors.isEmpty else { return "Good" }
-        let maxTemp = monitor.sensors.map(\.temperature).max() ?? 0
-        if maxTemp >= 90 { return "Hot" }
-        if maxTemp >= 75 { return "Warm" }
-        return "Good"
+        currentThermalStatus.label
     }
 
     private var thermalStatusColor: Color {
-        guard !monitor.sensors.isEmpty else { return .green }
         let isLight = (settings.preferredColorScheme ?? colorScheme) == .light
-        let maxTemp = monitor.sensors.map(\.temperature).max() ?? 0
-        if maxTemp >= 90 { return .red }
-        if maxTemp >= 75 { return isLight ? Color(red: 0.80, green: 0.45, blue: 0.0) : .orange }
-        return .green
+        switch currentThermalStatus {
+        case .hot: return .red
+        case .warm: return isLight ? Color(red: 0.80, green: 0.45, blue: 0.0) : .orange
+        case .good, .unknown: return .green
+        }
     }
 
     private var maxTempDisplay: String {

@@ -81,6 +81,8 @@ final class AppSettings: ObservableObject {
     @AppStorage("forcePerformanceOnBattery") var forcePerformanceOnBattery = false
     @AppStorage("keepFansOnScreenSleep") var keepFansOnScreenSleep = false
     @AppStorage("showFPS") var showFPS = false
+    /// When on, the menu bar shows a compact temp next to the fan only while Warm/Hot.
+    @AppStorage("showMenuBarTemp") var showMenuBarTemp = true
 
     static let popoverMinHeight: CGFloat = 400
     static let popoverMaxHeight: CGFloat = 900

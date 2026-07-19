@@ -348,6 +348,34 @@ struct SettingsView: View {
                 Divider()
                     .background(theme.dividerSubtle)
 
+                // Menu bar temperature (Warm/Hot only)
+                HStack {
+                    Image(systemName: "menubar.arrow.up.rectangle")
+                        .font(.system(size: 16))
+                        .foregroundColor(theme.textTertiary)
+                        .frame(width: 24)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Show Temp in Menu Bar")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(theme.textPrimary)
+                        Text("Only when Warm or Hot — stays quiet when Good")
+                            .font(.system(size: 11))
+                            .foregroundColor(theme.textQuaternary)
+                    }
+                    Spacer()
+                    Toggle(isOn: $settings.showMenuBarTemp) {
+                        EmptyView()
+                    }
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .tint(.teal)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+
+                Divider()
+                    .background(theme.dividerSubtle)
+
                 // Reset popover height
                 HStack {
                     Image(systemName: "arrow.up.and.down.square")
