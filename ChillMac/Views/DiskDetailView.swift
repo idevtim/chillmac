@@ -317,3 +317,34 @@ private struct DiskLegendRow: View {
         }
     }
 }
+
+#if DEBUG
+#Preview("Disk Detail — Dark") {
+    DiskDetailView(
+        systemInfo: PreviewSupport.systemInfo,
+        monitor: PreviewSupport.fanMonitor,
+        settings: AppSettings.shared
+    )
+    .previewHost(theme: .dark, frame: .detail)
+}
+
+#Preview("Disk Detail — Light") {
+    DiskDetailView(
+        systemInfo: PreviewSupport.systemInfo,
+        monitor: PreviewSupport.fanMonitor,
+        settings: AppSettings.shared
+    )
+    .previewHost(theme: .light, frame: .detail)
+}
+
+#Preview("Disk Legend Row") {
+    let cat = PreviewSupport.systemInfo.diskCategories[0]
+    return DiskLegendRow(
+        color: Color(nsColor: cat.color),
+        label: cat.name,
+        value: SystemInfo.formatDiskBytes(cat.bytes)
+    )
+    .padding()
+    .previewHost(theme: .dark, frame: .detail)
+}
+#endif

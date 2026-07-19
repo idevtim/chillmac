@@ -3,10 +3,11 @@ import Foundation
 final class HelperConnection {
     private var connection: NSXPCConnection?
 
-    func connect() -> HelperProtocol? {
+    func connect(completionOnError: ((Bool, String?) -> Void)? = nil) -> HelperProtocol? {
         if let conn = connection {
             return conn.remoteObjectProxyWithErrorHandler { error in
                 NSLog("HelperConnection: XPC proxy error: %@", error.localizedDescription)
+                completionOnError?(false, error.localizedDescription)
             } as? HelperProtocol
         }
 
@@ -26,11 +27,12 @@ final class HelperConnection {
         self.connection = conn
         return conn.remoteObjectProxyWithErrorHandler { error in
             NSLog("HelperConnection: XPC proxy error: %@", error.localizedDescription)
+            completionOnError?(false, error.localizedDescription)
         } as? HelperProtocol
     }
 
     func setFanSpeed(fanIndex: Int, rpm: Int, completion: @escaping (Bool, String?) -> Void) {
-        guard let helper = connect() else {
+        guard let helper = connect(completionOnError: completion) else {
             NSLog("HelperConnection: connect() returned nil")
             completion(false, "Failed to connect to helper")
             return
@@ -39,7 +41,7 @@ final class HelperConnection {
     }
 
     func setFanMode(fanIndex: Int, isAuto: Bool, completion: @escaping (Bool, String?) -> Void) {
-        guard let helper = connect() else {
+        guard let helper = connect(completionOnError: completion) else {
             NSLog("HelperConnection: connect() returned nil")
             completion(false, "Failed to connect to helper")
             return

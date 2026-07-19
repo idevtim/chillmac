@@ -4,6 +4,8 @@
 <dict>
     <key>Label</key>
     <string>com.idevtim.ChillMac.Helper</string>
+    <key>BundleProgram</key>
+    <string>Contents/Library/LaunchServices/com.idevtim.ChillMac.Helper</string>
     <key>MachServices</key>
     <dict>
         <key>com.idevtim.ChillMac.Helper</key>

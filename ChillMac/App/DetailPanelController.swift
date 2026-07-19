@@ -166,3 +166,13 @@ struct DetailPanelCloseButton: View {
         .buttonStyle(.plain)
     }
 }
+
+#if DEBUG
+#Preview("Detail Panel Close Button") {
+    return PreviewSupport.previewHost(theme: .dark, frame: .detail) {
+        DetailPanelCloseButton(action: {})
+            .padding()
+    }
+}
+#endif
+

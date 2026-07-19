@@ -450,100 +450,16 @@ final class FanMonitor: ObservableObject {
                         self.sensors = stableSensors
                     }
                 }
-                // Performance mode: zone-aware fan curve based on per-zone temperatures
-                self.applyPerformanceCurve(sensors: sensorsByKey, batterySaverShouldSuppress: batterySaverShouldSuppress)
+                // Defer curve/UI publishes to the next turn so they don't land mid-body
+                // while SwiftUI is still applying the fan/sensor updates above.
+                DispatchQueue.main.async {
+                    self.applyPerformanceCurve(sensors: sensorsByKey, batterySaverShouldSuppress: batterySaverShouldSuppress)
+                }
             }
         }
     }
 
     // MARK: - Performance Mode Fan Curve
-
-    /// Minimum fan speed % (above minRPM) while performance mode is engaged.
-    /// Keeping a non-zero floor — and staying in manual mode — eliminates the audible
-    /// "on / off / on / off" cycling that happens when fans bounce between manual and auto.
-    private func minFanSpeedFloor() -> Double {
-        switch AppSettings.shared.performanceLevel {
-        case .low: return 0.0      // sits at exactly minRPM — inaudible, but never auto
-        case .medium: return 0.10
-        case .high: return 0.25
-        case .max: return 0.50     // proactive baseline; never need to spin up from cold
-        }
-    }
-
-    /// Max RPM increase per 2s poll cycle. Lower = gentler audible ramp-up.
-    private func rampUpRate() -> Double {
-        switch AppSettings.shared.performanceLevel {
-        case .low: return 400
-        case .medium: return 700
-        case .high: return 1200
-        case .max: return 2000
-        }
-    }
-
-    /// Max RPM decrease per 2s poll cycle. Always slower than ramp-up.
-    private func rampDownRate() -> Double {
-        switch AppSettings.shared.performanceLevel {
-        case .low: return 150
-        case .medium: return 250
-        case .high: return 400
-        case .max: return 500
-        }
-    }
-
-    /// EMA factor for temperature smoothing — lower = heavier smoothing, slower reactivity.
-    /// Low mode is heavily damped so brief temp spikes don't audibly spin the fans up.
-    private func smoothingFactor() -> Double {
-        switch AppSettings.shared.performanceLevel {
-        case .low: return 0.15
-        case .medium: return 0.25
-        case .high: return 0.35
-        case .max: return 0.50
-        }
-    }
-
-    /// Maps a (smoothed) peak zone temperature to a fan speed % between the level's
-    /// floor and 100%. Curves are continuous so there are no audible cliffs.
-    private func fanSpeedPercent(forTemperature temp: Double) -> Double {
-        switch AppSettings.shared.performanceLevel {
-        case .low:
-            // Floor = minRPM (inaudible). Only intervenes once the chassis is genuinely hot.
-            switch temp {
-            case ...70: return 0.0
-            case 70..<85:  return        (temp - 70) / 15.0 * 0.30  // 0 → 30%
-            case 85..<95:  return 0.30 + (temp - 85) / 10.0 * 0.30  // 30 → 60%
-            case 95..<105: return 0.60 + (temp - 95) / 10.0 * 0.20  // 60 → 80%
-            default: return 0.80
-            }
-        case .medium:
-            // Floor = 10%. Quiet idle, responsive once load shows up.
-            switch temp {
-            case ...55: return 0.10
-            case 55..<70: return 0.10 + (temp - 55) / 15.0 * 0.25   // 10 → 35%
-            case 70..<82: return 0.35 + (temp - 70) / 12.0 * 0.30   // 35 → 65%
-            case 82..<92: return 0.65 + (temp - 82) / 10.0 * 0.25   // 65 → 90%
-            default: return min(0.90 + (temp - 92) / 8.0 * 0.10, 1.0)
-            }
-        case .high:
-            // Floor = 25%. Aggressive — keeps the chassis cool well before thermal pressure.
-            switch temp {
-            case ...45: return 0.25
-            case 45..<58: return 0.25 + (temp - 45) / 13.0 * 0.25   // 25 → 50%
-            case 58..<70: return 0.50 + (temp - 58) / 12.0 * 0.25   // 50 → 75%
-            case 70..<82: return 0.75 + (temp - 70) / 12.0 * 0.20   // 75 → 95%
-            default: return 1.0
-            }
-        case .max:
-            // Smart max: high baseline (50%) so cooling is preemptive, ramps to 100% well
-            // before throttle territory. NOT constant-100% — that's pointless noise & wear
-            // when there's thermal headroom.
-            switch temp {
-            case ...40: return 0.50
-            case 40..<55: return 0.50 + (temp - 40) / 15.0 * 0.20   // 50 → 70%
-            case 55..<68: return 0.70 + (temp - 55) / 13.0 * 0.30   // 70 → 100%
-            default: return 1.0
-            }
-        }
-    }
 
     private func applyPerformanceCurve(sensors: [String: TemperatureSensor], batterySaverShouldSuppress: Bool) {
         // Skip fan commands while system is asleep or performance is suspended (screen lock/sleep)
@@ -559,7 +475,9 @@ final class FanMonitor: ObservableObject {
         // Battery saver: suppress performance mode when on battery below threshold
         let batterySaving = performanceEnabled && batterySaverShouldSuppress
         let isActive = performanceEnabled && !batterySaving
-        batterySaverActive = batterySaving
+        if batterySaverActive != batterySaving {
+            batterySaverActive = batterySaving
+        }
 
         guard let helper = helper else { return }
 
@@ -573,7 +491,9 @@ final class FanMonitor: ObservableObject {
             }
             manualOverrides.removeAll()
             targetOverrides.removeAll()
-            performanceCurvePercent = 0
+            if performanceCurvePercent != 0 {
+                performanceCurvePercent = 0
+            }
             smoothedZoneTemps.removeAll()
             lastSentRPM.removeAll()
             return
@@ -582,10 +502,11 @@ final class FanMonitor: ObservableObject {
         guard isActive else { return }
         wasPerformanceModeActive = true
 
-        let floor = minFanSpeedFloor()
-        let smoothFactor = smoothingFactor()
-        let upRate = rampUpRate()
-        let downRate = rampDownRate()
+        let level = AppSettings.shared.performanceLevel
+        let floor = PerformanceCurve.minFloor(level: level)
+        let smoothFactor = PerformanceCurve.smoothingFactor(level: level)
+        let upRate = PerformanceCurve.rampUpRate(level: level)
+        let downRate = PerformanceCurve.rampDownRate(level: level)
 
         // Per-zone smoothed temp → curve % contribution
         var zonePcts: [ThermalZone: Double] = [:]
@@ -599,7 +520,10 @@ final class FanMonitor: ObservableObject {
             } else {
                 smoothedZoneTemps[zone] = peak
             }
-            zonePcts[zone] = fanSpeedPercent(forTemperature: smoothedZoneTemps[zone]!)
+            zonePcts[zone] = PerformanceCurve.speedPercent(
+                level: level,
+                temperature: smoothedZoneTemps[zone]!
+            )
         }
 
         // Each fan = max contribution across zones (weighted by zone-fan affinity)
@@ -628,7 +552,10 @@ final class FanMonitor: ObservableObject {
 
         // UI shows the highest fan percentage
         let maxPct = fanPcts.values.max() ?? floor
-        performanceCurvePercent = maxPct * 100
+        let curvePercent = maxPct * 100
+        if abs(performanceCurvePercent - curvePercent) >= 0.5 {
+            performanceCurvePercent = curvePercent
+        }
 
         // Send each fan to its target with per-level rate limiting
         for fan in fans {
@@ -652,10 +579,21 @@ final class FanMonitor: ObservableObject {
             let alreadyManual = manualOverrides[fan.id] == true
             guard abs(rounded - currentTarget) >= 100 || !alreadyManual else { continue }
 
-            lastSentRPM[fan.id] = rounded
-            targetOverrides[fan.id] = rounded
-            manualOverrides[fan.id] = true
-            helper.setFanSpeed(fanIndex: fan.id, rpm: Int(rounded)) { _, _ in }
+            let fanId = fan.id
+            let rpmToSend = Int(rounded)
+            helper.setFanSpeed(fanIndex: fanId, rpm: rpmToSend) { [weak self] ok, _ in
+                guard let self else { return }
+                DispatchQueue.main.async {
+                    FanTargetCommit.apply(
+                        ok: ok,
+                        fanId: fanId,
+                        rpm: Double(rpmToSend),
+                        manualOverrides: &self.manualOverrides,
+                        targetOverrides: &self.targetOverrides,
+                        lastSentRPM: &self.lastSentRPM
+                    )
+                }
+            }
         }
     }
 
