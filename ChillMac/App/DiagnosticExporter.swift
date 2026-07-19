@@ -28,6 +28,7 @@ struct SettingsSnapshot: Codable {
     let batterySaverThreshold: Int
     let useFahrenheit: Bool
     let keepFansOnScreenSleep: Bool
+    let keepFansClosedOnPower: Bool
 }
 
 // MARK: - Exporter
@@ -56,7 +57,8 @@ enum DiagnosticExporter {
                 batterySaverEnabled: settings.batterySaverEnabled,
                 batterySaverThreshold: settings.batterySaverThreshold,
                 useFahrenheit: settings.useFahrenheit,
-                keepFansOnScreenSleep: settings.keepFansOnScreenSleep
+                keepFansOnScreenSleep: settings.keepFansOnScreenSleep,
+                keepFansClosedOnPower: settings.keepFansClosedOnPower
             ),
             sleepIntervals: logger.sleepIntervalsSnapshot(),
             history: logger.snapshot()

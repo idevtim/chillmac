@@ -121,6 +121,17 @@ final class FanMonitor: ObservableObject {
     }
 
     @objc private func handleSleep() {
+        let shouldReset = DisplaySleepFanPolicy.shouldResetFansOnSystemWillSleep(
+            keepClosedOnPower: AppSettings.shared.keepFansClosedOnPower,
+            keepOnScreenSleep: AppSettings.shared.keepFansOnScreenSleep,
+            onAC: PowerSource.isOnAC
+        )
+        if !shouldReset {
+            // Lid-close often posts willSleep after screensDidSleep. Do not undo a keep decision
+            // by forcing fans back to auto — especially keepClosedOnPower + AC.
+            NSLog("FanMonitor: system willSleep — keeping fans active (user preference)")
+            return
+        }
         NSLog("FanMonitor: system going to sleep — resetting fans to auto")
         systemAsleep = true
         resetAllFansToAuto()
@@ -133,7 +144,11 @@ final class FanMonitor: ObservableObject {
     }
 
     @objc private func handleScreenSleep() {
-        if AppSettings.shared.keepFansOnScreenSleep {
+        if DisplaySleepFanPolicy.shouldKeepFansThroughDisplaySleep(
+            keepClosedOnPower: AppSettings.shared.keepFansClosedOnPower,
+            keepOnScreenSleep: AppSettings.shared.keepFansOnScreenSleep,
+            onAC: PowerSource.isOnAC
+        ) {
             NSLog("FanMonitor: screen sleep — keeping fans active (user preference)")
             return
         }
@@ -149,7 +164,11 @@ final class FanMonitor: ObservableObject {
     }
 
     @objc private func handleScreenLocked() {
-        if AppSettings.shared.keepFansOnScreenSleep {
+        if DisplaySleepFanPolicy.shouldKeepFansThroughDisplaySleep(
+            keepClosedOnPower: AppSettings.shared.keepFansClosedOnPower,
+            keepOnScreenSleep: AppSettings.shared.keepFansOnScreenSleep,
+            onAC: PowerSource.isOnAC
+        ) {
             NSLog("FanMonitor: screen locked — keeping fans active (user preference)")
             return
         }
