@@ -450,8 +450,11 @@ final class FanMonitor: ObservableObject {
                         self.sensors = stableSensors
                     }
                 }
-                // Performance mode: zone-aware fan curve based on per-zone temperatures
-                self.applyPerformanceCurve(sensors: sensorsByKey, batterySaverShouldSuppress: batterySaverShouldSuppress)
+                // Defer curve/UI publishes to the next turn so they don't land mid-body
+                // while SwiftUI is still applying the fan/sensor updates above.
+                DispatchQueue.main.async {
+                    self.applyPerformanceCurve(sensors: sensorsByKey, batterySaverShouldSuppress: batterySaverShouldSuppress)
+                }
             }
         }
     }
@@ -472,8 +475,9 @@ final class FanMonitor: ObservableObject {
         // Battery saver: suppress performance mode when on battery below threshold
         let batterySaving = performanceEnabled && batterySaverShouldSuppress
         let isActive = performanceEnabled && !batterySaving
-        batterySaverActive = batterySaving
-
+        if batterySaverActive != batterySaving {
+            batterySaverActive = batterySaving
+        }
 
         guard let helper = helper else { return }
 
@@ -487,7 +491,9 @@ final class FanMonitor: ObservableObject {
             }
             manualOverrides.removeAll()
             targetOverrides.removeAll()
-            performanceCurvePercent = 0
+            if performanceCurvePercent != 0 {
+                performanceCurvePercent = 0
+            }
             smoothedZoneTemps.removeAll()
             lastSentRPM.removeAll()
             return
@@ -546,7 +552,10 @@ final class FanMonitor: ObservableObject {
 
         // UI shows the highest fan percentage
         let maxPct = fanPcts.values.max() ?? floor
-        performanceCurvePercent = maxPct * 100
+        let curvePercent = maxPct * 100
+        if abs(performanceCurvePercent - curvePercent) >= 0.5 {
+            performanceCurvePercent = curvePercent
+        }
 
         // Send each fan to its target with per-level rate limiting
         for fan in fans {
