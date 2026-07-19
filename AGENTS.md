@@ -93,6 +93,7 @@ ChillMac/
     BatteryInfo       Battery info via IOKit/IOPowerSources (polls every 5s)
   SMC/              - IOKit bridge (SMCConnection, SMCTypes, SMCKeys)
   XPC/              - HelperConnection (client), HelperInstaller
+  Preview/          - PreviewSupport factories for SwiftUI canvas + tests (#if DEBUG)
 FanControlHelper/
   main.swift        - Helper daemon entry point
   HelperDelegate.swift - XPC listener + code signature validation
@@ -123,6 +124,28 @@ scripts/
 - 420x640 main popover, 370x560 detail panels
 - Footer with quit button, app name, and °F/°C toggle
 
-## No Tests
+## Testing
 
-There is no test suite. Testing is done manually via the UI.
+Unit tests live in `ChillMacTests` (Swift Testing). Run:
+
+```bash
+xcodegen generate && xcodebuild -project ChillMac.xcodeproj -scheme ChillMac -destination 'platform=macOS' test
+```
+
+Layout (door-open for future suites — prefer these homes over reshuffling):
+
+```
+ChillMacTests/
+  Support/          Tags.swift, harness smoke
+  Fixtures/         PreviewSupportTests, etc.
+  Unit/             Pure / parallel-safe (Fan/, SMC/, App/)
+  Integration/      Live host / XPC later (Fan/, SMC/, XPC/)
+  Mocks/            Fakes for isolation
+```
+
+- Use `@Test` / `#expect` / `@Suite` (Swift Testing only — no XCTest UI suite yet)
+- Tag suites via `Support/Tags.swift`: `.unit`, `.integration`, `.fan`, `.fixtures` — e.g. `@Suite("PerformanceCurve", .tags(.unit, .fan))`. Default parallel OK for pure math; use `.serialized` only for shared UserDefaults/SMC. Tags enable CI filters without changing `project.yml`
+- Sample data for fixtures and canvas comes from `ChillMac/Preview/PreviewSupport.swift` — do not hit live SMC/XPC in unit tests or invent local sample data in views
+- SwiftUI convention: add in-file `#Preview("…")` (plain macros, no traits) wired to `PreviewSupport` factories; keep `#Preview` under `#if DEBUG`
+- Zero external test dependencies (no ViewInspector, no snapshot libs)
+- Test plan: `TestPlans/Unit.xctestplan`

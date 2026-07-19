@@ -39,3 +39,18 @@ struct TemperatureRowView: View {
         }
     }
 }
+
+#if DEBUG
+#Preview("TemperatureRowView") {
+    VStack(spacing: 8) {
+        ForEach(PreviewSupport.sampleSensors) { sensor in
+            TemperatureRowView(
+                sensor: sensor,
+                settings: AppSettings.shared
+            )
+        }
+    }
+    .padding()
+    .previewHost(theme: .dark)
+}
+#endif

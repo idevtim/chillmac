@@ -262,3 +262,28 @@ private struct BatteryDetailRow: View {
         .padding(.vertical, 8)
     }
 }
+
+#if DEBUG
+#Preview("Battery Detail — Dark") {
+    BatteryDetailView(
+        batteryInfo: PreviewSupport.batteryInfo,
+        settings: AppSettings.shared
+    )
+    .previewHost(theme: .dark, frame: .detail)
+}
+
+#Preview("Battery Detail — Light") {
+    BatteryDetailView(
+        batteryInfo: PreviewSupport.batteryInfo,
+        settings: AppSettings.shared
+    )
+    .previewHost(theme: .light, frame: .detail)
+}
+
+#Preview("Battery Detail Row") {
+    let info = PreviewSupport.batteryInfo
+    return BatteryDetailRow(label: "Condition", value: info.condition)
+        .padding()
+        .previewHost(theme: .dark, frame: .detail)
+}
+#endif

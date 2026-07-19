@@ -205,13 +205,11 @@ struct PopoverView: View {
                 .opacity(appeared ? 1 : 0)
                 .animation(.easeOut(duration: 0.3).delay(0.35), value: appeared)
 
-            // Performance Mode toggle
-            if monitor.helperReady {
-                performanceModeCard
-                    .opacity(appeared ? 1 : 0)
-                    .offset(y: appeared ? 0 : 12)
-                    .animation(.easeOut(duration: 0.3).delay(0.37), value: appeared)
-            }
+            // Performance Mode card — always visible; install CTA when helper is down
+            performanceModeCard
+                .opacity(appeared ? 1 : 0)
+                .offset(y: appeared ? 0 : 12)
+                .animation(.easeOut(duration: 0.3).delay(0.37), value: appeared)
 
             ForEach(Array(monitor.fans.enumerated()), id: \.element.id) { index, fan in
                 FanRowView(fan: fan, helper: helper, monitor: monitor)
@@ -244,15 +242,19 @@ struct PopoverView: View {
     private var performanceModeCard: some View {
         VStack(spacing: 10) {
             HStack {
-                Image(systemName: settings.performanceMode ? "bolt.fill" : "bolt")
+                Image(systemName: PerformanceControl.isActivelyControlling(performanceMode: settings.performanceMode, helperReady: monitor.helperReady) ? "bolt.fill" : "bolt")
                     .font(.system(size: 18))
-                    .foregroundColor(settings.performanceMode ? .orange : theme.textQuaternary)
+                    .foregroundColor(PerformanceControl.isActivelyControlling(performanceMode: settings.performanceMode, helperReady: monitor.helperReady) ? .orange : theme.textQuaternary)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Performance Mode")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(theme.textPrimary)
-                    Text(settings.performanceMode ? settings.performanceLevel.description : "Fan curve to keep temps low")
+                    Text(
+                        !monitor.helperReady
+                            ? "Helper required to control fans"
+                            : (settings.performanceMode ? settings.performanceLevel.description : "Fan curve to keep temps low")
+                    )
                         .font(.system(size: 11))
                         .foregroundColor(theme.textQuaternary)
                 }
@@ -265,9 +267,27 @@ struct PopoverView: View {
                 .toggleStyle(.switch)
                 .controlSize(.small)
                 .tint(.orange)
+                .disabled(!monitor.helperReady)
             }
 
-            if settings.performanceMode {
+            if !monitor.helperReady {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Fan control needs the privileged helper. Approve ChillMac in System Settings → General → Login Items & Extensions (Background Items), then tap Install.")
+                        .font(.system(size: 11))
+                        .foregroundColor(theme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button {
+                        installHelper()
+                    } label: {
+                        Text("Install Helper")
+                            .font(.system(size: 12, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.orange)
+                    .controlSize(.small)
+                }
+            } else if settings.performanceMode {
                 VStack(spacing: 10) {
                     // Battery saver active indicator
                     if monitor.batterySaverActive {
@@ -356,6 +376,23 @@ struct PopoverView: View {
                 .stroke(settings.performanceMode ? Color.orange.opacity(0.4) : Color.clear, lineWidth: 1)
         )
         .animation(.easeInOut(duration: 0.2), value: settings.performanceMode)
+    }
+
+
+    private func installHelper() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            _ = HelperInstaller.register()
+            HelperInstaller.openApprovalSettingsIfNeeded()
+            Thread.sleep(forTimeInterval: 0.5)
+            let status = HelperInstaller.checkHelperStatus()
+            let ready = HelperReadiness.isReady(status)
+            DispatchQueue.main.async {
+                monitor.helperReady = ready
+                if ready {
+                    monitor.setupSystemObservers()
+                }
+            }
+        }
     }
 
     private var perfAccentColor: Color {
@@ -580,3 +617,85 @@ struct SectionHeader: View {
         CardSectionHeader(title: title)
     }
 }
+
+#if DEBUG
+#Preview("PopoverView Dark") {
+    AppSettings.shared.appearanceMode = .dark
+    AppSettings.shared.performanceMode = true
+    AppSettings.shared.performanceLevel = .max
+    return PopoverView(
+        monitor: PreviewSupport.fanMonitorPerformanceActive,
+        settings: AppSettings.shared,
+        systemInfo: PreviewSupport.systemInfo,
+        batteryInfo: PreviewSupport.batteryInfo,
+        cpuInfo: PreviewSupport.cpuInfo,
+        memoryInfo: PreviewSupport.memoryInfo,
+        fpsMonitor: PreviewSupport.fpsMonitor,
+        updateChecker: PreviewSupport.updateChecker,
+        helper: PreviewSupport.helper
+    )
+    .previewHost(theme: .dark)
+    .onAppear { PreviewSupport.triggerPopoverAppeared() }
+}
+
+#Preview("PopoverView Light") {
+    AppSettings.shared.appearanceMode = .light
+    AppSettings.shared.performanceMode = true
+    AppSettings.shared.performanceLevel = .max
+    return PopoverView(
+        monitor: PreviewSupport.fanMonitorPerformanceActive,
+        settings: AppSettings.shared,
+        systemInfo: PreviewSupport.systemInfo,
+        batteryInfo: PreviewSupport.batteryInfo,
+        cpuInfo: PreviewSupport.cpuInfo,
+        memoryInfo: PreviewSupport.memoryInfo,
+        fpsMonitor: PreviewSupport.fpsMonitor,
+        updateChecker: PreviewSupport.updateChecker,
+        helper: PreviewSupport.helper
+    )
+    .previewHost(theme: .light)
+    .onAppear { PreviewSupport.triggerPopoverAppeared() }
+}
+
+
+#Preview("PopoverView Ultra") {
+    AppSettings.shared.appearanceMode = .dark
+    AppSettings.shared.performanceMode = true
+    AppSettings.shared.performanceLevel = .ultra
+    return PopoverView(
+        monitor: PreviewSupport.fanMonitorUltra,
+        settings: AppSettings.shared,
+        systemInfo: PreviewSupport.systemInfo,
+        batteryInfo: PreviewSupport.batteryInfo,
+        cpuInfo: PreviewSupport.cpuInfo,
+        memoryInfo: PreviewSupport.memoryInfo,
+        fpsMonitor: PreviewSupport.fpsMonitor,
+        updateChecker: PreviewSupport.updateChecker,
+        helper: PreviewSupport.helper
+    )
+    .previewHost(theme: .dark)
+    .onAppear { PreviewSupport.triggerPopoverAppeared() }
+}
+
+#Preview("CardSectionHeader") {
+    CardSectionHeader(title: "Fans")
+        .previewHost(theme: .dark)
+}
+
+#Preview("InfoCard") {
+    let info = PreviewSupport.systemInfo
+    return InfoCard(
+        icon: "cpu",
+        title: info.chipName,
+        subtitle: "Processor",
+        accent: .teal,
+        onTap: {}
+    )
+    .previewHost(theme: .dark)
+}
+
+#Preview("SectionHeader") {
+    SectionHeader(title: "Temperatures")
+        .previewHost(theme: .dark)
+}
+#endif

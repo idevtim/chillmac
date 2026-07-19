@@ -24,10 +24,10 @@ enum HelperInstaller {
         let service = SMAppService.daemon(plistName: "com.idevtim.ChillMac.Helper.plist")
         do {
             try service.register()
-            NSLog("HelperInstaller: registered successfully")
+            NSLog("HelperInstaller: registered successfully — status=\(service.status.rawValue)")
             return true
         } catch {
-            NSLog("HelperInstaller: registration failed — \(error)")
+            NSLog("HelperInstaller: registration failed — \(error) status=\(service.status.rawValue)")
             return false
         }
     }
@@ -40,6 +40,18 @@ enum HelperInstaller {
             NSLog("HelperInstaller: unregistered successfully")
         } catch {
             NSLog("HelperInstaller: unregister failed — \(error)")
+        }
+    }
+
+
+    /// Open Login Items / Background approvals when the daemon is waiting on admin consent.
+    static func openApprovalSettingsIfNeeded() {
+        let service = SMAppService.daemon(plistName: "com.idevtim.ChillMac.Helper.plist")
+        if service.status == .requiresApproval {
+            NSLog("HelperInstaller: daemon requires approval — opening System Settings")
+            if #available(macOS 13.0, *) {
+                SMAppService.openSystemSettingsLoginItems()
+            }
         }
     }
 
