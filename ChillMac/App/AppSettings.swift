@@ -33,7 +33,6 @@ final class AppSettings: ObservableObject {
     /// Cool engaged (Balanced / Performance). Native sets this false.
     @AppStorage("performanceMode") var performanceMode = false
     @AppStorage("coolIntent") private var coolIntentRaw: String = CoolIntent.balanced.rawValue
-    @AppStorage("popoverHeight") var popoverHeight: Double = 320
     @AppStorage("showScrollIndicators") var showScrollIndicators = true
 
     @AppStorage("detailPanelHeight") var detailPanelHeight: Double = 560
@@ -46,10 +45,6 @@ final class AppSettings: ObservableObject {
     @AppStorage("showFPS") var showFPS = false
     @AppStorage("showMenuBarTemp") var showMenuBarTemp = true
 
-    static let popoverWidth: CGFloat = 300
-    static let popoverMinHeight: CGFloat = 280
-    static let popoverMaxHeight: CGFloat = 480
-    static let popoverDefaultHeight: CGFloat = 320
     static let detailPanelMinHeight: CGFloat = 350
     static let detailPanelMaxHeight: CGFloat = 800
     static let detailPanelDefaultHeight: CGFloat = 560
@@ -105,7 +100,6 @@ final class AppSettings: ObservableObject {
 
     private init() {
         migrateCoolIntentIfNeeded()
-        migratePopoverSizeIfNeeded()
         syncLaunchAtLogin()
     }
 
@@ -123,13 +117,6 @@ final class AppSettings: ObservableObject {
         }
         if migrated == .native, performanceMode {
             performanceMode = false
-        }
-    }
-
-    private func migratePopoverSizeIfNeeded() {
-        if popoverHeight > Double(Self.popoverMaxHeight)
-            || popoverHeight < Double(Self.popoverMinHeight) {
-            popoverHeight = Double(Self.popoverDefaultHeight)
         }
     }
 

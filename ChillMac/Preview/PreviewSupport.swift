@@ -87,12 +87,6 @@ enum PreviewSupport {
         return monitor
     }
 
-    /// Posts the same notification StatusBarController sends when the popover opens,
-    /// so `@State appeared` fades content in during canvas previews.
-    static func triggerPopoverAppeared() {
-        NotificationCenter.default.post(name: .popoverDidShow, object: nil)
-    }
-
     static var cpuInfo: CpuInfo {
         let info = CpuInfo()
         info.userPercent = 28

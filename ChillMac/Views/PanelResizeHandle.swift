@@ -1,10 +1,7 @@
 import SwiftUI
 
 extension Notification.Name {
-    static let popoverHeightChanged = Notification.Name("ChillMac.popoverHeightChanged")
     static let detailPanelHeightReset = Notification.Name("ChillMac.detailPanelHeightReset")
-    static let popoverDidShow = Notification.Name("ChillMac.popoverDidShow")
-    static let popoverDidClose = Notification.Name("ChillMac.popoverDidClose")
     static let detailPanelChanged = Notification.Name("ChillMac.detailPanelChanged")
 }
 

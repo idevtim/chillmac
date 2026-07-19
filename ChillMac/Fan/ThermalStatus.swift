@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Shared Good / Warm / Hot vocabulary for popover + menu bar.
+/// Shared Good / Warm / Hot vocabulary for Cool menu + menu bar.
 enum ThermalStatus: Equatable {
     case unknown
     case good

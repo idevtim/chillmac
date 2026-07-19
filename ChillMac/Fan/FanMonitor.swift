@@ -34,8 +34,8 @@ final class FanMonitor: ObservableObject {
     /// Set by AppDelegate after helper is ready
     var helper: HelperConnection?
 
-    /// Set by StatusBarController when popover opens/closes — controls adaptive poll interval
-    var isPopoverVisible = false {
+    /// Set by StatusBarController when the status menu opens/closes — controls adaptive poll interval
+    var isMenuVisible = false {
         didSet { updatePollInterval() }
     }
 
@@ -57,7 +57,7 @@ final class FanMonitor: ObservableObject {
     private let smcQueue = DispatchQueue(label: "com.idevtim.ChillMac.smc")
     /// Guard against overlapping poll cycles
     private var pollInFlight = false
-    /// Counter for periodic full fan reads when popover is hidden (for diagnostic accuracy)
+    /// Counter for periodic full fan reads when menu is hidden (for diagnostic accuracy)
     private var backgroundPollCount: UInt = 0
 
     // MARK: - Thermal Zones
@@ -296,9 +296,9 @@ final class FanMonitor: ObservableObject {
         removeSystemObservers()
     }
 
-    /// Current poll interval: 2s when popover visible or performance mode active, 10s idle
+    /// Current poll interval: 2s when menu visible or performance mode active, 10s idle
     private var currentPollInterval: TimeInterval {
-        if isPopoverVisible || AppSettings.shared.performanceMode { return 2.0 }
+        if isMenuVisible || AppSettings.shared.performanceMode { return 2.0 }
         return 10.0
     }
 
@@ -323,7 +323,7 @@ final class FanMonitor: ObservableObject {
     private func poll() {
         guard let smc = smc, !pollInFlight else { return }
         pollInFlight = true
-        let popoverVisible = isPopoverVisible
+        let menuVisible = isMenuVisible
         let performanceMode = AppSettings.shared.performanceMode
         let helperReadySnapshot = helperReady
         let manualOverridesSnapshot = manualOverrides
@@ -349,7 +349,7 @@ final class FanMonitor: ObservableObject {
                 // Full read every cycle when visible; every 15th cycle (~30s) when hidden
                 // to keep diagnostic samples accurate without constant IOKit overhead
                 self.backgroundPollCount += 1
-                let needsFullRead = popoverVisible || (!popoverVisible && self.backgroundPollCount % 15 == 0)
+                let needsFullRead = menuVisible || (!menuVisible && self.backgroundPollCount % 15 == 0)
 
                 for i in 0..<fanCount {
                     let current = self.clampRPM((try? smc.readFanSpeed(index: i)) ?? 0)
@@ -375,7 +375,7 @@ final class FanMonitor: ObservableObject {
                         maxRPM = raw
                     }
 
-                    // Skip target/mode reads when popover is hidden — saves 2 IOKit calls per fan
+                    // Skip target/mode reads when menu is hidden — saves 2 IOKit calls per fan
                     let target: Double
                     let isManual: Bool
                     if needsFullRead {
@@ -463,17 +463,17 @@ final class FanMonitor: ObservableObject {
                     self.smcError = nil
                 }
 
-                // Only publish when popover is visible or performance mode needs fan data,
-                // to avoid unnecessary SwiftUI view diffs while the popover is hidden.
+                // Only publish when menu is visible or performance mode needs fan data,
+                // to avoid unnecessary SwiftUI view diffs while the menu is closed.
                 if let updatedFans,
-                   (self.isPopoverVisible || performanceMode),
+                   (self.isMenuVisible || performanceMode),
                    self.fans != updatedFans {
                     self.fans = updatedFans
                 }
 
                 // Threshold @Published updates — EMA produces hundredths-of-a-degree noise that
                 // would otherwise fire SwiftUI invalidations every 2s for the entire 24/7 lifetime
-                // of the app, even with the popover closed (NSHostingController retains the view tree).
+                // of the app, even with the menu closed.
                 let tempEpsilon = 0.1
                 if abs(self.peakTemperature - peak) >= tempEpsilon {
                     self.peakTemperature = peak
@@ -490,8 +490,8 @@ final class FanMonitor: ObservableObject {
                 if abs(self.peakSsdTemperature - ssdPeak) >= tempEpsilon {
                     self.peakSsdTemperature = ssdPeak
                 }
-                // Only publish sensor array UI data when the popover is visible
-                if self.isPopoverVisible {
+                // Only publish sensor array UI data when the menu is visible
+                if self.isMenuVisible {
                     if self.sensors != stableSensors {
                         self.sensors = stableSensors
                     }

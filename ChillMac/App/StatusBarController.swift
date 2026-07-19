@@ -2,10 +2,9 @@ import Cocoa
 import Combine
 import SwiftUI
 
-final class StatusBarController: NSObject {
+final class StatusBarController: NSObject, NSMenuDelegate {
     private let statusItem: NSStatusItem
-    private let popover: NSPopover
-    private var eventMonitor: Any?
+    private let statusMenu: NSMenu
     private var settingsSub: AnyCancellable?
     private var statusItemSubs = Set<AnyCancellable>()
     private var lastStatusItemSignature: String?
@@ -18,38 +17,24 @@ final class StatusBarController: NSObject {
 
     init(fanMonitor: FanMonitor, systemInfo: SystemInfo, updateChecker: UpdateChecker) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        popover = NSPopover()
+        statusMenu = NSMenu()
         self.systemInfo = systemInfo
         self.fanMonitor = fanMonitor
         self.updateChecker = updateChecker
 
         super.init()
 
-        popover.behavior = .applicationDefined
-        popover.animates = false
-        popover.appearance = AppSettings.shared.nsAppearance
-        popover.contentSize = NSSize(
-            width: AppSettings.popoverWidth,
-            height: CGFloat(AppSettings.shared.popoverHeight)
-        )
+        statusMenu.delegate = self
+        statusItem.menu = statusMenu
 
         if let button = statusItem.button {
             button.imagePosition = .imageLeft
-            button.action = #selector(togglePopover(_:))
-            button.target = self
         }
         updateStatusItem()
-
-        eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            guard let self, self.popover.isShown else { return }
-            self.closePopover()
-        }
 
         settingsSub = AppSettings.shared.objectWillChange.sink { [weak self] _ in
             DispatchQueue.main.async {
                 guard let self else { return }
-                self.popover.appearance = AppSettings.shared.nsAppearance
-                self.popover.contentViewController?.view.appearance = AppSettings.shared.nsAppearance
                 self.settingsWindow?.contentView?.appearance = AppSettings.shared.nsAppearance
                 self.updateStatusItem()
             }
@@ -76,7 +61,7 @@ final class StatusBarController: NSObject {
         guard signature != lastStatusItemSignature else { return }
         lastStatusItemSignature = signature
 
-        let image = NSImage(systemSymbolName: "fan.fill", accessibilityDescription: nil)
+        let image = NSImage(systemSymbolName: "fan", accessibilityDescription: nil)
         image?.isTemplate = true
         button.image = image
         button.title = title
@@ -85,51 +70,69 @@ final class StatusBarController: NSObject {
         button.setAccessibilityLabel(showTemp ? "ChillMac, \(thermal.label), \(title)" : "ChillMac")
     }
 
-    deinit {
-        if let monitor = eventMonitor {
-            NSEvent.removeMonitor(monitor)
-        }
-    }
+    // MARK: - NSMenuDelegate
 
-    @objc private func togglePopover(_ sender: AnyObject?) {
-        if popover.isShown {
-            closePopover()
-        } else if let button = statusItem.button {
-            fanMonitor.isPopoverVisible = true
-            AppSettings.shared.syncLaunchAtLogin()
-            popover.contentViewController = makeHostingController()
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            NSApp.activate(ignoringOtherApps: true)
-            popover.contentViewController?.view.window?.makeKeyAndOrderFront(nil)
-            NotificationCenter.default.post(name: .popoverDidShow, object: nil)
-        }
-    }
-
-    private func closePopover() {
-        guard popover.isShown else { return }
-        NotificationCenter.default.post(name: .popoverDidClose, object: nil)
-        popover.performClose(nil)
-        popover.contentViewController = nil
-        fanMonitor.isPopoverVisible = false
-    }
-
-    private func makeHostingController() -> NSHostingController<PopoverView> {
-        let hosting = NSHostingController(
-            rootView: PopoverView(
-                monitor: fanMonitor,
-                settings: AppSettings.shared,
-                updateChecker: updateChecker,
-                onOpenSettings: { [weak self] in
-                    self?.closePopover()
-                    self?.showSettingsWindow()
-                }
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        AppSettings.shared.syncLaunchAtLogin()
+        CoolStatusMenuBuilder.rebuild(
+            menu: menu,
+            monitor: fanMonitor,
+            settings: AppSettings.shared,
+            updateAvailable: updateChecker.updateAvailable,
+            actions: .init(
+                target: self,
+                selectMode: #selector(selectCoolMode(_:)),
+                openSettings: #selector(openSettings(_:)),
+                quit: #selector(quitApp(_:)),
+                installHelper: #selector(installHelper(_:)),
+                overrideBatterySaver: #selector(overrideBatterySaver(_:))
             )
         )
-        let height = CGFloat(AppSettings.shared.popoverHeight)
-        hosting.view.frame = NSRect(x: 0, y: 0, width: AppSettings.popoverWidth, height: height)
-        hosting.view.appearance = AppSettings.shared.nsAppearance
-        popover.contentSize = NSSize(width: AppSettings.popoverWidth, height: height)
-        return hosting
+    }
+
+    func menuWillOpen(_ menu: NSMenu) {
+        fanMonitor.isMenuVisible = true
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        fanMonitor.isMenuVisible = false
+    }
+
+    // MARK: - Menu actions
+
+    @objc private func selectCoolMode(_ sender: NSMenuItem) {
+        guard let mode = CoolStatusMenuBuilder.intent(forTag: sender.tag) else { return }
+        AppSettings.shared.setCoolMode(mode)
+    }
+
+    @objc private func openSettings(_ sender: Any?) {
+        showSettingsWindow()
+    }
+
+    @objc private func quitApp(_ sender: Any?) {
+        NSApp.terminate(nil)
+    }
+
+    @objc private func installHelper(_ sender: Any?) {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            _ = HelperInstaller.register()
+            HelperInstaller.openApprovalSettingsIfNeeded()
+            Thread.sleep(forTimeInterval: 0.5)
+            let status = HelperInstaller.checkHelperStatus()
+            let ready = HelperReadiness.isReady(status)
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.fanMonitor.helperReady = ready
+                if ready {
+                    self.fanMonitor.setupSystemObservers()
+                }
+            }
+        }
+    }
+
+    @objc private func overrideBatterySaver(_ sender: Any?) {
+        AppSettings.shared.forcePerformanceOnBattery = true
     }
 
     // MARK: - Settings window
