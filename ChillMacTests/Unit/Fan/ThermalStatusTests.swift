@@ -1,3 +1,4 @@
+import SwiftUI
 import Testing
 @testable import ChillMac
 
@@ -15,5 +16,12 @@ struct ThermalStatusTests {
         #expect(!ThermalStatus.good.showsMenuBarTemperature)
         #expect(ThermalStatus.warm.showsMenuBarTemperature)
         #expect(ThermalStatus.hot.showsMenuBarTemperature)
+    }
+
+    @Test("Good emphasis stays calm; Warm/Hot use hue")
+    func emphasisColor() {
+        #expect(ThermalStatus.good.emphasisColor == Color.secondary)
+        #expect(ThermalStatus.warm.emphasisColor == Color.orange)
+        #expect(ThermalStatus.hot.emphasisColor == Color.red)
     }
 }

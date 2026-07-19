@@ -17,7 +17,6 @@ struct PopoverView: View {
     var onCpuTap: (() -> Void)?
     var onTemperatureTap: (() -> Void)?
 
-    @State private var appeared = false
     @State private var showingSettings = false
     @State private var liveHeight: CGFloat = 0
     @State private var dragStartHeight: CGFloat = 0
@@ -51,13 +50,8 @@ struct PopoverView: View {
         .preferredColorScheme(settings.preferredColorScheme)
         .onReceive(NotificationCenter.default.publisher(for: .popoverDidShow)) { _ in
             showingSettings = false
-            appeared = false
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                appeared = true
-            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .popoverDidClose)) { _ in
-            appeared = false
             activePanelID = nil
         }
         .onReceive(NotificationCenter.default.publisher(for: .detailPanelChanged)) { notification in
@@ -67,20 +61,23 @@ struct PopoverView: View {
 
     private var mainContent: some View {
         VStack(spacing: 0) {
-            headerSection
-
             if let error = monitor.smcError {
                 errorSection(error)
             } else {
-                ScrollView(.vertical, showsIndicators: settings.showScrollIndicators) {
-                    VStack(spacing: DesignSystem.Space.md) {
-                        coolHeroCard
+                VStack(alignment: .leading, spacing: 0) {
+                    statusHeader
+                        .padding(.horizontal, 20)
+                        .padding(.top, 14)
+                        .padding(.bottom, 4)
+
+                    Form {
+                        coolSection
                         fansSection
-                        systemGlance
+                        systemSection
                     }
-                    .padding(.horizontal, DesignSystem.Space.lg)
-                    .padding(.top, DesignSystem.Space.md)
-                    .padding(.bottom, DesignSystem.Space.lg)
+                    .formStyle(.grouped)
+                    .scrollContentBackground(.hidden)
+                    .scrollIndicators(settings.showScrollIndicators ? .automatic : .hidden)
                 }
             }
 
@@ -88,33 +85,20 @@ struct PopoverView: View {
         }
     }
 
-    // MARK: - Header
+    // MARK: - Quiet status (unboxed section header)
 
-    private var headerSection: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: DesignSystem.Space.sm) {
-                    Text("System Temp:")
-                        .font(DesignSystem.TypeScale.title)
-                        .foregroundStyle(.primary)
-                    Text(currentThermalStatus.label)
-                        .font(DesignSystem.TypeScale.title)
-                        .foregroundStyle(currentThermalStatus.color)
-                }
-                Text(systemInfo.machineModel)
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            Image(systemName: "laptopcomputer")
-                .font(.system(size: 40))
+    private var statusHeader: some View {
+        HStack(spacing: 0) {
+            Text(currentThermalStatus.label)
+                .foregroundStyle(currentThermalStatus.emphasisColor)
+            Text(" · ")
+                .foregroundStyle(.tertiary)
+            Text(systemInfo.machineModel)
                 .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, DesignSystem.Space.xl)
-        .padding(.top, 18)
-        .padding(.bottom, DesignSystem.Space.md)
-        .opacity(appeared ? 1 : 0)
-        .animation(.easeOut(duration: 0.3), value: appeared)
+        .font(.subheadline)
+        .textCase(nil)
     }
 
     private var currentThermalStatus: ThermalStatus {
@@ -125,26 +109,19 @@ struct PopoverView: View {
         return ThermalStatus.from(peakCelsius: maxTemp)
     }
 
-    // MARK: - Cool hero
+    // MARK: - Cool
 
-    private var coolHeroCard: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.Space.sm) {
-            HStack {
+    @ViewBuilder
+    private var coolSection: some View {
+        Section {
+            Toggle(isOn: $settings.performanceMode) {
                 Text("Cool")
-                    .font(DesignSystem.TypeScale.headline)
-                    .foregroundStyle(.primary)
-                Spacer()
-                Toggle(isOn: $settings.performanceMode) {
-                    EmptyView()
-                }
-                .toggleStyle(.switch)
-                .controlSize(.small)
-                .disabled(!monitor.helperReady)
             }
+            .disabled(!monitor.helperReady)
 
             if !monitor.helperReady {
-                Text("Helper required to control fans. Approve ChillMac in Login Items, then Install.")
-                    .font(DesignSystem.TypeScale.caption)
+                Text("Approve ChillMac in Login Items, then install the helper.")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Button("Install Helper") { installHelper() }
@@ -157,41 +134,23 @@ struct PopoverView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-
-                Text(coolStatusLine)
-                    .font(DesignSystem.TypeScale.caption)
-                    .foregroundStyle(.secondary)
+                .labelsHidden()
 
                 if monitor.batterySaverActive {
                     HStack {
-                        Image(systemName: "battery.25")
                         Text("Battery saver — fans on Auto")
-                            .font(DesignSystem.TypeScale.caption)
+                            .foregroundStyle(.orange)
                         Spacer()
                         Button("Override") { settings.forcePerformanceOnBattery = true }
                             .buttonStyle(.link)
                     }
+                    .font(.caption)
                 }
-
-                if monitor.coolingEngaged {
-                    HStack(spacing: DesignSystem.Space.md) {
-                        Label(settings.formatTemperature(monitor.peakTemperature), systemImage: "thermometer.medium")
-                            .font(DesignSystem.TypeScale.mono)
-                            .foregroundStyle(ThermalStatus.color(forCelsius: monitor.peakTemperature))
-                        Text(String(format: "%.0f%%", monitor.performanceCurvePercent))
-                            .font(DesignSystem.TypeScale.mono)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                    }
-                }
-            } else {
-                Text("macOS controls fans")
-                    .font(DesignSystem.TypeScale.caption)
-                    .foregroundStyle(.tertiary)
             }
+        } footer: {
+            Text(coolStatusLine)
+                .foregroundStyle(.secondary)
         }
-        .chillCard()
-        .opacity(appeared ? 1 : 0)
     }
 
     private var coolIntentBinding: Binding<CoolIntent> {
@@ -202,107 +161,67 @@ struct PopoverView: View {
     }
 
     private var coolStatusLine: String {
-        if monitor.coolingEngaged {
-            return "Cooling — \(settings.coolIntent.fullLabel)"
+        if !monitor.helperReady {
+            return "Helper required to control fans"
         }
-        return "\(settings.coolIntent.fullLabel) — fans on Auto"
+        if !settings.performanceMode {
+            return "macOS controls fans"
+        }
+        if monitor.coolingEngaged {
+            return "Cooling · \(settings.formatTemperature(monitor.peakTemperature)) · \(settings.coolIntent.fullLabel)"
+        }
+        return "Fans on Auto"
     }
 
     // MARK: - Fans
 
+    @ViewBuilder
     private var fansSection: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.Space.sm) {
-            Text("Fans")
-                .chillSectionHeader()
-
-            ForEach(Array(monitor.fans.enumerated()), id: \.element.id) { _, fan in
-                FanRowView(fan: fan, helper: helper, monitor: monitor)
-            }
-
+        Section("Fans") {
             if monitor.fans.isEmpty {
-                HStack {
-                    Image(systemName: "fan.slash")
-                    Text("No fans detected")
+                Text("No fans detected")
+                    .foregroundStyle(.tertiary)
+            } else {
+                ForEach(monitor.fans, id: \.id) { fan in
+                    FanRowView(fan: fan, helper: helper, monitor: monitor)
                 }
-                .font(.system(size: 14))
-                .foregroundStyle(.tertiary)
-                .frame(maxWidth: .infinity)
-                .chillCard()
             }
         }
     }
 
-    // MARK: - System glance
+    // MARK: - System (Form rows — Settings kinship)
 
-    private var systemGlance: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.Space.sm) {
-            Text("System")
-                .chillSectionHeader()
-
-            HStack(spacing: DesignSystem.Space.sm) {
-                glanceChip(
-                    title: String(format: "%.0f%%", memoryInfo.pressurePercent),
-                    subtitle: "Mem",
-                    isActive: activePanelID == "memory",
-                    action: onMemoryTap
-                )
-                glanceChip(
-                    title: String(format: "%.0f%%", cpuInfo.totalUsage),
-                    subtitle: "CPU",
-                    isActive: activePanelID == "cpu",
-                    action: onCpuTap
-                )
-                glanceChip(
-                    title: "\(batteryInfo.currentCharge)%",
-                    subtitle: "Batt",
-                    isActive: activePanelID == "battery",
-                    action: onBatteryTap
-                )
-            }
-
-            HStack(spacing: DesignSystem.Space.sm) {
-                glanceChip(
-                    title: systemInfo.diskUsage,
-                    subtitle: "Disk",
-                    isActive: activePanelID == "disk",
-                    action: onDiskTap
-                )
-                glanceChip(
-                    title: maxTempDisplay,
-                    subtitle: "Temp",
-                    isActive: activePanelID == "temperature",
-                    action: onTemperatureTap
-                )
-                Spacer(minLength: 0)
-            }
+    @ViewBuilder
+    private var systemSection: some View {
+        Section("System") {
+            systemRow("Memory", value: String(format: "%.0f%%", memoryInfo.pressurePercent), active: activePanelID == "memory", action: onMemoryTap)
+            systemRow("CPU", value: String(format: "%.0f%%", cpuInfo.totalUsage), active: activePanelID == "cpu", action: onCpuTap)
+            systemRow("Battery", value: "\(batteryInfo.currentCharge)%", active: activePanelID == "battery", action: onBatteryTap)
+            systemRow("Disk", value: systemInfo.diskUsage, active: activePanelID == "disk", action: onDiskTap)
+            systemRow("Temp", value: maxTempDisplay, active: activePanelID == "temperature", action: onTemperatureTap)
         }
     }
 
-    private func glanceChip(title: String, subtitle: String, isActive: Bool, action: (() -> Void)?) -> some View {
+    private func systemRow(_ title: String, value: String, active: Bool, action: (() -> Void)?) -> some View {
         Button {
             action?()
         } label: {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(DesignSystem.TypeScale.body)
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                Text(subtitle)
-                    .font(DesignSystem.TypeScale.caption)
-                    .foregroundStyle(.secondary)
+            LabeledContent(title) {
+                HStack(spacing: 6) {
+                    Text(value)
+                        .font(.body.monospacedDigit())
+                        .foregroundStyle(.primary)
+                    if action != nil {
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(DesignSystem.Space.sm)
-            .background(
-                RoundedRectangle(cornerRadius: DesignSystem.Radius.sm, style: .continuous)
-                    .fill(.thinMaterial)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: DesignSystem.Radius.sm, style: .continuous)
-                            .strokeBorder(isActive ? Color.accentColor.opacity(0.6) : .clear, lineWidth: 1)
-                    )
-            )
+            .foregroundStyle(.primary)
         }
         .buttonStyle(.plain)
+        .listRowBackground(active ? Color.accentColor.opacity(0.12) : nil)
         .disabled(action == nil)
     }
 
@@ -333,7 +252,7 @@ struct PopoverView: View {
     private func errorSection(_ error: String) -> some View {
         VStack(spacing: DesignSystem.Space.sm) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 40))
+                .font(.system(size: 36))
                 .foregroundStyle(.orange)
             Text("SMC Error")
                 .font(.headline)
@@ -377,7 +296,7 @@ struct PopoverView: View {
                     }
                 } label: {
                     ZStack(alignment: .topTrailing) {
-                        Image(systemName: "gearshape.fill")
+                        Image(systemName: "gearshape")
                             .foregroundStyle(.secondary)
                         if updateChecker.updateAvailable {
                             Circle()
@@ -432,7 +351,7 @@ struct PopoverView: View {
 #Preview("Popover Cool") {
     AppSettings.shared.appearanceMode = .dark
     AppSettings.shared.performanceMode = true
-    AppSettings.shared.coolIntent = .performance
+    AppSettings.shared.coolIntent = .balanced
     return PopoverView(
         monitor: PreviewSupport.fanMonitorPerformanceActive,
         settings: AppSettings.shared,
@@ -445,6 +364,5 @@ struct PopoverView: View {
         helper: PreviewSupport.helper
     )
     .previewHost(scheme: .dark)
-    .onAppear { PreviewSupport.triggerPopoverAppeared() }
 }
 #endif

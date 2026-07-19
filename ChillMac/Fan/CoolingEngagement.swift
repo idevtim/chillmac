@@ -10,7 +10,7 @@ enum CoolIntent: String, CaseIterable {
         switch self {
         case .quiet: return "Quiet"
         case .balanced: return "Balanced"
-        case .performance: return "Perf"
+        case .performance: return "Performance"
         }
     }
 

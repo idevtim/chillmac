@@ -42,105 +42,61 @@ struct FanRowView: View {
         return lo...hi
     }
 
-    private var rpmPercent: Double {
-        guard fan.maxRPM > fan.minRPM else { return 0 }
-        return (fan.currentRPM - fan.minRPM) / (fan.maxRPM - fan.minRPM)
-    }
-
-    private var rpmColor: Color {
-        if rpmPercent > 0.8 { return .red }
-        if rpmPercent > 0.5 { return .orange }
-        return .green
-    }
-
-    private var modeLabel: String {
-        if activelyCooling { return "Cooling" }
-        if isManual.wrappedValue { return "Manual" }
-        return "Auto"
+    private var rpmText: String {
+        "\(Int(fan.currentRPM.rounded()))"
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.Space.sm) {
-            HStack {
-                Image(systemName: "fan.fill")
-                    .font(.system(size: 20))
-                    .foregroundStyle(fan.currentRPM > 0 ? Color.green : Color.secondary)
-                    .rotationEffect(.degrees(fan.currentRPM > 0 ? 360 : 0))
-                    .animation(
-                        fan.currentRPM > 0
-                            ? .linear(duration: max(0.5, 3000 / max(fan.currentRPM, 1))).repeatForever(autoreverses: false)
-                            : .default,
-                        value: fan.currentRPM > 0
-                    )
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(fan.name)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.primary)
-                    Text(modeLabel)
-                        .font(.system(size: 12))
-                        .foregroundStyle(activelyCooling ? Color.accentColor : Color.secondary)
-                }
-
-                Spacer()
-
-                HStack(alignment: .firstTextBaseline, spacing: 2) {
-                    Text("\(Int(fan.currentRPM.rounded()))")
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
-                        .foregroundStyle(rpmColor)
-                    Text("RPM")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.tertiary)
-                }
-                .frame(width: 110, alignment: .trailing)
-            }
-
+        VStack(alignment: .leading, spacing: 6) {
             if activelyCooling {
-                Label("Controlled by Cool", systemImage: "snowflake")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
+                LabeledContent {
+                    Text(rpmText)
+                        .font(.body.monospacedDigit())
+                        .foregroundStyle(.primary)
+                } label: {
+                    Text(shortName)
+                        .foregroundStyle(.primary)
+                }
             } else if monitor.helperReady {
-                HStack {
-                    Toggle(isOn: isManual) { EmptyView() }
-                        .toggleStyle(.switch)
+                LabeledContent {
+                    HStack(spacing: 8) {
+                        Text(rpmText)
+                            .font(.body.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                        Toggle(isOn: isManual) { EmptyView() }
+                            .toggleStyle(.switch)
+                            .controlSize(.mini)
+                            .labelsHidden()
+                    }
+                } label: {
+                    Text(shortName)
+                }
+
+                if !settings.performanceMode, isManual.wrappedValue, sliderRange.upperBound > sliderRange.lowerBound {
+                    Slider(value: targetRPM, in: sliderRange, step: 100)
                         .controlSize(.small)
-                    Text(isManual.wrappedValue ? "Manual Control" : "Automatic")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                    Spacer()
                 }
             } else {
-                HStack(spacing: DesignSystem.Space.sm) {
-                    ProgressView().controlSize(.small)
-                    Text("Connecting to helper…")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.tertiary)
-                    Spacer()
-                }
-            }
-
-            if !settings.performanceMode, monitor.helperReady, isManual.wrappedValue, sliderRange.upperBound > sliderRange.lowerBound {
-                VStack(spacing: 6) {
-                    Slider(value: targetRPM, in: sliderRange, step: 100)
-                    HStack {
-                        Text("\(Int(fan.minRPM))")
-                        Spacer()
-                        Text("Target: \(Int(targetRPM.wrappedValue)) RPM").fontWeight(.medium)
-                        Spacer()
-                        Text("\(Int(fan.maxRPM))")
-                    }
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
+                LabeledContent {
+                    ProgressView()
+                        .controlSize(.small)
+                } label: {
+                    Text(shortName)
                 }
             }
 
             if let error = errorMessage {
                 Text(error)
-                    .font(.system(size: 12))
+                    .font(.caption)
                     .foregroundStyle(.red)
             }
         }
-        .chillCard()
+    }
+
+    private var shortName: String {
+        fan.name
+            .replacingOccurrences(of: " Fan", with: "")
+            .replacingOccurrences(of: "fan", with: "")
     }
 
     private func setFanMode(manual: Bool) {
@@ -176,11 +132,16 @@ struct FanRowView: View {
 
 #if DEBUG
 #Preview("FanRowView") {
-    FanRowView(
-        fan: PreviewSupport.sampleFans[0],
-        helper: PreviewSupport.helper,
-        monitor: PreviewSupport.fanMonitor
-    )
+    Form {
+        Section("Fans") {
+            FanRowView(
+                fan: PreviewSupport.sampleFans[0],
+                helper: PreviewSupport.helper,
+                monitor: PreviewSupport.fanMonitor
+            )
+        }
+    }
+    .formStyle(.grouped)
     .previewHost(scheme: .dark)
 }
 #endif

@@ -33,7 +33,7 @@ final class AppSettings: ObservableObject {
     /// Cool master switch (formerly Performance Mode).
     @AppStorage("performanceMode") var performanceMode = false
     @AppStorage("coolIntent") private var coolIntentRaw: String = CoolIntent.balanced.rawValue
-    @AppStorage("popoverHeight") var popoverHeight: Double = 640
+    @AppStorage("popoverHeight") var popoverHeight: Double = 500
     @AppStorage("showScrollIndicators") var showScrollIndicators = true
 
     @AppStorage("detailPanelHeight") var detailPanelHeight: Double = 560
@@ -48,7 +48,7 @@ final class AppSettings: ObservableObject {
 
     static let popoverMinHeight: CGFloat = 400
     static let popoverMaxHeight: CGFloat = 900
-    static let popoverDefaultHeight: CGFloat = 640
+    static let popoverDefaultHeight: CGFloat = 500
     static let detailPanelMinHeight: CGFloat = 350
     static let detailPanelMaxHeight: CGFloat = 800
     static let detailPanelDefaultHeight: CGFloat = 560

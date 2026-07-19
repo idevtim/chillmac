@@ -28,7 +28,16 @@ enum ThermalStatus: Equatable {
         self == .warm || self == .hot
     }
 
-    /// Closed semantic color mapping — system colors only, no RGB bags.
+    /// Saturated hue only when Warm/Hot — Good stays calm secondary.
+    var emphasisColor: Color {
+        switch self {
+        case .unknown, .good: return Color.secondary
+        case .warm: return .orange
+        case .hot: return .red
+        }
+    }
+
+    /// Detail-row mapping still uses semantic ramps (green→orange→red).
     var color: Color {
         switch self {
         case .unknown, .good: return .green
@@ -46,7 +55,6 @@ enum ThermalStatus: Equatable {
         return "\(Int(celsius.rounded()))°"
     }
 
-    /// Closed mapper for arbitrary peak temps (detail rows).
     static func color(forCelsius celsius: Double) -> Color {
         from(peakCelsius: celsius).color
     }
