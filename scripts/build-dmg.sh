@@ -25,7 +25,9 @@ if [ ! -f "$RELEASE_NOTES" ]; then
 fi
 echo "✓ Found release notes for v$VERSION"
 
-APP_NAME="ChillMac"
+# Product display name (.app / .dmg). Xcode project/scheme stay ChillMac.
+APP_NAME="Fan Sooner"
+XCODE_PROJECT="ChillMac"
 HELPER_BUNDLE_ID="com.idevtim.ChillMac.Helper"
 SIGNING_IDENTITY="Developer ID Application: Tim Murphy ($APPLE_TEAM_ID)"
 TEAM_ID="$APPLE_TEAM_ID"
@@ -43,8 +45,8 @@ mkdir -p "$BUILD_DIR"
 # ─── Build ───────────────────────────────────────────────────────────────────
 echo "🔨 Building $APP_NAME..."
 xcodebuild \
-  -project "$PROJECT_DIR/$APP_NAME.xcodeproj" \
-  -scheme "$APP_NAME" \
+  -project "$PROJECT_DIR/$XCODE_PROJECT.xcodeproj" \
+  -scheme "$XCODE_PROJECT" \
   -configuration Release \
   -derivedDataPath "$DERIVED_DIR" \
   CODE_SIGN_STYLE="Manual" \
@@ -54,7 +56,7 @@ xcodebuild \
   DSTROOT="$BUILD_DIR/dst" \
   2>&1 | tail -5
 
-# Find the built .app
+# Find the built .app (PRODUCT_NAME may include a space)
 BUILT_APP=$(find "$DERIVED_DIR" -name "$APP_NAME.app" -type d | head -1)
 if [ -z "$BUILT_APP" ]; then
   echo "❌ Build failed — .app not found"

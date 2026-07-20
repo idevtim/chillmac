@@ -1,6 +1,8 @@
-# ChillMac
+# Fan Sooner
 
 macOS menu bar app for system monitoring and fan control. Stay cool, stay fast.
+
+> Product name: **Fan Sooner**. Code module / Xcode target / bundle IDs remain `ChillMac` / `com.idevtim.ChillMac` so the privileged helper and Login Items keep working.
 
 ## Architecture
 
@@ -56,7 +58,7 @@ Steps performed:
 5. Notarize via `notarytool` and staple the ticket
 6. Gatekeeper verification
 
-Output: `build/ChillMac.dmg`
+Output: `build/Fan Sooner.dmg`
 
 ### Targets
 

@@ -66,8 +66,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         button.image = image
         button.title = title
         button.imagePosition = showTemp ? .imageLeft : .imageOnly
-        button.toolTip = showTemp ? "ChillMac — \(thermal.label) \(title)" : "ChillMac"
-        button.setAccessibilityLabel(showTemp ? "ChillMac, \(thermal.label), \(title)" : "ChillMac")
+        button.toolTip = showTemp ? "\(AppBrand.displayName) — \(thermal.label) \(title)" : AppBrand.displayName
+        button.setAccessibilityLabel(showTemp ? "\(AppBrand.displayName), \(thermal.label), \(title)" : AppBrand.displayName)
     }
 
     // MARK: - NSMenuDelegate
@@ -152,7 +152,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
                 backing: .buffered,
                 defer: false
             )
-            window.title = "ChillMac Settings"
+            window.title = "\(AppBrand.displayName) Settings"
             window.contentViewController = hosting
             window.isReleasedWhenClosed = false
             window.setContentSize(NSSize(width: 380, height: 560))

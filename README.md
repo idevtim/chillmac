@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="assets/hero.svg" alt="ChillMac — Stay cool, stay fast." width="860">
+  <img src="assets/hero.svg" alt="Fan Sooner — Stay cool, stay fast." width="860">
 </p>
 
-# ChillMac
+# Fan Sooner
 
 A free, open-source macOS menu bar app for monitoring your system and controlling fan speeds. Keep your Mac chilly.
 
@@ -37,9 +37,9 @@ A free, open-source macOS menu bar app for monitoring your system and controllin
 
 ### Download (recommended)
 
-1. Grab `ChillMac.dmg` from the [latest release](https://github.com/idevtim/chillmac/releases/latest)
-2. Open the DMG and drag ChillMac to Applications
-3. Launch ChillMac — it'll appear in your menu bar
+1. Grab `Fan Sooner.dmg` from the [latest release](https://github.com/idevtim/chillmac/releases/latest)
+2. Open the DMG and drag Fan Sooner to Applications
+3. Launch Fan Sooner — it'll appear in your menu bar
 4. On first launch, you'll be prompted for admin credentials to install the fan control helper
 
 The DMG is signed, notarized, and stapled by Apple — Gatekeeper will let it through.

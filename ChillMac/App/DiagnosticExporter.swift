@@ -78,7 +78,7 @@ enum DiagnosticExporter {
         let dateStr = formatter.string(from: Date())
 
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = "ChillMac-Diagnostics-\(dateStr).json"
+        panel.nameFieldStringValue = "FanSooner-Diagnostics-\(dateStr).json"
         panel.allowedContentTypes = [.json]
         panel.canCreateDirectories = true
 

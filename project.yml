@@ -19,6 +19,7 @@ targets:
       - path: Shared
     settings:
       base:
+        PRODUCT_NAME: Fan Sooner
         PRODUCT_BUNDLE_IDENTIFIER: com.idevtim.ChillMac
         INFOPLIST_FILE: ChillMac/Info.plist
         CODE_SIGN_ENTITLEMENTS: ChillMac/ChillMac.entitlements

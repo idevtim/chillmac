@@ -77,7 +77,7 @@ enum CoolStatusMenuBuilder {
             menu.addItem(.separator())
             appendDisabledCaption(
                 menu: menu,
-                title: "Approve ChillMac in Login Items, then install the helper."
+                title: "Approve \(AppBrand.displayName) in Login Items, then install the helper."
             )
             let install = NSMenuItem(
                 title: "Install Helper",
@@ -190,7 +190,7 @@ enum CoolStatusMenuBuilder {
         menu.addItem(.separator())
 
         let quit = NSMenuItem(
-            title: "Quit ChillMac",
+            title: "Quit \(AppBrand.displayName)",
             action: actions.quit,
             keyEquivalent: "q"
         )
