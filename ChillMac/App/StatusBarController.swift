@@ -80,8 +80,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             settings: AppSettings.shared,
             updateAvailable: updateChecker.updateAvailable,
             actions: .init(
+                onSelectMode: { [weak self] mode in self?.applyCoolMode(mode) },
                 target: self,
-                selectMode: #selector(selectCoolMode(_:)),
                 openSettings: #selector(openSettings(_:)),
                 quit: #selector(quitApp(_:)),
                 installHelper: #selector(installHelper(_:)),
@@ -92,7 +92,6 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     func menuWillOpen(_ menu: NSMenu) {
         fanMonitor.isMenuVisible = true
-        NSApp.activate(ignoringOtherApps: true)
     }
 
     func menuDidClose(_ menu: NSMenu) {
@@ -101,9 +100,12 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     // MARK: - Menu actions
 
-    @objc private func selectCoolMode(_ sender: NSMenuItem) {
-        guard let mode = CoolStatusMenuBuilder.intent(forTag: sender.tag) else { return }
+    private func applyCoolMode(_ mode: CoolIntent) {
         AppSettings.shared.setCoolMode(mode)
+        fanMonitor.updatePollInterval()
+        if mode == .native {
+            fanMonitor.resetAllFansToAuto()
+        }
     }
 
     @objc private func openSettings(_ sender: Any?) {

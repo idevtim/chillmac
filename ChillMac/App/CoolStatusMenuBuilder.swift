@@ -14,8 +14,8 @@ enum CoolStatusMenuBuilder {
     }
 
     struct Actions {
+        let onSelectMode: (CoolIntent) -> Void
         let target: AnyObject
-        let selectMode: Selector
         let openSettings: Selector
         let quit: Selector
         let installHelper: Selector
@@ -70,7 +70,7 @@ enum CoolStatusMenuBuilder {
         }
 
         for mode in CoolIntent.allCases {
-            menu.addItem(modeItem(mode, selected: settings.coolMode == mode, actions: actions))
+            menu.addItem(modeItem(mode, actions: actions))
         }
 
         if settings.coolMode != .native, !monitor.helperReady {
@@ -114,7 +114,7 @@ enum CoolStatusMenuBuilder {
         let item = NSMenuItem()
         item.isEnabled = false
         let strip = CoolZoneTrackStrip(peakCelsius: peakCelsius)
-        let host = NSHostingView(rootView: strip)
+        let host = MenuFirstClickHostingView(rootView: strip)
         host.frame = NSRect(x: 0, y: 0, width: 260, height: 34)
         item.view = host
         menu.addItem(item)
@@ -137,24 +137,17 @@ enum CoolStatusMenuBuilder {
 
     private static func modeItem(
         _ mode: CoolIntent,
-        selected: Bool,
         actions: Actions
     ) -> NSMenuItem {
-        let item = NSMenuItem(
-            title: mode.label,
-            action: actions.selectMode,
-            keyEquivalent: ""
-        )
-        item.target = actions.target
+        let item = NSMenuItem(title: mode.label, action: nil, keyEquivalent: "")
         item.tag = tag(for: mode)
-        item.state = .off
         item.isEnabled = true
+        item.state = .off
 
-        let row = CoolModeRowView(mode: mode, selected: selected) {
-            NSApp.sendAction(actions.selectMode, to: actions.target, from: item)
-            item.menu?.cancelTracking()
+        let row = CoolModeRowView(mode: mode) {
+            actions.onSelectMode(mode)
         }
-        let host = NSHostingView(rootView: row)
+        let host = MenuFirstClickHostingView(rootView: row)
         host.frame = NSRect(x: 0, y: 0, width: 260, height: 36)
         item.view = host
         return item
@@ -220,50 +213,55 @@ enum CoolStatusMenuBuilder {
 
 // MARK: - Custom menu views
 
+/// Hosting view that accepts the first click into the menu (no focus steal / second-click).
+private final class MenuFirstClickHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}
+
 private struct CoolModeRowView: View {
     let mode: CoolIntent
-    let selected: Bool
     let onSelect: () -> Void
+    @ObservedObject private var settings = AppSettings.shared
+
+    private var selected: Bool { settings.coolMode == mode }
 
     var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 8) {
-                ZStack {
+        HStack(spacing: 8) {
+            ZStack {
+                Circle()
+                    .fill(selected ? Color.accentColor : Color.primary.opacity(0.06))
+                    .frame(width: 22, height: 22)
+                if let symbol = mode.modeSystemImage {
+                    Image(systemName: symbol)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(selected ? Color.white : Color.secondary)
+                } else {
                     Circle()
-                        .fill(selected ? Color.accentColor : Color.primary.opacity(0.06))
-                        .frame(width: 22, height: 22)
-                    if let symbol = mode.modeSystemImage {
-                        Image(systemName: symbol)
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(selected ? Color.white : Color.secondary)
-                    } else {
-                        Circle()
-                            .strokeBorder(
-                                selected ? Color.white.opacity(0.9) : Color.secondary.opacity(0.55),
-                                lineWidth: 1.5
-                            )
-                            .frame(width: 10, height: 10)
-                    }
-                }
-
-                Text(mode.label)
-                    .font(.system(size: 13, weight: selected ? .semibold : .regular))
-                    .foregroundStyle(.primary)
-
-                Spacer(minLength: 4)
-
-                if mode == .native {
-                    Text(mode.description)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
+                        .strokeBorder(
+                            selected ? Color.white.opacity(0.9) : Color.secondary.opacity(0.55),
+                            lineWidth: 1.5
+                        )
+                        .frame(width: 10, height: 10)
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 6)
-            .frame(width: 260, height: 36, alignment: .leading)
-            .contentShape(Rectangle())
+
+            Text(mode.label)
+                .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                .foregroundStyle(.primary)
+
+            Spacer(minLength: 4)
+
+            if mode == .native {
+                Text(mode.description)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+            }
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .frame(width: 260, height: 36, alignment: .leading)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onSelect)
     }
 }
 
