@@ -3,21 +3,21 @@ import Testing
 
 @Suite("PerformanceCurve", .tags(.unit, .fan))
 struct PerformanceCurveTests {
-    @Test("Performance intent idle has zero floor")
-    func performanceIdleNoFloor() {
-        #expect(PerformanceCurve.minFloor(intent: .performance, engaged: false) == 0)
+    @Test("Ultra intent idle has zero floor")
+    func ultraIdleNoFloor() {
+        #expect(PerformanceCurve.minFloor(intent: .ultra, engaged: false) == 0)
     }
 
-    @Test("Performance intent engaged has soft floor only")
-    func performanceEngagedSoftFloor() {
-        let floor = PerformanceCurve.minFloor(intent: .performance, engaged: true)
+    @Test("Ultra intent engaged has soft floor only")
+    func ultraEngagedSoftFloor() {
+        let floor = PerformanceCurve.minFloor(intent: .ultra, engaged: true)
         #expect(floor == 0.25)
         #expect(floor < 0.70)
     }
 
-    @Test("Performance curve reaches 100% by ~60C when engaged")
-    func performanceHotFull() {
-        #expect(PerformanceCurve.speedPercent(intent: .performance, temperature: 60) == 1.0)
+    @Test("Ultra curve reaches 100% by ~60C when engaged")
+    func ultraHotFull() {
+        #expect(PerformanceCurve.speedPercent(intent: .ultra, temperature: 60) == 1.0)
     }
 
     @Test("Native curve is gentle at warm temps")
@@ -31,23 +31,34 @@ struct PerformanceCurveTests {
 struct CoolIntentTests {
     @Test(arguments: [
         ("low", CoolIntent.native),
-        ("medium", CoolIntent.balanced),
-        ("high", CoolIntent.balanced),
-        ("max", CoolIntent.performance),
-        ("ultra", CoolIntent.performance),
+        ("medium", CoolIntent.max),
+        ("high", CoolIntent.max),
         ("quiet", CoolIntent.native),
         ("native", CoolIntent.native),
-        ("balanced", CoolIntent.balanced),
-        ("performance", CoolIntent.performance),
+        ("balanced", CoolIntent.max),
+        ("performance", CoolIntent.ultra),
+        ("max", CoolIntent.max),
+        ("ultra", CoolIntent.ultra),
     ])
     func migratesLegacy(raw: String, expected: CoolIntent) {
         #expect(CoolIntent.migrated(fromLegacyRaw: raw) == expected)
     }
 
-    @Test("labels are Native / Balanced / Performance")
+    @Test(arguments: [
+        ("low", CoolIntent.native),
+        ("medium", CoolIntent.max),
+        ("high", CoolIntent.max),
+        ("max", CoolIntent.ultra),
+        ("ultra", CoolIntent.ultra),
+    ])
+    func migratesLegacyPerformanceLevel(raw: String, expected: CoolIntent) {
+        #expect(CoolIntent.fromLegacyPerformanceLevel(raw) == expected)
+    }
+
+    @Test("labels are Native / Max / Ultra")
     func labels() {
         #expect(CoolIntent.native.label == "Native")
-        #expect(CoolIntent.balanced.label == "Balanced")
-        #expect(CoolIntent.performance.label == "Performance")
+        #expect(CoolIntent.max.label == "Max")
+        #expect(CoolIntent.ultra.label == "Ultra")
     }
 }

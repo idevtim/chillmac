@@ -3,12 +3,12 @@ import Testing
 
 @Suite("CoolingEngagement", .tags(.unit, .fan))
 struct CoolingEngagementTests {
-    @Test("cool peak stays idle — Performance intent does not engage")
-    func performanceSilentWhenCool() {
+    @Test("cool peak stays idle — Ultra intent does not engage")
+    func ultraSilentWhenCool() {
         let next = CoolingEngagement.nextState(
             currentlyEngaged: false,
             peakCelsius: 40,
-            intent: .performance,
+            intent: .ultra,
             thermalForceEngage: false,
             secondsInBand: 30
         )
@@ -20,7 +20,7 @@ struct CoolingEngagementTests {
         let next = CoolingEngagement.nextState(
             currentlyEngaged: false,
             peakCelsius: 56,
-            intent: .performance,
+            intent: .ultra,
             thermalForceEngage: false,
             secondsInBand: 15
         )
@@ -32,7 +32,7 @@ struct CoolingEngagementTests {
         let next = CoolingEngagement.nextState(
             currentlyEngaged: true,
             peakCelsius: 40,
-            intent: .performance,
+            intent: .ultra,
             thermalForceEngage: false,
             secondsInBand: 15
         )
@@ -44,7 +44,7 @@ struct CoolingEngagementTests {
         let next = CoolingEngagement.nextState(
             currentlyEngaged: true,
             peakCelsius: 40,
-            intent: .performance,
+            intent: .ultra,
             thermalForceEngage: false,
             secondsInBand: 2
         )
@@ -65,12 +65,12 @@ struct CoolingEngagementTests {
 
     @Test("idle means no soft floor")
     func idleNoFloor() {
-        #expect(CoolingEngagement.softFloorWhileEngaged(intent: .performance) > 0)
-        #expect(PerformanceCurve.minFloor(intent: .performance, engaged: false) == 0)
+        #expect(CoolingEngagement.softFloorWhileEngaged(intent: .ultra) > 0)
+        #expect(PerformanceCurve.minFloor(intent: .ultra, engaged: false) == 0)
     }
 
     @Test("engaged applies soft floor")
     func engagedSoftFloor() {
-        #expect(PerformanceCurve.minFloor(intent: .performance, engaged: true) > 0)
+        #expect(PerformanceCurve.minFloor(intent: .ultra, engaged: true) > 0)
     }
 }

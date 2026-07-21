@@ -83,7 +83,7 @@ enum PreviewSupport {
             TemperatureSensor(id: "TB0T", label: "Battery", temperature: 32.0),
         ]
         monitor.performanceCurvePercent =
-            PerformanceCurve.speedPercent(intent: .performance, temperature: peak) * 100
+            PerformanceCurve.speedPercent(intent: .ultra, temperature: peak) * 100
         return monitor
     }
 

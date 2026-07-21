@@ -20,6 +20,7 @@ targets:
     settings:
       base:
         PRODUCT_NAME: Fan Sooner
+        PRODUCT_MODULE_NAME: ChillMac
         PRODUCT_BUNDLE_IDENTIFIER: com.idevtim.ChillMac
         INFOPLIST_FILE: ChillMac/Info.plist
         CODE_SIGN_ENTITLEMENTS: ChillMac/ChillMac.entitlements
@@ -60,6 +61,8 @@ targets:
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGN_STYLE: Automatic
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks @loader_path/../Frameworks"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Fan Sooner.app/Contents/MacOS/Fan Sooner"
+        BUNDLE_LOADER: "$(TEST_HOST)"
 
   com.idevtim.ChillMac.Helper:
     type: tool

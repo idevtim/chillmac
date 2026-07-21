@@ -30,9 +30,9 @@ final class AppSettings: ObservableObject {
 
     @AppStorage("useFahrenheit") var useFahrenheit = false
     @AppStorage("appearanceMode") var appearanceMode: AppearanceMode = .dark
-    /// Cool engaged (Balanced / Performance). Native sets this false.
+    /// Cool engaged (Max / Ultra). Native sets this false.
     @AppStorage("performanceMode") var performanceMode = false
-    @AppStorage("coolIntent") private var coolIntentRaw: String = CoolIntent.balanced.rawValue
+    @AppStorage("coolIntent") private var coolIntentRaw: String = CoolIntent.max.rawValue
     @AppStorage("showScrollIndicators") var showScrollIndicators = true
 
     @AppStorage("detailPanelHeight") var detailPanelHeight: Double = 560
@@ -49,13 +49,13 @@ final class AppSettings: ObservableObject {
     static let detailPanelMaxHeight: CGFloat = 800
     static let detailPanelDefaultHeight: CGFloat = 560
 
-    /// Intent used by the engagement curve while Cool is on (Balanced / Performance).
+    /// Intent used by the engagement curve while Cool is on (Max / Ultra).
     var coolIntent: CoolIntent {
         get { CoolIntent.migrated(fromLegacyRaw: coolIntentRaw) }
         set { coolIntentRaw = newValue.rawValue }
     }
 
-    /// Single source of truth for the Cool menu: Native · Balanced · Performance.
+    /// Single source of truth for the Cool menu: Native · Max · Ultra.
     var coolMode: CoolIntent {
         guard performanceMode else { return .native }
         let intent = coolIntent
@@ -68,7 +68,7 @@ final class AppSettings: ObservableObject {
         case .native:
             performanceMode = false
             coolIntentRaw = CoolIntent.native.rawValue
-        case .balanced, .performance:
+        case .max, .ultra:
             performanceMode = true
             coolIntentRaw = mode.rawValue
         }
@@ -107,10 +107,10 @@ final class AppSettings: ObservableObject {
         let defaults = UserDefaults.standard
         if defaults.object(forKey: "coolIntent") == nil,
            let legacy = defaults.string(forKey: "performanceLevel") {
-            coolIntentRaw = CoolIntent.migrated(fromLegacyRaw: legacy).rawValue
+            coolIntentRaw = CoolIntent.fromLegacyPerformanceLevel(legacy).rawValue
         }
 
-        // Quiet / low → Native; Native means macOS owns fans.
+        // Quiet / low / balanced / performance → Native / Max / Ultra.
         let migrated = CoolIntent.migrated(fromLegacyRaw: coolIntentRaw)
         if coolIntentRaw != migrated.rawValue {
             coolIntentRaw = migrated.rawValue

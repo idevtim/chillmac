@@ -68,7 +68,7 @@ struct SettingsView: View {
                 Section {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Fan control helper")
-                        Text("Not needed for Native. Required for Balanced & Performance.")
+                        Text("Not needed for Native. Required for Max & Ultra.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

@@ -5,8 +5,8 @@ import Testing
 struct CoolStatusMenuBuilderTests {
     @Test(arguments: [
         (CoolIntent.native, CoolStatusMenuBuilder.ItemTag.modeNative.rawValue),
-        (CoolIntent.balanced, CoolStatusMenuBuilder.ItemTag.modeBalanced.rawValue),
-        (CoolIntent.performance, CoolStatusMenuBuilder.ItemTag.modePerformance.rawValue),
+        (CoolIntent.max, CoolStatusMenuBuilder.ItemTag.modeMax.rawValue),
+        (CoolIntent.ultra, CoolStatusMenuBuilder.ItemTag.modeUltra.rawValue),
     ])
     func tagRoundTrip(intent: CoolIntent, expectedTag: Int) {
         #expect(CoolStatusMenuBuilder.tag(for: intent) == expectedTag)

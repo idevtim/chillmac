@@ -12,24 +12,24 @@ enum PerformanceCurve {
     static func rampUpRate(intent: CoolIntent) -> Double {
         switch intent {
         case .native: return 400
-        case .balanced: return 1200
-        case .performance: return 3500
+        case .max: return 1200
+        case .ultra: return 3500
         }
     }
 
     static func rampDownRate(intent: CoolIntent) -> Double {
         switch intent {
         case .native: return 150
-        case .balanced: return 400
-        case .performance: return 800
+        case .max: return 400
+        case .ultra: return 800
         }
     }
 
     static func smoothingFactor(intent: CoolIntent) -> Double {
         switch intent {
         case .native: return 0.15
-        case .balanced: return 0.35
-        case .performance: return 0.70
+        case .max: return 0.35
+        case .ultra: return 0.70
         }
     }
 
@@ -47,7 +47,7 @@ enum PerformanceCurve {
             case 95..<105: return 0.60 + (temp - 95) / 10.0 * 0.20
             default: return 0.80
             }
-        case .balanced:
+        case .max:
             switch temp {
             case ...45: return floor
             case 45..<58: return floor + (temp - 45) / 13.0 * (0.50 - floor)
@@ -55,7 +55,7 @@ enum PerformanceCurve {
             case 70..<82: return 0.75 + (temp - 70) / 12.0 * 0.20
             default: return 1.0
             }
-        case .performance:
+        case .ultra:
             // Steep when hot (former Ultra hot behavior) — but floor only while engaged.
             switch temp {
             case ...35: return floor

@@ -5,8 +5,8 @@ import SwiftUI
 enum CoolStatusMenuBuilder {
     enum ItemTag: Int {
         case modeNative = 100
-        case modeBalanced = 101
-        case modePerformance = 102
+        case modeMax = 101
+        case modeUltra = 102
         case settings = 200
         case quit = 201
         case installHelper = 202
@@ -25,8 +25,8 @@ enum CoolStatusMenuBuilder {
     static func intent(forTag tag: Int) -> CoolIntent? {
         switch ItemTag(rawValue: tag) {
         case .modeNative: return .native
-        case .modeBalanced: return .balanced
-        case .modePerformance: return .performance
+        case .modeMax: return .max
+        case .modeUltra: return .ultra
         default: return nil
         }
     }
@@ -34,8 +34,8 @@ enum CoolStatusMenuBuilder {
     static func tag(for intent: CoolIntent) -> Int {
         switch intent {
         case .native: return ItemTag.modeNative.rawValue
-        case .balanced: return ItemTag.modeBalanced.rawValue
-        case .performance: return ItemTag.modePerformance.rawValue
+        case .max: return ItemTag.modeMax.rawValue
+        case .ultra: return ItemTag.modeUltra.rawValue
         }
     }
 

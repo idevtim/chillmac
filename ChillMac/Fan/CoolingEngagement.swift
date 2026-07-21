@@ -1,16 +1,16 @@
 import Foundation
 
-/// Closed cooling intensity — Native / Balanced / Performance.
+/// Closed cooling intensity — Native / Max / Ultra.
 enum CoolIntent: String, CaseIterable {
     case native
-    case balanced
-    case performance
+    case max
+    case ultra
 
     var label: String {
         switch self {
         case .native: return "Native"
-        case .balanced: return "Balanced"
-        case .performance: return "Performance"
+        case .max: return "Max"
+        case .ultra: return "Ultra"
         }
     }
 
@@ -21,8 +21,8 @@ enum CoolIntent: String, CaseIterable {
     var description: String {
         switch self {
         case .native: return "macOS owns fans"
-        case .balanced: return "Silent until needed — responsive when hot"
-        case .performance: return "Earlier cooling — still silent when cool"
+        case .max: return "Silent until needed — responsive when hot"
+        case .ultra: return "Earlier cooling — still silent when cool"
         }
     }
 
@@ -30,8 +30,8 @@ enum CoolIntent: String, CaseIterable {
     var modeGlyph: String {
         switch self {
         case .native: return "○"
-        case .balanced: return "◎"
-        case .performance: return "◉"
+        case .max: return "◎"
+        case .ultra: return "◉"
         }
     }
 
@@ -39,20 +39,31 @@ enum CoolIntent: String, CaseIterable {
     var modeSystemImage: String? {
         switch self {
         case .native: return nil
-        case .balanced, .performance: return "fan"
+        case .max: return "fan"
+        case .ultra: return "fan.fill"
         }
     }
 
-    /// Migrate legacy PerformanceLevel / Quiet raw values stored in UserDefaults.
+    /// One-shot map from the old `performanceLevel` key (max/ultra were both aggressive).
+    static func fromLegacyPerformanceLevel(_ raw: String) -> CoolIntent {
+        switch raw {
+        case "low": return .native
+        case "medium", "high": return .max
+        case "max", "ultra": return .ultra
+        default: return .max
+        }
+    }
+
+    /// Normalize stored `coolIntent` (and similar) strings, including Cool-menu renames.
     static func migrated(fromLegacyRaw raw: String?) -> CoolIntent {
         switch raw {
         case "low", "quiet": return .native
-        case "medium", "high", nil: return .balanced
-        case "max", "ultra": return .performance
+        case "medium", "high", "balanced", nil: return .max
+        case "performance": return .ultra
+        case "max": return .max
+        case "ultra": return .ultra
         case "native": return .native
-        case "balanced": return .balanced
-        case "performance": return .performance
-        default: return .balanced
+        default: return .max
         }
     }
 }
@@ -67,24 +78,24 @@ enum CoolingEngagement {
     static func engageCelsius(intent: CoolIntent) -> Double {
         switch intent {
         case .native: return 70
-        case .balanced: return 65
-        case .performance: return 55
+        case .max: return 65
+        case .ultra: return 55
         }
     }
 
     static func releaseCelsius(intent: CoolIntent) -> Double {
         switch intent {
         case .native: return 60
-        case .balanced: return 55
-        case .performance: return 45
+        case .max: return 55
+        case .ultra: return 45
         }
     }
 
     static func dwellSeconds(intent: CoolIntent) -> TimeInterval {
         switch intent {
         case .native: return 25
-        case .balanced: return 18
-        case .performance: return 12
+        case .max: return 18
+        case .ultra: return 12
         }
     }
 
@@ -92,8 +103,8 @@ enum CoolingEngagement {
     static func softFloorWhileEngaged(intent: CoolIntent) -> Double {
         switch intent {
         case .native: return 0.05
-        case .balanced: return 0.15
-        case .performance: return 0.25
+        case .max: return 0.15
+        case .ultra: return 0.25
         }
     }
 
