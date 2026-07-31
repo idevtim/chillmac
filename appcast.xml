@@ -3,6 +3,45 @@
     <channel>
         <title>ChillMac</title>
         <item>
+            <title>1.8.1</title>
+            <pubDate>Fri, 31 Jul 2026 14:13:58 -0400</pubDate>
+            <link>https://github.com/idevtim/chillmac</link>
+            <sparkle:fullReleaseNotesLink>https://github.com/idevtim/chillmac/releases</sparkle:fullReleaseNotesLink>
+            <sparkle:version>1.8.1</sparkle:version>
+            <sparkle:shortVersionString>1.8.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[## Highlights
+
+Fan control didn't work on recent installs, and this fixes it.
+
+ChillMac changes fan speeds through a small privileged helper that runs in the background. On any reasonably recent install, that helper was never actually getting installed — the app asked macOS to register it at every launch, the request failed, and the failure only went to the system log. Nothing in the interface said anything was wrong. Sliders moved, Performance Mode looked engaged, and no fan ever changed speed.
+
+Monitoring was never affected — temperatures, CPU, memory, battery and fan RPM readouts were always accurate, because reading doesn't need the helper. Only changing fan speed did.
+
+## Fixed
+
+- **The privileged helper now installs correctly.** The app bundle was missing the launch daemon definition that macOS reads to install it, so registration failed every time with "Unable to read plist". The definition is now built into the app, and the helper registers, starts on demand and answers normally
+
+## After updating
+
+macOS may ask you to approve ChillMac's background helper. If fan control still does nothing after this update, open **System Settings → General → Login Items & Extensions** and make sure ChillMac is enabled under "Allow in the Background".
+
+## If you've used ChillMac since its early releases
+
+Very early versions installed the helper a different way, leaving files in `/Library`. That older copy still claims the same identifier, which blocks the new one from registering — so if fan control is still dead after updating and approving, remove the leftovers and restart ChillMac:
+
+```
+sudo launchctl bootout system/com.idevtim.ChillMac.Helper
+sudo rm -f /Library/LaunchDaemons/com.idevtim.ChillMac.Helper.plist
+sudo rm -f /Library/PrivilegedHelperTools/com.idevtim.ChillMac.Helper
+```
+
+Most people won't need this. If ChillMac was installed recently, skip it.
+]]></description>
+            <enclosure url="https://github.com/idevtim/chillmac/releases/download/v1.8.1/ChillMac-1.8.1.zip" length="2422184" type="application/octet-stream" sparkle:edSignature="zOtamWRv4uLf0Pnin6CrLgJeduo/HLTaR7wwL2U2QlAspZ//qPtHxGZPo0xTUiJyBxwYAm9oUnJwAutm6x0aBg=="/>
+        </item>
+        <item>
             <title>1.8.0</title>
             <pubDate>Fri, 31 Jul 2026 13:10:38 -0400</pubDate>
             <link>https://github.com/idevtim/chillmac</link>
