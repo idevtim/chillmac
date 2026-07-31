@@ -38,11 +38,12 @@ A free, open-source macOS menu bar app for monitoring your system and controllin
 ### Download (recommended)
 
 1. Grab `Fan Sooner.dmg` from the [latest release](https://github.com/idevtim/chillmac/releases/latest)
-2. Open the DMG and drag Fan Sooner to Applications
-3. Launch Fan Sooner — it'll appear in your menu bar
-4. On first launch, you'll be prompted for admin credentials to install the fan control helper
+2. Open the DMG and drag **Fan Sooner** into **Applications** (not Desktop or Downloads)
+3. Launch Fan Sooner — it appears in the menu bar
+4. On first launch, approve it under **System Settings → General → Login Items** (Allow in the Background) so the fan-control helper can run
+5. Settings → Helper should show **Ready** before Max / Ultra will change fan speeds
 
-The DMG is signed, notarized, and stapled by Apple — Gatekeeper will let it through.
+The DMG is signed, notarized, and stapled — Gatekeeper will let it through. Fan writes need that notarized helper; a dragged Debug build will not.
 
 ### Build from source
 
@@ -55,12 +56,41 @@ The DMG is signed, notarized, and stapled by Apple — Gatekeeper will let it th
 git clone https://github.com/idevtim/chillmac.git
 cd chillmac
 xcodegen generate
-xcodebuild -project ChillMac.xcodeproj -scheme ChillMac build
+open ChillMac.xcodeproj   # ⌘R for day-to-day UI work
 ```
 
-Or open `ChillMac.xcodeproj` in Xcode and hit Run.
+Or:
 
-> **Note:** Debug builds skip the helper's code signature check, so the privileged helper works without matching the original signing identity. You can build, run, and hack on ChillMac with your own (or no) Developer ID.
+```bash
+xcodebuild -project ChillMac.xcodeproj -scheme ChillMac -configuration Debug build
+```
+
+**What Debug vs Release is for**
+
+| Goal | How |
+|------|-----|
+| Menu bar UI, sensors, Native Cool | Xcode Debug / adhoc Run is fine |
+| Max / Ultra fan control on a real install | Notarized Release app in `/Applications` (`./scripts/build-dmg.sh`) |
+
+Copying a Debug `Fan Sooner.app` into `/Applications` looks installed but the privileged helper usually fails to spawn (`EX_CONFIG` / launch constraints). Use the release pipeline (or an equivalent Developer ID sign → notarize → staple) and approve Login Items once.
+
+**Release / local notarized install**
+
+```bash
+cp .env.example .env   # APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID
+# Optional: APPLE_SIGNING_NAME="Your Name" if not Tim Murphy
+brew install create-dmg
+./scripts/build-dmg.sh
+# Install from build/Fan Sooner.dmg → /Applications, launch, approve Login Items
+```
+
+Helper health check:
+
+```bash
+launchctl print system/com.idevtim.ChillMac.Helper3 | rg 'state =|pid ='
+```
+
+If Helper stays “Not ready” after an upgrade: use in-app **Install Helper**, or as a last resort `sudo sfltool resetbtm` and reboot (resets all third-party Login Items approvals).
 
 ## How It Works
 
@@ -71,7 +101,7 @@ Menu Bar App (UI + read-only SMC) ──XPC──> Helper Daemon (root, write SM
 ```
 
 - **Main app** (unprivileged) — Reads SMC sensors every 2 seconds and displays a SwiftUI popover with system dashboards.
-- **Helper daemon** (root) — Installed via `SMAppService`, handles fan speed/mode writes over XPC. Validates the caller's code signature before accepting connections.
+- **Helper daemon** (root) — Registered via `SMAppService` from `Contents/Library/LaunchDaemons/…Helper3.plist`, binary at `Contents/Library/HelperTools/`. Handles fan speed/mode writes over XPC. Validates the caller's code signature before accepting connections (relaxed in Debug).
 
 On Apple Silicon, the helper manages SMC test mode to bypass `thermalmonitord` for manual fan control. Signal handlers ensure cleanup if the helper exits unexpectedly. Fans always reset to automatic mode on app launch and quit.
 
@@ -90,9 +120,12 @@ xcodegen generate
 
 # Build and run from Xcode, or:
 xcodebuild -project ChillMac.xcodeproj -scheme ChillMac build
+
+# Unit tests (Swift Testing)
+xcodegen generate && xcodebuild -project ChillMac.xcodeproj -scheme ChillMac -destination 'platform=macOS' test
 ```
 
-There's no test suite — testing is done manually via the UI. If you're adding a feature, just make sure the app builds and the feature works as expected.
+For Max/Ultra changes, also verify a notarized `/Applications` install (see Install above). Agents: see `AGENTS.md` → **Getting started**.
 
 ## Project Structure
 

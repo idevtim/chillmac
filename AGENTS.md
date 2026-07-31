@@ -29,6 +29,61 @@ Main App (UI + read-only SMC) --XPC--> Helper Daemon (root, write SMC)
 - **Temperature Sensors** — Color-coded display of all detected SMC sensors (CPU, GPU, DRAM, SSD, etc.)
 - **System Info** — Machine model, chip name, RAM, macOS version
 
+## Getting started (how to run)
+
+Two different “start” paths. Pick the right one:
+
+### A. Day-to-day UI / monitoring (Xcode Debug)
+
+Fine for menu bar UI, sensors, and Native Cool. Adhoc-signed Debug builds **do not** give a reliable root helper for Max/Ultra.
+
+```bash
+brew install xcodegen   # once
+xcodegen generate
+open ChillMac.xcodeproj # Run (⌘R) — or:
+xcodebuild -project ChillMac.xcodeproj -scheme ChillMac -configuration Debug build
+```
+
+### B. Fan control that actually works (Release + notarized in `/Applications`)
+
+Max/Ultra need the `SMAppService` LaunchDaemon. Apple requires the **parent app** to be Developer ID–signed and **notarized**. Copying a Debug `.app` into `/Applications` will look installed but the helper dies with `EX_CONFIG` / launch-constraint errors.
+
+```bash
+# 1. .env from .env.example — APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID
+#    Optional: APPLE_SIGNING_NAME="Noah Deskin" (default: Tim Murphy)
+./scripts/build-dmg.sh
+
+# Or: Release build + deep-sign helper then app, zip, notarytool submit --wait, stapler staple
+# 2. Install only under /Applications (not Desktop / Downloads — TCC/MAC path traps)
+# 3. Launch once → approve Fan Sooner under System Settings → General → Login Items
+#    (Allow in the Background). Settings → Helper should show Ready.
+```
+
+**Quick health check after install:**
+
+```bash
+launchctl print system/com.idevtim.ChillMac.Helper3 | rg 'state =|pid =|job state|program identifier'
+# Expect: state = running, a pid, program under Contents/Library/HelperTools/
+```
+
+**If the helper is stuck** (`spawn failed`, `EX_CONFIG`, Helper “Not ready”, or poisoned BTM after rebrand/re-sign):
+
+1. Prefer in-app **Install Helper** (unregister → register).
+2. Confirm Login Items still allows the background item.
+3. Nuclear reset (wipes *all* third-party Login Items approvals): `sudo sfltool resetbtm` then reboot.
+4. Do not leave old `ChillMac.app` / DerivedData copies around with the same bundle ID while testing installs.
+
+### Helper layout (do not regress)
+
+| | Correct (SMAppService) | Wrong (SMJobBless-era) |
+|--|------------------------|-------------------------|
+| Binary | `Contents/Library/HelperTools/com.idevtim.ChillMac.Helper` | `Contents/Library/LaunchServices/…` |
+| Plist | `Contents/Library/LaunchDaemons/com.idevtim.ChillMac.Helper3.plist` | Old `Helper.plist` / LaunchServices path |
+| Launchd label / Mach service | `com.idevtim.ChillMac.Helper3` | `com.idevtim.ChillMac.Helper` |
+| Plist keys | `BundleProgram` + `RunAtLoad`; no `SMPrivilegedExecutables` / `SMAuthorizedClients` | Absolute `Program`, LaunchServices placement |
+
+Apple DTS: LaunchServices is for **SMJobBless**, not SMAppService. Working peer pattern on macOS: HelperTools + `RunAtLoad` + explicit `app-sandbox = false` on the helper, notarized parent app.
+
 ## Build System
 
 Uses **XcodeGen** (`project.yml`) to generate `ChillMac.xcodeproj`.
@@ -48,7 +103,7 @@ xcodebuild -project ChillMac.xcodeproj -scheme ChillMac build
 
 Full release pipeline that builds, signs, creates DMG, notarizes, and staples in one step.
 
-Requires a `.env` file with `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID` (see `.env.example`). Also requires `create-dmg` (`brew install create-dmg`) and a Developer ID Application certificate.
+Requires a `.env` file with `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID` (see `.env.example`). Optional `APPLE_SIGNING_NAME` overrides the Developer ID CN (default `Tim Murphy`). Also requires `create-dmg` (`brew install create-dmg`) and a Developer ID Application certificate.
 
 Steps performed:
 1. Clean build via `xcodebuild` (Release config)
@@ -70,7 +125,7 @@ Output: `build/Fan Sooner.dmg`
 - Deployment target: macOS 13.0+
 - Swift 5.9
 - Hardened runtime enabled, sandbox disabled (required for IOKit access)
-- Post-compile script copies helper into `Library/LaunchServices/`
+- Post-compile script copies helper into `Library/HelperTools/` and the launchd plist as `Helper3.plist`
 
 ## Project Structure
 
@@ -114,7 +169,8 @@ scripts/
 - **SMCConnection** wraps IOKit calls; uses fixed-point encoding (fpe2 for RPM, sp78 for temperature)
 - **HelperDelegate** validates caller code signature before accepting XPC connections
 - Apple Silicon uses `Ftst` (test mode) key to bypass thermalmonitord; signal handlers ensure cleanup on exit
-- `#if DEBUG` allows unsigned helper connections during development
+- `#if DEBUG` allows unsigned helper connections during development (UI/dev only — not a substitute for notarized `/Applications` installs)
+- **HelperInstaller.reregister()** unregisters then registers when the daemon is stale or the binary moved; register-only loops leave BTM/`needs LWCR update` poison
 - Fans always reset to auto mode on app launch
 - Detail panels (CPU, Memory, Battery, Disk) open as floating NSPanels to the left of the main popover
 

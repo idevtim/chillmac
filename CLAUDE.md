@@ -70,7 +70,7 @@ Output: `build/Fan Sooner.dmg`
 - Deployment target: macOS 13.0+
 - Swift 5.9
 - Hardened runtime enabled, sandbox disabled (required for IOKit access)
-- Post-compile script copies helper into `Library/LaunchServices/`
+- Post-compile script copies helper into `Library/HelperTools/` (launchd plist `Helper3.plist`). See **Getting started** in `AGENTS.md` for Debug vs notarized `/Applications` installs.
 
 ## Project Structure
 
