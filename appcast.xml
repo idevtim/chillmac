@@ -4,7 +4,7 @@
         <title>ChillMac</title>
         <item>
             <title>1.8.0</title>
-            <pubDate>Fri, 31 Jul 2026 12:55:35 -0400</pubDate>
+            <pubDate>Fri, 31 Jul 2026 13:10:38 -0400</pubDate>
             <link>https://github.com/idevtim/chillmac</link>
             <sparkle:fullReleaseNotesLink>https://github.com/idevtim/chillmac/releases</sparkle:fullReleaseNotesLink>
             <sparkle:version>1.8.0</sparkle:version>
@@ -36,7 +36,7 @@ Two things to know about this particular release: you'll need to install it by h
 - **Diagnostics record ChillMac's own memory use**, and the privileged helper's — which the app can't measure directly, so the helper now reports it over XPC. System-wide memory figures can't reveal a leak in the app itself
 - **Sleep tracking rewritten** — sleep intervals are now derived from gaps in sampling rather than paired against wake notifications. Dark wake and Power Nap resume sampling without posting a wake notification, which let a single "sleep" interval stretch across 15 hours that contained hundreds of wide-awake samples
 ]]></description>
-            <enclosure url="https://github.com/idevtim/chillmac/releases/download/v1.8.0/ChillMac-1.8.0.zip" length="2399908" type="application/octet-stream" sparkle:edSignature="thsH0DwdLBo/dqGk+Mbb/6W4tUou0bMD9/c/eRGlRCUD5Racpj6PeY+rMPyuif8LQrKzDrbbwMxWTVuV0AulBA=="/>
+            <enclosure url="https://github.com/idevtim/chillmac/releases/download/v1.8.0/ChillMac-1.8.0.zip" length="2420054" type="application/octet-stream" sparkle:edSignature="prOHSdBjQM5AzAqz7bFQKQucA6HUVx7R2hSxCuGtOV8ikAeOhGX+E8Qw4WypySjHYIDVJvTSrLZugcu+wLusCQ=="/>
         </item>
     </channel>
 </rss>
