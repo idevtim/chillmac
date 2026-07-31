@@ -12,7 +12,14 @@ final class MemoryInfo: ObservableObject {
     @Published var topProcesses: [ProcessMemory] = []
 
     /// When true, fetches top processes (expensive). Set by StatusBarController when Memory detail panel is visible.
-    var isDetailVisible = false
+    /// Becoming visible refreshes immediately rather than waiting out the remainder of the
+    /// 5s timer, which the panel would otherwise spend showing an empty list.
+    var isDetailVisible = false {
+        didSet {
+            guard isDetailVisible, !oldValue else { return }
+            refresh()
+        }
+    }
 
     let totalMemory = ProcessInfo.processInfo.physicalMemory
 

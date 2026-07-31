@@ -13,7 +13,14 @@ final class CpuInfo: ObservableObject {
     @Published var topProcesses: [CpuProcess] = []
 
     /// When true, fetches top processes (expensive). Set by StatusBarController when CPU detail panel is visible.
-    var isDetailVisible = false
+    /// Becoming visible fetches immediately — the periodic path only samples every 5th poll
+    /// (~20s), which left the panel showing an empty list for most of that window.
+    var isDetailVisible = false {
+        didSet {
+            guard isDetailVisible, !oldValue else { return }
+            fetchTopProcessesNow()
+        }
+    }
 
     private var timer: Timer?
     private var previousInfo: host_cpu_load_info?
@@ -87,7 +94,14 @@ final class CpuInfo: ObservableObject {
 
         // Fetch top processes every 5th poll, only when detail panel is visible.
         pollCount += 1
-        guard isDetailVisible, pollCount % 5 == 0, !topProcessFetchInFlight else { return }
+        guard isDetailVisible, pollCount % 5 == 0 else { return }
+        fetchTopProcessesNow()
+    }
+
+    /// Samples the top CPU consumers off-main. Safe to call spuriously — an in-flight fetch
+    /// short-circuits. Must be called on main: it reads NSWorkspace.
+    private func fetchTopProcessesNow() {
+        guard !topProcessFetchInFlight else { return }
         topProcessFetchInFlight = true
 
         // Snapshot app metadata on main thread. NSWorkspace/AppKit stays on main; sorting stays off-main.

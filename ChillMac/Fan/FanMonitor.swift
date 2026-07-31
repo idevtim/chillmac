@@ -7,6 +7,10 @@ final class FanMonitor: ObservableObject {
     @Published var sensors: [TemperatureSensor] = []
     @Published var smcError: String?
     @Published var helperReady = false
+    /// False until the first poll has published results. Lets the UI tell "still reading the
+    /// SMC" apart from "this Mac genuinely has no fans" — a fanless MacBook Air must end up
+    /// with the empty-state message, not a spinner that never stops.
+    @Published var hasCompletedFirstPoll = false
 
     /// The hottest sensor temperature from the last poll (used by performance mode UI)
     @Published var peakTemperature: Double = 0
@@ -453,10 +457,16 @@ final class FanMonitor: ObservableObject {
 
                 // Only publish when popover is visible or performance mode needs fan data,
                 // to avoid unnecessary SwiftUI view diffs while the popover is hidden.
-                if let updatedFans,
-                   (self.isPopoverVisible || performanceMode),
-                   self.fans != updatedFans {
-                    self.fans = updatedFans
+                if let updatedFans, self.isPopoverVisible || performanceMode {
+                    if self.fans != updatedFans {
+                        self.fans = updatedFans
+                    }
+                    // Flagged on publish, not on poll completion: while the popover is hidden
+                    // and performance mode is off, polls run but `fans` is never filled in, so
+                    // "a poll finished" wouldn't mean the array is trustworthy yet.
+                    if !self.hasCompletedFirstPoll {
+                        self.hasCompletedFirstPoll = true
+                    }
                 }
 
                 // Threshold @Published updates — EMA produces hundredths-of-a-degree noise that

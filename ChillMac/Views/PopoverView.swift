@@ -221,15 +221,24 @@ struct PopoverView: View {
             }
 
             if monitor.fans.isEmpty {
-                HStack {
-                    Image(systemName: "fan.slash")
-                        .font(.system(size: 16))
-                        .foregroundColor(theme.textQuaternary)
-                    Text("No fans detected")
-                        .font(.system(size: 14))
-                        .foregroundColor(theme.textQuaternary)
+                Group {
+                    // Until the first poll publishes, an empty array only means "not read
+                    // yet" — claiming "No fans detected" there would be wrong on every Mac.
+                    if !monitor.hasCompletedFirstPoll && monitor.smcError == nil {
+                        PanelLoadingView(message: "Reading fans…", minHeight: 24)
+                            .padding(14)
+                    } else {
+                        HStack {
+                            Image(systemName: "fan.slash")
+                                .font(.system(size: 16))
+                                .foregroundColor(theme.textQuaternary)
+                            Text("No fans detected")
+                                .font(.system(size: 14))
+                                .foregroundColor(theme.textQuaternary)
+                        }
+                        .padding(14)
+                    }
                 }
-                .padding(14)
                 .frame(maxWidth: .infinity, alignment: .center)
                 .background(theme.cardBgSecondary)
                 .cornerRadius(12)
