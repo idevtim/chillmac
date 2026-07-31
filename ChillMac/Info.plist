@@ -17,12 +17,12 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.8.0</string>
+    <string>1.8.1</string>
     <!-- Sparkle compares releases on CFBundleVersion, so this must increase every
          release. build-dmg.sh syncs it to CFBundleShortVersionString before building
          to keep the two from drifting apart. -->
     <key>CFBundleVersion</key>
-    <string>1.8.0</string>
+    <string>1.8.1</string>
     <key>LSMinimumSystemVersion</key>
     <string>$(MACOSX_DEPLOYMENT_TARGET)</string>
     <key>LSUIElement</key>

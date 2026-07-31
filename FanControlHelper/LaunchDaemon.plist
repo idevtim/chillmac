@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  SMAppService daemon definition. Copied into the app bundle at
+  Contents/Library/LaunchDaemons/com.idevtim.ChillMac.Helper.plist by the build.
+
+  SMAppService.daemon(plistName:) reads the plist from that exact location and nowhere
+  else. Without it, register() fails with SMAppServiceErrorDomain 108 "Unable to read
+  plist" and the app silently has no privileged helper — fan control does nothing.
+
+  Distinct from Launchd.plist, which is embedded in the helper binary's __launchd_plist
+  section. That one describes the daemon to launchd; this one is what SMAppService reads
+  to install it, and it needs BundleProgram (a path relative to the app bundle) because
+  the executable ships inside the app rather than in /Library/PrivilegedHelperTools.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.idevtim.ChillMac.Helper</string>
+    <key>BundleProgram</key>
+    <string>Contents/Library/LaunchServices/com.idevtim.ChillMac.Helper</string>
+    <key>MachServices</key>
+    <dict>
+        <key>com.idevtim.ChillMac.Helper</key>
+        <true/>
+    </dict>
+    <!-- Lets macOS attribute the daemon to ChillMac in Login Items & Extensions -->
+    <key>AssociatedBundleIdentifiers</key>
+    <array>
+        <string>com.idevtim.ChillMac</string>
+    </array>
+</dict>
+</plist>

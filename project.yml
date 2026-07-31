@@ -42,9 +42,16 @@ targets:
         script: |
           mkdir -p "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchServices"
           cp "${BUILT_PRODUCTS_DIR}/com.idevtim.ChillMac.Helper" "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchServices/"
-        inputFiles: []
+          # SMAppService reads the daemon definition from Contents/Library/LaunchDaemons
+          # and only from there. Omitting it makes register() fail with error 108 and the
+          # app ends up with no privileged helper at all.
+          mkdir -p "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchDaemons"
+          cp "${SRCROOT}/FanControlHelper/LaunchDaemon.plist" "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchDaemons/com.idevtim.ChillMac.Helper.plist"
+        inputFiles:
+          - "$(SRCROOT)/FanControlHelper/LaunchDaemon.plist"
         outputFiles:
           - "$(BUILT_PRODUCTS_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchServices/com.idevtim.ChillMac.Helper"
+          - "$(BUILT_PRODUCTS_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchDaemons/com.idevtim.ChillMac.Helper.plist"
 
   com.idevtim.ChillMac.Helper:
     type: tool
