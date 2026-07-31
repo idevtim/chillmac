@@ -34,12 +34,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 case .runningCorrectVersion:
                     NSLog("AppDelegate: helper already running with correct version")
                 case .runningWrongVersion:
-                    NSLog("AppDelegate: helper version mismatch — re-registering")
-                    HelperInstaller.unregister()
-                    _ = HelperInstaller.register()
+                    NSLog("AppDelegate: helper version mismatch — unregister then register")
+                    _ = HelperInstaller.reregister()
                 case .notRunning:
-                    NSLog("AppDelegate: helper registered but not responding — re-registering")
-                    _ = HelperInstaller.register()
+                    NSLog("AppDelegate: helper registered but not responding — unregister then register")
+                    _ = HelperInstaller.reregister()
                 }
             } else {
                 NSLog("AppDelegate: helper not registered — installing")

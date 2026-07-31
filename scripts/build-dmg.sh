@@ -29,7 +29,9 @@ echo "✓ Found release notes for v$VERSION"
 APP_NAME="Fan Sooner"
 XCODE_PROJECT="ChillMac"
 HELPER_BUNDLE_ID="com.idevtim.ChillMac.Helper"
-SIGNING_IDENTITY="Developer ID Application: Tim Murphy ($APPLE_TEAM_ID)"
+# Override with APPLE_SIGNING_NAME in .env when releasing under a different Developer ID.
+SIGNING_NAME="${APPLE_SIGNING_NAME:-Tim Murphy}"
+SIGNING_IDENTITY="Developer ID Application: $SIGNING_NAME ($APPLE_TEAM_ID)"
 TEAM_ID="$APPLE_TEAM_ID"
 
 BUILD_DIR="$PROJECT_DIR/build"
@@ -69,7 +71,7 @@ echo "   ✓ Built: $APP_PATH"
 echo "🔏 Deep code signing (inside-out)..."
 
 # 1. Sign the helper first (innermost)
-HELPER_PATH="$APP_PATH/Contents/Library/LaunchServices/$HELPER_BUNDLE_ID"
+HELPER_PATH="$APP_PATH/Contents/Library/HelperTools/$HELPER_BUNDLE_ID"
 if [ -f "$HELPER_PATH" ]; then
   codesign --force --timestamp --options runtime \
     --sign "$SIGNING_IDENTITY" \

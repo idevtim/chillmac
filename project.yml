@@ -36,16 +36,16 @@ targets:
       # inputFiles required so User Script Sandboxing can read the helper product
       - name: "Copy Helper Tool"
         script: |
-          mkdir -p "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchServices"
+          mkdir -p "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Library/HelperTools"
           mkdir -p "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchDaemons"
-          cp "${BUILT_PRODUCTS_DIR}/com.idevtim.ChillMac.Helper" "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchServices/"
-          cp "${SRCROOT}/FanControlHelper/Launchd.plist" "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchDaemons/com.idevtim.ChillMac.Helper.plist"
+          cp "${BUILT_PRODUCTS_DIR}/com.idevtim.ChillMac.Helper" "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Library/HelperTools/"
+          cp "${SRCROOT}/FanControlHelper/Launchd.plist" "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchDaemons/com.idevtim.ChillMac.Helper3.plist"
         inputFiles:
           - "$(BUILT_PRODUCTS_DIR)/com.idevtim.ChillMac.Helper"
           - "$(SRCROOT)/FanControlHelper/Launchd.plist"
         outputFiles:
-          - "$(BUILT_PRODUCTS_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchServices/com.idevtim.ChillMac.Helper"
-          - "$(BUILT_PRODUCTS_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchDaemons/com.idevtim.ChillMac.Helper.plist"
+          - "$(BUILT_PRODUCTS_DIR)/$(CONTENTS_FOLDER_PATH)/Library/HelperTools/com.idevtim.ChillMac.Helper"
+          - "$(BUILT_PRODUCTS_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchDaemons/com.idevtim.ChillMac.Helper3.plist"
 
   ChillMacTests:
     type: bundle.unit-test
@@ -76,6 +76,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.idevtim.ChillMac.Helper
         PRODUCT_NAME: com.idevtim.ChillMac.Helper
         INFOPLIST_FILE: FanControlHelper/Info.plist
+        CODE_SIGN_ENTITLEMENTS: FanControlHelper/Helper.entitlements
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGN_STYLE: Automatic
         ENABLE_HARDENED_RUNTIME: YES

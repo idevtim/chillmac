@@ -118,7 +118,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     @objc private func installHelper(_ sender: Any?) {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            _ = HelperInstaller.register()
+            _ = HelperInstaller.reregister()
             HelperInstaller.openApprovalSettingsIfNeeded()
             Thread.sleep(forTimeInterval: 0.5)
             let status = HelperInstaller.checkHelperStatus()

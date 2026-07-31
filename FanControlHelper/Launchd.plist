@@ -3,12 +3,18 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.idevtim.ChillMac.Helper</string>
+    <string>com.idevtim.ChillMac.Helper3</string>
     <key>BundleProgram</key>
-    <string>Contents/Library/LaunchServices/com.idevtim.ChillMac.Helper</string>
+    <string>Contents/Library/HelperTools/com.idevtim.ChillMac.Helper</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>AssociatedBundleIdentifiers</key>
+    <array>
+        <string>com.idevtim.ChillMac</string>
+    </array>
     <key>MachServices</key>
     <dict>
-        <key>com.idevtim.ChillMac.Helper</key>
+        <key>com.idevtim.ChillMac.Helper3</key>
         <true/>
     </dict>
 </dict>
