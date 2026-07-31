@@ -10,6 +10,11 @@ settings:
   base:
     SWIFT_VERSION: "5.9"
 
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.6.0"
+
 targets:
   ChillMac:
     type: application
@@ -30,6 +35,8 @@ targets:
       - target: com.idevtim.ChillMac.Helper
         embed: false
         codeSign: false
+      # In-app updates. Helper target deliberately excluded — the daemon never updates itself.
+      - package: Sparkle
     postCompileScripts:
       - name: "Copy Helper Tool"
         script: |

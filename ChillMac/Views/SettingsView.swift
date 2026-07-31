@@ -2,7 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var settings: AppSettings
-    @ObservedObject var updateChecker: UpdateChecker
+    @ObservedObject var updateController: UpdateController
     let systemInfo: SystemInfo
     let fanMonitor: FanMonitor
     let cpuInfo: CpuInfo
@@ -60,7 +60,7 @@ struct SettingsView: View {
             .padding(.bottom, 12)
         }
         .onAppear {
-            updateChecker.performCheck()
+            updateController.refreshUpdateStatus()
         }
     }
 
@@ -84,15 +84,15 @@ struct SettingsView: View {
                         Text("Current Version")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(theme.textPrimary)
-                        Text("v\(updateChecker.currentVersion)")
+                        Text("v\(updateController.currentVersion)")
                             .font(.system(size: 11))
                             .foregroundColor(theme.textQuaternary)
                     }
                     Spacer()
                     Button(action: {
-                        updateChecker.performCheck()
+                        updateController.checkForUpdates()
                     }) {
-                        if updateChecker.isChecking {
+                        if updateController.isChecking {
                             ProgressView()
                                 .controlSize(.small)
                         } else {
@@ -102,12 +102,12 @@ struct SettingsView: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .disabled(updateChecker.isChecking)
+                    .disabled(updateController.isChecking || !updateController.canCheckForUpdates)
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
 
-                if updateChecker.updateAvailable, let version = updateChecker.latestVersion {
+                if updateController.updateAvailable, let version = updateController.latestVersion {
                     Divider()
                         .background(theme.dividerSubtle)
 
@@ -120,27 +120,27 @@ struct SettingsView: View {
                             Text("v\(version) Available")
                                 .font(.system(size: 13, weight: .medium))
                                 .foregroundColor(theme.textPrimary)
-                            Text("A new version is ready to download")
+                            Text("Installs and relaunches automatically")
                                 .font(.system(size: 11))
                                 .foregroundColor(theme.textQuaternary)
                         }
                         Spacer()
-                        if let url = updateChecker.downloadURL ?? updateChecker.releaseURL {
-                            Button(action: { NSWorkspace.shared.open(url) }) {
-                                Text("Download")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 5)
-                                    .background(Color.teal)
-                                    .cornerRadius(8)
-                            }
-                            .buttonStyle(.plain)
+                        // Hands off to Sparkle, which downloads, verifies the signature,
+                        // swaps the bundle and relaunches — no browser round trip.
+                        Button(action: { updateController.checkForUpdates() }) {
+                            Text("Update")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 5)
+                                .background(Color.teal)
+                                .cornerRadius(8)
                         }
+                        .buttonStyle(.plain)
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
-                } else if updateChecker.hasChecked && !updateChecker.updateAvailable {
+                } else if updateController.hasChecked && !updateController.updateAvailable {
                     Divider()
                         .background(theme.dividerSubtle)
 

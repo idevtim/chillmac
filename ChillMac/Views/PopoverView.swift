@@ -9,7 +9,7 @@ struct PopoverView: View {
     @ObservedObject var cpuInfo: CpuInfo
     @ObservedObject var memoryInfo: MemoryInfo
     @ObservedObject var fpsMonitor: DisplayFPSMonitor
-    @ObservedObject var updateChecker: UpdateChecker
+    @ObservedObject var updateController: UpdateController
     let helper: HelperConnection
     var onMemoryTap: (() -> Void)?
     var onDiskTap: (() -> Void)?
@@ -35,7 +35,7 @@ struct PopoverView: View {
             if showingSettings {
                 SettingsView(
                     settings: settings,
-                    updateChecker: updateChecker,
+                    updateController: updateController,
                     systemInfo: systemInfo,
                     fanMonitor: monitor,
                     cpuInfo: cpuInfo,
@@ -440,7 +440,7 @@ struct PopoverView: View {
                             .font(.system(size: 16))
                             .foregroundColor(theme.textTertiary)
 
-                        if updateChecker.updateAvailable {
+                        if updateController.updateAvailable {
                             Circle()
                                 .fill(Color.teal)
                                 .frame(width: 7, height: 7)

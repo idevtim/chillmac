@@ -9,7 +9,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let batteryInfo = BatteryInfo()
     let cpuInfo = CpuInfo()
     let helperConnection = HelperConnection()
-    let updateChecker = UpdateChecker()
+    let updateController = UpdateController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Only start FanMonitor at launch — it runs continuously for menu bar + performance mode.
@@ -27,9 +27,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             memoryInfo: memoryInfo,
             batteryInfo: batteryInfo,
             cpuInfo: cpuInfo,
-            updateChecker: updateChecker
+            updateController: updateController
         )
-        updateChecker.startPeriodicChecks()
+        // Sparkle starts its own scheduled checks when UpdateController is constructed.
 
         // Install/load the privileged helper in the background so the UI appears immediately
         DispatchQueue.global(qos: .userInitiated).async { [self] in
