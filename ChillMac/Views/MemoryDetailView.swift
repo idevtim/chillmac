@@ -199,6 +199,11 @@ struct MemoryDetailView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
 
+                if memoryInfo.topProcesses.isEmpty {
+                    PanelLoadingView(message: "Sampling processes…")
+                        .padding(.bottom, 6)
+                }
+
                 ForEach(memoryInfo.topProcesses) { proc in
                     HStack(spacing: 10) {
                         // Real app icon or fallback

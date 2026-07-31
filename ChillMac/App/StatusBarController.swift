@@ -13,14 +13,14 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     private let systemInfo: SystemInfo
     private let fanMonitor: FanMonitor
-    private let updateChecker: UpdateChecker
+    private let updateController: UpdateController
 
-    init(fanMonitor: FanMonitor, systemInfo: SystemInfo, updateChecker: UpdateChecker) {
+    init(fanMonitor: FanMonitor, systemInfo: SystemInfo, updateController: UpdateController) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusMenu = NSMenu()
         self.systemInfo = systemInfo
         self.fanMonitor = fanMonitor
-        self.updateChecker = updateChecker
+        self.updateController = updateController
 
         super.init()
 
@@ -78,7 +78,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             menu: menu,
             monitor: fanMonitor,
             settings: AppSettings.shared,
-            updateAvailable: updateChecker.updateAvailable,
+            updateAvailable: updateController.updateAvailable,
             actions: .init(
                 onSelectMode: { [weak self] mode in self?.applyCoolMode(mode) },
                 target: self,
@@ -143,7 +143,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         if settingsWindow == nil {
             let root = SettingsView(
                 settings: AppSettings.shared,
-                updateChecker: updateChecker,
+                updateController: updateController,
                 fanMonitor: fanMonitor,
                 systemInfo: systemInfo
             )

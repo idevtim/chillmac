@@ -22,6 +22,19 @@ struct TemperatureDetailView: View {
                     VStack(spacing: 16) {
                         summaryCard
 
+                        // Sensor keys are discovered by probing the SMC over the first few
+                        // poll cycles, so the groups below fill in progressively.
+                        if monitor.sensors.isEmpty {
+                            if monitor.smcError == nil {
+                                PanelLoadingView(message: "Detecting sensors…", minHeight: 120)
+                            } else {
+                                Text("No sensors detected")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, minHeight: 120)
+                            }
+                        }
+
                         if !cpuSensors.isEmpty {
                             sensorGroup(title: "CPU", sensors: cpuSensors)
                         }

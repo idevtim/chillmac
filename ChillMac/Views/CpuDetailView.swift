@@ -41,36 +41,35 @@ struct CpuDetailView: View {
 
     private var graphSection: some View {
         HStack(alignment: .top, spacing: 14) {
-            // Line chart
+            // Line chart. Usage is a delta between two polls, so nothing can be drawn until
+            // the second one lands — roughly 4s after the popover first opens.
             VStack(alignment: .leading, spacing: 4) {
-                CpuGraphView(history: cpuInfo.history, userHistory: cpuInfo.userHistory, systemHistory: cpuInfo.systemHistory)
-                    .frame(height: 100)
+                if cpuInfo.history.isEmpty {
+                    PanelLoadingView(message: "Measuring…", minHeight: 100)
+                } else {
+                    CpuGraphView(history: cpuInfo.history, userHistory: cpuInfo.userHistory, systemHistory: cpuInfo.systemHistory)
+                        .frame(height: 100)
+                }
             }
             .frame(maxWidth: .infinity)
 
             // Breakdown
             VStack(alignment: .leading, spacing: 12) {
-                UsageRow(
-                    color: .teal,
-                    value: String(format: "%.1f %%", 100 - cpuInfo.totalUsage),
-                    label: "Available"
-                )
-                UsageRow(
-                    color: .blue,
-                    value: String(format: "%.1f %%", cpuInfo.userPercent),
-                    label: "User"
-                )
-                UsageRow(
-                    color: .orange,
-                    value: String(format: "%.1f %%", cpuInfo.systemPercent),
-                    label: "System"
-                )
+                UsageRow(color: .teal, value: usageValue(100 - cpuInfo.totalUsage), label: "Available")
+                UsageRow(color: .blue, value: usageValue(cpuInfo.userPercent), label: "User")
+                UsageRow(color: .orange, value: usageValue(cpuInfo.systemPercent), label: "System")
             }
             .frame(width: 100)
         }
         .padding(16)
         .background(Color.clear)
         .cornerRadius(14)
+    }
+
+    /// Dashes out the breakdown until the first delta exists — "0.0 %" before any
+    /// measurement reads as a real reading rather than a pending one.
+    private func usageValue(_ value: Double) -> String {
+        cpuInfo.history.isEmpty ? "—" : String(format: "%.1f %%", value)
     }
 
     // MARK: - Info Cards
@@ -190,6 +189,11 @@ struct CpuDetailView: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
+
+                if cpuInfo.topProcesses.isEmpty {
+                    PanelLoadingView(message: "Sampling processes…")
+                        .padding(.bottom, 6)
+                }
 
                 ForEach(cpuInfo.topProcesses) { proc in
                     HStack(spacing: 10) {

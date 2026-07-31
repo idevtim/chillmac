@@ -3,11 +3,24 @@ import Foundation
 import IOKit.ps
 import Darwin
 
+/// A fan's state at sample time. Every field is optional because an SMC read can fail and
+/// a background poll can skip the target/mode reads entirely — `null` means "not measured",
+/// which is a different fact from a fan genuinely sitting at 0 RPM in auto mode.
 struct FanSample: Codable {
     let name: String
-    let currentRPM: Double
-    let targetRPM: Double
-    let isManualMode: Bool
+    let currentRPM: Double?
+    let targetRPM: Double?
+    let isManualMode: Bool?
+
+    /// Encodes missing values as explicit `null` rather than omitting the keys, so a
+    /// reader never has to guess whether a field was absent or unreadable.
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(name, forKey: .name)
+        try container.encode(currentRPM, forKey: .currentRPM)
+        try container.encode(targetRPM, forKey: .targetRPM)
+        try container.encode(isManualMode, forKey: .isManualMode)
+    }
 }
 
 struct DiagnosticSample: Codable {
@@ -24,6 +37,12 @@ struct DiagnosticSample: Codable {
     let memoryWired: UInt64
     let memoryCompressed: UInt64
     let swapUsed: UInt64
+    /// Physical footprint of the ChillMac app process itself, in bytes. Nil if unreadable.
+    /// System-wide memory numbers can't reveal a leak in this app — this can.
+    let appMemoryBytes: UInt64?
+    /// Physical footprint of the privileged helper daemon, in bytes. Nil until the helper
+    /// answers (it runs as root, so the value has to come back over XPC).
+    let helperMemoryBytes: UInt64?
     let batteryCharge: Int
     let batteryIsCharging: Bool
     let batteryTemperature: Double
@@ -56,10 +75,23 @@ final class DiagnosticLogger {
     private let capacity = 1440 // 24h at 1 sample/min
     private var timer: Timer?
 
-    // Sleep interval tracking
+    // Sleep interval tracking — see `recordGapIfNeeded`
     private var sleepIntervals: [SleepInterval] = []
     private let maxSleepIntervals = 200
+    /// Hint from `willSleepNotification`, used to sharpen an interval's start time.
     private var sleepStartedAt: Date?
+    /// Timestamp of the previous stored sample. Nil until this launch takes its first.
+    private var lastSampleAt: Date?
+    /// A sampling pause longer than this counts as a sleep interval — 2.5× the 60s cadence,
+    /// so ordinary timer jitter never registers.
+    private let minSleepGap: TimeInterval = 150
+
+    /// Last footprint the helper reported, refreshed asynchronously each sample, plus when
+    /// it arrived. If the daemon stops answering, the stale figure is dropped rather than
+    /// repeated — a flat line that is really "no reply" would read as "no leak".
+    private var lastHelperMemory: UInt64?
+    private var lastHelperMemoryAt: Date?
+    private let helperMemoryMaxAge: TimeInterval = 180
 
     // CPU delta tracking — accessed only on `queue` to avoid races
     private var previousCpuInfo: host_cpu_load_info?
@@ -102,7 +134,9 @@ final class DiagnosticLogger {
         timer?.invalidate()
         timer = nil
         removeSleepObservers()
-        flushToDisk()
+        // Synchronous: this runs from applicationWillTerminate, and an async flush loses
+        // the race against process exit — taking the unsaved tail of the history with it.
+        queue.sync { flushToDiskLocked() }
     }
 
     /// Returns all collected samples in chronological order.
@@ -132,22 +166,42 @@ final class DiagnosticLogger {
     }
 
     @objc private func handleWillSleep() {
+        // Only a hint for the interval's start time. The interval itself is recorded from
+        // the sampling gap, because dark wake / Power Nap resumes sampling without posting
+        // `didWakeNotification` — pairing on that notification alone produced single
+        // "sleep" intervals spanning many hours of demonstrably awake samples.
         queue.async { self.sleepStartedAt = Date() }
+        flushToDisk()
     }
 
     @objc private func handleDidWake() {
         queue.async {
-            defer { self.sleepStartedAt = nil }
-            let end = Date()
-            let start = self.sleepStartedAt ?? end
-            // Only record real sleeps (>30s) to filter out noise
-            guard end.timeIntervalSince(start) >= 30 else { return }
-            self.sleepIntervals.append(SleepInterval(start: start, end: end))
-            if self.sleepIntervals.count > self.maxSleepIntervals {
-                self.sleepIntervals.removeFirst(self.sleepIntervals.count - self.maxSleepIntervals)
-            }
             // Re-anchor CPU delta after sleep — ticks accumulated across sleep are meaningless
             self.previousCpuInfo = self.fetchCpuLoadInfo()
+        }
+    }
+
+    /// Records the pause since the previous sample as a sleep interval when it's long
+    /// enough to mean the timer stopped firing. Defining intervals by the *absence* of
+    /// samples makes it impossible for one to contain awake samples.
+    /// Must be called on `queue`.
+    private func recordGapIfNeeded(now: Date) {
+        defer { lastSampleAt = now }
+        guard let last = lastSampleAt, now.timeIntervalSince(last) >= minSleepGap else { return }
+
+        // Prefer the notification's timestamp when it falls inside the gap — it's precise
+        // to the moment of suspension rather than to the last sample up to 60s earlier.
+        let start: Date
+        if let noted = sleepStartedAt, noted > last, noted < now {
+            start = noted
+        } else {
+            start = last
+        }
+        sleepStartedAt = nil
+
+        sleepIntervals.append(SleepInterval(start: start, end: now))
+        if sleepIntervals.count > maxSleepIntervals {
+            sleepIntervals.removeFirst(sleepIntervals.count - maxSleepIntervals)
         }
     }
 
@@ -155,8 +209,14 @@ final class DiagnosticLogger {
 
     private func takeSample() {
         // Snapshot fan-monitor values on main (cheap) — they're @Published so must be read here.
+        // Unmeasured values become nil rather than inheriting the UI's 0/false placeholders.
         let fans = fanMonitor?.fans.map {
-            FanSample(name: $0.name, currentRPM: $0.currentRPM, targetRPM: $0.targetRPM, isManualMode: $0.isManualMode)
+            FanSample(
+                name: $0.name,
+                currentRPM: $0.currentRPMValid ? $0.currentRPM : nil,
+                targetRPM: $0.targetRPMValid ? $0.targetRPM : nil,
+                isManualMode: $0.isManualModeValid ? $0.isManualMode : nil
+            )
         } ?? []
         let peak = fanMonitor?.peakTemperature ?? 0
         let peakLabel = fanMonitor?.peakTemperatureLabel ?? ""
@@ -167,9 +227,15 @@ final class DiagnosticLogger {
         let timestamp = Date()
         let totalMem = ProcessInfo.processInfo.physicalMemory
         let thermal = readThermalState()
+        let appMemory = ProcessMemory.footprintBytes()
+
+        // Ask the helper for its footprint; the reply lands after this sample, so each
+        // sample carries the previous minute's figure. At 60s cadence that lag is immaterial.
+        refreshHelperMemory()
 
         // Move IOKit/sysctl reads off main thread — they stall the UI over 24/7 operation.
         queue.async {
+            self.recordGapIfNeeded(now: timestamp)
             let mem = self.readMemoryStats()
             let usedPct = Double(mem.active + mem.wired + mem.compressed) / Double(totalMem) * 100
             let pressureLevel = self.readMemoryPressureLevel()
@@ -188,6 +254,8 @@ final class DiagnosticLogger {
                 memoryWired: mem.wired,
                 memoryCompressed: mem.compressed,
                 swapUsed: mem.swap,
+                appMemoryBytes: appMemory,
+                helperMemoryBytes: self.freshHelperMemory(asOf: timestamp),
                 batteryCharge: batt.charge,
                 batteryIsCharging: batt.isCharging,
                 batteryTemperature: batt.temperature,
@@ -209,6 +277,29 @@ final class DiagnosticLogger {
                 self.flushToDiskLocked()
             }
         }
+    }
+
+    /// Requests the helper daemon's footprint over XPC and caches the reply.
+    /// Must be called on main — `fanMonitor` holds the connection.
+    private func refreshHelperMemory() {
+        guard let helper = fanMonitor?.helper else { return }
+        helper.memoryFootprint { [weak self] bytes in
+            guard let self else { return }
+            let received = Date()
+            self.queue.async {
+                self.lastHelperMemory = bytes > 0 ? bytes : nil
+                self.lastHelperMemoryAt = received
+            }
+        }
+    }
+
+    /// The helper's footprint, or nil if the last reply is too old to still describe it
+    /// (helper not installed, not running, or an XPC call that never came back).
+    /// Must be called on `queue`.
+    private func freshHelperMemory(asOf now: Date) -> UInt64? {
+        guard let at = lastHelperMemoryAt,
+              now.timeIntervalSince(at) < helperMemoryMaxAge else { return nil }
+        return lastHelperMemory
     }
 
     // MARK: - Persistence
@@ -249,6 +340,9 @@ final class DiagnosticLogger {
         }
         writeIndex = samples.count % capacity
         sleepIntervals = payload.sleepIntervals
+        // `lastSampleAt` deliberately stays nil: the span between the last run and this one
+        // is app downtime, not sleep, and labelling it as sleep would be a lie. It shows up
+        // as an unexplained gap in the history, which is exactly what it is.
     }
 
     // MARK: - Direct System Reads

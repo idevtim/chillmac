@@ -1,0 +1,81 @@
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>ChillMac</title>
+        <item>
+            <title>1.8.1</title>
+            <pubDate>Fri, 31 Jul 2026 14:13:58 -0400</pubDate>
+            <link>https://github.com/idevtim/chillmac</link>
+            <sparkle:fullReleaseNotesLink>https://github.com/idevtim/chillmac/releases</sparkle:fullReleaseNotesLink>
+            <sparkle:version>1.8.1</sparkle:version>
+            <sparkle:shortVersionString>1.8.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[## Highlights
+
+Fan control didn't work on recent installs, and this fixes it.
+
+ChillMac changes fan speeds through a small privileged helper that runs in the background. On any reasonably recent install, that helper was never actually getting installed — the app asked macOS to register it at every launch, the request failed, and the failure only went to the system log. Nothing in the interface said anything was wrong. Sliders moved, Performance Mode looked engaged, and no fan ever changed speed.
+
+Monitoring was never affected — temperatures, CPU, memory, battery and fan RPM readouts were always accurate, because reading doesn't need the helper. Only changing fan speed did.
+
+## Fixed
+
+- **The privileged helper now installs correctly.** The app bundle was missing the launch daemon definition that macOS reads to install it, so registration failed every time with "Unable to read plist". The definition is now built into the app, and the helper registers, starts on demand and answers normally
+
+## After updating
+
+macOS may ask you to approve ChillMac's background helper. If fan control still does nothing after this update, open **System Settings → General → Login Items & Extensions** and make sure ChillMac is enabled under "Allow in the Background".
+
+## If you've used ChillMac since its early releases
+
+Very early versions installed the helper a different way, leaving files in `/Library`. That older copy still claims the same identifier, which blocks the new one from registering — so if fan control is still dead after updating and approving, remove the leftovers and restart ChillMac:
+
+```
+sudo launchctl bootout system/com.idevtim.ChillMac.Helper
+sudo rm -f /Library/LaunchDaemons/com.idevtim.ChillMac.Helper.plist
+sudo rm -f /Library/PrivilegedHelperTools/com.idevtim.ChillMac.Helper
+```
+
+Most people won't need this. If ChillMac was installed recently, skip it.
+]]></description>
+            <enclosure url="https://github.com/idevtim/chillmac/releases/download/v1.8.1/ChillMac-1.8.1.zip" length="2422184" type="application/octet-stream" sparkle:edSignature="zOtamWRv4uLf0Pnin6CrLgJeduo/HLTaR7wwL2U2QlAspZ//qPtHxGZPo0xTUiJyBxwYAm9oUnJwAutm6x0aBg=="/>
+        </item>
+        <item>
+            <title>1.8.0</title>
+            <pubDate>Fri, 31 Jul 2026 13:10:38 -0400</pubDate>
+            <link>https://github.com/idevtim/chillmac</link>
+            <sparkle:fullReleaseNotesLink>https://github.com/idevtim/chillmac/releases</sparkle:fullReleaseNotesLink>
+            <sparkle:version>1.8.0</sparkle:version>
+            <sparkle:shortVersionString>1.8.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[## Highlights
+
+ChillMac updates itself now. When a new version ships you get a prompt in the app — one click downloads it, verifies the signature, installs it and relaunches. No more grabbing a DMG and dragging it over the old copy.
+
+Two things to know about this particular release: you'll need to install it by hand one last time (v1.7.0 has no updater in it to receive this one), and it will ask for your password once on first launch, because the privileged helper changed and has to be re-registered. Every release after this is a single click.
+
+## Added
+
+- **In-app updates** — checks run automatically in the background, and Settings → Check runs one on demand. Updates are cryptographically signed; anything not signed with the ChillMac release key is refused, so a tampered or spoofed download can't install itself. Release notes are shown in the update prompt before you accept
+- **Loading indicators** — panels that fetch data now show a spinner while it's on its way instead of an empty list or a blank graph
+
+## Fixed
+
+- **"No fans detected" no longer flashes when the popover opens** — that message was shown during the couple of seconds it takes to read the SMC, before any fan data existed. It now shows a "Reading fans…" spinner and only reports no fans once the read has genuinely completed. Fanless Macs still get the real message
+- **Crash after about a month of uptime** — the CPU panel computed usage by subtracting the kernel's tick counters without wrapping. Those counters are 32-bit and roll over after roughly 31 days of uptime, and the rollover would trap rather than produce the correct delta
+- **Diagnostics history no longer lost on quit** — the log was flushed to disk asynchronously as the app terminated, and usually lost the race against the process exiting, discarding up to 15 minutes of samples
+- **A stale connection to the privileged helper could tear down its replacement** — if an old XPC connection was invalidated after a new one had already been established, it cleared the live one
+
+## Improvements
+
+- **Top consumers appear immediately** — the CPU panel sampled its process list only on every fifth poll, so opening it could mean staring at an empty list for up to 20 seconds. Both the CPU and Memory panels now sample the moment the panel opens
+- **Diagnostics exports are honest about what wasn't measured** — failed sensor reads are recorded as `null` instead of `0`, so a fan that stopped and a fan that couldn't be read are no longer indistinguishable in the log. Fan target and mode values reused from cache rather than read from hardware are no longer reported as measurements
+- **Diagnostics record ChillMac's own memory use**, and the privileged helper's — which the app can't measure directly, so the helper now reports it over XPC. System-wide memory figures can't reveal a leak in the app itself
+- **Sleep tracking rewritten** — sleep intervals are now derived from gaps in sampling rather than paired against wake notifications. Dark wake and Power Nap resume sampling without posting a wake notification, which let a single "sleep" interval stretch across 15 hours that contained hundreds of wide-awake samples
+]]></description>
+            <enclosure url="https://github.com/idevtim/chillmac/releases/download/v1.8.0/ChillMac-1.8.0.zip" length="2420054" type="application/octet-stream" sparkle:edSignature="prOHSdBjQM5AzAqz7bFQKQucA6HUVx7R2hSxCuGtOV8ikAeOhGX+E8Qw4WypySjHYIDVJvTSrLZugcu+wLusCQ=="/>
+        </item>
+    </channel>
+</rss>

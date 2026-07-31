@@ -2,7 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var settings: AppSettings
-    @ObservedObject var updateChecker: UpdateChecker
+    @ObservedObject var updateController: UpdateController
     @ObservedObject var fanMonitor: FanMonitor
     let systemInfo: SystemInfo
 
@@ -87,25 +87,28 @@ struct SettingsView: View {
                     HStack {
                         VStack(alignment: .leading) {
                             Text("Current Version")
-                            Text("v\(updateChecker.currentVersion)")
+                            Text("v\(updateController.currentVersion)")
                                 .foregroundStyle(.secondary)
                                 .font(DesignSystem.TypeScale.caption)
                         }
                         Spacer()
-                        Button("Check") { updateChecker.performCheck() }
-                            .disabled(updateChecker.isChecking)
+                        Button("Check") { updateController.checkForUpdates() }
+                            .disabled(updateController.isChecking || !updateController.canCheckForUpdates)
                     }
-                    if updateChecker.updateAvailable, let version = updateChecker.latestVersion {
+                    if updateController.updateAvailable, let version = updateController.latestVersion {
                         HStack {
-                            Text("v\(version) Available")
-                            Spacer()
-                            if let url = updateChecker.downloadURL ?? updateChecker.releaseURL {
-                                Button("Download") { NSWorkspace.shared.open(url) }
-                                    .buttonStyle(.borderedProminent)
-                                    .controlSize(.small)
+                            VStack(alignment: .leading) {
+                                Text("v\(version) Available")
+                                Text("Installs and relaunches automatically")
+                                    .font(DesignSystem.TypeScale.caption)
+                                    .foregroundStyle(.secondary)
                             }
+                            Spacer()
+                            Button("Update") { updateController.checkForUpdates() }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.small)
                         }
-                    } else if updateChecker.hasChecked && !updateChecker.updateAvailable {
+                    } else if updateController.hasChecked && !updateController.updateAvailable {
                         Label("You're up to date", systemImage: "checkmark.circle.fill")
                             .foregroundStyle(.green)
                     }
@@ -142,7 +145,7 @@ struct SettingsView: View {
             .padding(.bottom, DesignSystem.Space.md)
         }
         .frame(minWidth: 360, idealWidth: 380, minHeight: 420)
-        .onAppear { updateChecker.performCheck() }
+        .onAppear { updateController.refreshUpdateStatus() }
     }
 
     private var helperStatusLabel: String {
@@ -161,7 +164,7 @@ struct SettingsView: View {
 #Preview("Settings") {
     SettingsView(
         settings: AppSettings.shared,
-        updateChecker: PreviewSupport.updateChecker,
+        updateController: PreviewSupport.updateController,
         fanMonitor: PreviewSupport.fanMonitor,
         systemInfo: PreviewSupport.systemInfo
     )

@@ -27,7 +27,7 @@ struct PreviewSupportTests {
         _ = PreviewSupport.batteryInfo
         _ = PreviewSupport.systemInfo
         _ = PreviewSupport.fpsMonitor
-        _ = PreviewSupport.updateChecker
+        _ = PreviewSupport.updateController
         _ = PreviewSupport.helper
     }
 }

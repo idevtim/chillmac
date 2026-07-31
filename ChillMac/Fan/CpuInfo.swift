@@ -13,7 +13,14 @@ final class CpuInfo: ObservableObject {
     @Published var topProcesses: [CpuProcess] = []
 
     /// When true, fetches top processes (expensive). Set by StatusBarController when CPU detail panel is visible.
-    var isDetailVisible = false
+    /// Becoming visible fetches immediately — the periodic path only samples every 5th poll
+    /// (~20s), which left the panel showing an empty list for most of that window.
+    var isDetailVisible = false {
+        didSet {
+            guard isDetailVisible, !oldValue else { return }
+            fetchTopProcessesNow()
+        }
+    }
 
     private var timer: Timer?
     private var previousInfo: host_cpu_load_info?
@@ -52,10 +59,13 @@ final class CpuInfo: ObservableObject {
             return
         }
 
-        let userDiff = Double(current.cpu_ticks.0 - previous.cpu_ticks.0)
-        let sysDiff = Double(current.cpu_ticks.1 - previous.cpu_ticks.1)
-        let idleDiff = Double(current.cpu_ticks.2 - previous.cpu_ticks.2)
-        let niceDiff = Double(current.cpu_ticks.3 - previous.cpu_ticks.3)
+        // Wrapping subtraction: cpu_ticks are UInt32 aggregated across every core, so at
+        // ~100Hz × core count they roll over after roughly a month of uptime. A plain `-`
+        // traps on that rollover instead of yielding the correct delta.
+        let userDiff = Double(current.cpu_ticks.0 &- previous.cpu_ticks.0)
+        let sysDiff = Double(current.cpu_ticks.1 &- previous.cpu_ticks.1)
+        let idleDiff = Double(current.cpu_ticks.2 &- previous.cpu_ticks.2)
+        let niceDiff = Double(current.cpu_ticks.3 &- previous.cpu_ticks.3)
         let totalDiff = userDiff + sysDiff + idleDiff + niceDiff
 
         previousInfo = current
@@ -105,7 +115,14 @@ final class CpuInfo: ObservableObject {
 
         // Fetch top processes every 5th poll, only when detail panel is visible.
         pollCount += 1
-        guard isDetailVisible, pollCount % 5 == 0, !topProcessFetchInFlight else { return }
+        guard isDetailVisible, pollCount % 5 == 0 else { return }
+        fetchTopProcessesNow()
+    }
+
+    /// Samples the top CPU consumers off-main. Safe to call spuriously — an in-flight fetch
+    /// short-circuits. Must be called on main: it reads NSWorkspace.
+    private func fetchTopProcessesNow() {
+        guard !topProcessFetchInFlight else { return }
         topProcessFetchInFlight = true
 
         // Snapshot app metadata on main thread. NSWorkspace/AppKit stays on main; sorting stays off-main.

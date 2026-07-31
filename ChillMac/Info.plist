@@ -19,9 +19,12 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.7.0</string>
+    <string>1.8.1</string>
+    <!-- Sparkle compares releases on CFBundleVersion, so this must increase every
+         release. build-dmg.sh syncs it to CFBundleShortVersionString before building
+         to keep the two from drifting apart. -->
     <key>CFBundleVersion</key>
-    <string>4</string>
+    <string>1.8.1</string>
     <key>LSMinimumSystemVersion</key>
     <string>$(MACOSX_DEPLOYMENT_TARGET)</string>
     <key>LSUIElement</key>
@@ -30,5 +33,15 @@
     <string></string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
+    <!-- Sparkle in-app updates. The feed is committed to the repo and served raw from
+         GitHub, which gives it a URL that never changes between releases. The public key
+         pairs with a private key held in the release machine's login keychain; updates
+         signed by anything else are rejected. -->
+    <key>SUFeedURL</key>
+    <string>https://raw.githubusercontent.com/idevtim/chillmac/main/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>TDnC5yMZcwQ8x4jjkJFyxK7yJF+z34NhMk4BanAiij0=</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
 </dict>
 </plist>
