@@ -52,10 +52,13 @@ final class CpuInfo: ObservableObject {
             return
         }
 
-        let userDiff = Double(current.cpu_ticks.0 - previous.cpu_ticks.0)
-        let sysDiff = Double(current.cpu_ticks.1 - previous.cpu_ticks.1)
-        let idleDiff = Double(current.cpu_ticks.2 - previous.cpu_ticks.2)
-        let niceDiff = Double(current.cpu_ticks.3 - previous.cpu_ticks.3)
+        // Wrapping subtraction: cpu_ticks are UInt32 aggregated across every core, so at
+        // ~100Hz × core count they roll over after roughly a month of uptime. A plain `-`
+        // traps on that rollover instead of yielding the correct delta.
+        let userDiff = Double(current.cpu_ticks.0 &- previous.cpu_ticks.0)
+        let sysDiff = Double(current.cpu_ticks.1 &- previous.cpu_ticks.1)
+        let idleDiff = Double(current.cpu_ticks.2 &- previous.cpu_ticks.2)
+        let niceDiff = Double(current.cpu_ticks.3 &- previous.cpu_ticks.3)
         let totalDiff = userDiff + sysDiff + idleDiff + niceDiff
 
         previousInfo = current

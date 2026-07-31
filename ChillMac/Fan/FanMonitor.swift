@@ -53,8 +53,13 @@ final class FanMonitor: ObservableObject {
     private let smcQueue = DispatchQueue(label: "com.idevtim.ChillMac.smc")
     /// Guard against overlapping poll cycles
     private var pollInFlight = false
-    /// Counter for periodic full fan reads when popover is hidden (for diagnostic accuracy)
-    private var backgroundPollCount: UInt = 0
+    /// When target/mode were last read from SMC. Drives the reduced-rate refresh while hidden.
+    private var lastFullFanRead: Date?
+    /// Last target/mode actually read from the hardware, per fan index. Reused on cycles that
+    /// skip those reads so diagnostics record a measurement rather than an echo of our own
+    /// commands. Cleared whenever we hand the fans back to macOS.
+    private var lastMeasuredTarget: [Int: Double] = [:]
+    private var lastMeasuredMode: [Int: Bool] = [:]
 
     // MARK: - Thermal Zones
 
@@ -185,6 +190,9 @@ final class FanMonitor: ObservableObject {
         wasPerformanceModeActive = false
         smoothedZoneTemps.removeAll()
         lastSentRPM.removeAll()
+        // The fans just changed hands — anything we measured before is no longer their state.
+        // Cleared on smcQueue because that's where the poll writes them.
+        invalidateMeasuredFanState()
         DispatchQueue.main.async {
             self.manualOverrides.removeAll()
             self.targetOverrides.removeAll()
@@ -300,13 +308,19 @@ final class FanMonitor: ObservableObject {
 
                 var fanSnapshot: [FanInfo] = []
 
-                // Full read every cycle when visible; every 15th cycle (~30s) when hidden
-                // to keep diagnostic samples accurate without constant IOKit overhead
-                self.backgroundPollCount += 1
-                let needsFullRead = popoverVisible || (!popoverVisible && self.backgroundPollCount % 15 == 0)
+                // Full read every cycle when visible. When hidden, refresh target/mode on a
+                // time basis rather than a poll count — the poll interval varies (2s vs 10s),
+                // and the diagnostic logger samples once a minute, so a count-based cadence
+                // left it with nothing recently measured to record.
+                let now = Date()
+                let needsFullRead = popoverVisible
+                    || self.lastFullFanRead.map { now.timeIntervalSince($0) >= 25 } ?? true
+                if needsFullRead { self.lastFullFanRead = now }
 
                 for i in 0..<fanCount {
-                    let current = self.clampRPM((try? smc.readFanSpeed(index: i)) ?? 0)
+                    // Keep the raw optional: a failed read is "unknown", not "0 RPM".
+                    let rawCurrent = try? smc.readFanSpeed(index: i)
+                    let current = self.clampRPM(rawCurrent ?? 0)
 
                     // Use cached min/max — they're hardware constants
                     let minRPM: Double
@@ -329,15 +343,32 @@ final class FanMonitor: ObservableObject {
                         maxRPM = raw
                     }
 
-                    // Skip target/mode reads when popover is hidden — saves 2 IOKit calls per fan
+                    // Skip target/mode reads on in-between cycles — saves 2 IOKit calls per fan.
+                    // On those cycles reuse the last real SMC reading (at most ~25s old) so
+                    // diagnostics still get a measurement. Only when the hardware has never
+                    // answered do we fall back to the app's own override cache, and that
+                    // value is flagged unmeasured so it can be logged as null instead of
+                    // being passed off as a reading.
                     let target: Double
                     let isManual: Bool
+                    let targetValid: Bool
+                    let modeValid: Bool
                     if needsFullRead {
-                        target = self.clampRPM((try? smc.readFanTargetSpeed(index: i)) ?? 0)
-                        isManual = (try? smc.readFanMode(index: i)) ?? false
+                        let rawTarget = try? smc.readFanTargetSpeed(index: i)
+                        let rawMode = try? smc.readFanMode(index: i)
+                        if let rawTarget { self.lastMeasuredTarget[i] = self.clampRPM(rawTarget) }
+                        if let rawMode { self.lastMeasuredMode[i] = rawMode }
+                        target = self.clampRPM(rawTarget ?? 0)
+                        isManual = rawMode ?? false
+                        targetValid = rawTarget != nil
+                        modeValid = rawMode != nil
                     } else {
-                        target = targetOverridesSnapshot[i] ?? 0
-                        isManual = manualOverridesSnapshot[i] ?? false
+                        let measuredTarget = self.lastMeasuredTarget[i]
+                        let measuredMode = self.lastMeasuredMode[i]
+                        target = measuredTarget ?? targetOverridesSnapshot[i] ?? 0
+                        isManual = measuredMode ?? manualOverridesSnapshot[i] ?? false
+                        targetValid = measuredTarget != nil
+                        modeValid = measuredMode != nil
                     }
 
                     let name: String
@@ -358,7 +389,10 @@ final class FanMonitor: ObservableObject {
                         minRPM: minRPM,
                         maxRPM: maxRPM,
                         targetRPM: target,
-                        isManualMode: isManual
+                        isManualMode: isManual,
+                        currentRPMValid: rawCurrent != nil,
+                        targetRPMValid: targetValid,
+                        isManualModeValid: modeValid
                     ))
                 }
 
@@ -576,6 +610,8 @@ final class FanMonitor: ObservableObject {
             performanceCurvePercent = 0
             smoothedZoneTemps.removeAll()
             lastSentRPM.removeAll()
+            // Force a fresh read now that macOS owns the fans again.
+            invalidateMeasuredFanState()
             return
         }
 
@@ -656,6 +692,16 @@ final class FanMonitor: ObservableObject {
             targetOverrides[fan.id] = rounded
             manualOverrides[fan.id] = true
             helper.setFanSpeed(fanIndex: fan.id, rpm: Int(rounded)) { _, _ in }
+        }
+    }
+
+    /// Drops the cached SMC readings for target/mode and forces the next poll to re-read them.
+    /// Hops to `smcQueue` because that is the only place those values are written.
+    private func invalidateMeasuredFanState() {
+        smcQueue.async {
+            self.lastFullFanRead = nil
+            self.lastMeasuredTarget.removeAll()
+            self.lastMeasuredMode.removeAll()
         }
     }
 

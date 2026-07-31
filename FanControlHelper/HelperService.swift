@@ -111,6 +111,10 @@ class HelperService: NSObject, HelperProtocol {
         reply(kHelperVersion)
     }
 
+    func memoryFootprint(reply: @escaping (UInt64) -> Void) {
+        reply(ProcessMemory.footprintBytes() ?? 0)
+    }
+
     func dumpFanKeys(reply: @escaping (String) -> Void) {
         // Also scan for all temperature keys
         scanTemperatureKeys()
