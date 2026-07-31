@@ -143,7 +143,7 @@ codesign --verify --deep --strict --verbose=2 "$APP_PATH" 2>&1
 echo "📤 Notarizing app bundle..."
 mkdir -p "$UPDATES_DIR"
 NOTARIZE_ZIP="$BUILD_DIR/notarize-app.zip"
-ditto -c -k --keepParent "$APP_PATH" "$NOTARIZE_ZIP"
+ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$NOTARIZE_ZIP"
 xcrun notarytool submit "$NOTARIZE_ZIP" \
   --apple-id "$APPLE_ID" \
   --team-id "$TEAM_ID" \
@@ -156,8 +156,15 @@ xcrun stapler staple "$APP_PATH"
 
 # ─── Create the Sparkle update archive ──────────────────────────────────────
 # Zipped from the stapled bundle, so what users download is self-validating.
+#
+# --sequesterRsrc is not optional here. Without it, ditto writes extended attributes as
+# AppleDouble "._" files inline next to each symlink in Sparkle.framework. Sparkle's own
+# extraction recombines them, but every other unzip tool leaves them on disk as literal
+# files, which codesign counts as unsealed content in an embedded framework — the app is
+# then refused by Gatekeeper. Sequestering puts that metadata in a sibling __MACOSX/
+# directory instead, so the bundle extracts clean no matter what opens the archive.
 echo "📦 Creating update archive..."
-ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
+ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_PATH"
 echo "   ✓ $ZIP_PATH"
 
 # ─── Create DMG ──────────────────────────────────────────────────────────────
