@@ -15,6 +15,14 @@ final class BatteryInfo: ObservableObject {
 
     private var timer: Timer?
 
+    /// Maximum Capacity % exactly as macOS reports it, when we can read it.
+    /// powerd filters and smooths the raw gauge reading before publishing this,
+    /// so it does not match a plain capacity ratio. Nil on machines where
+    /// system_profiler does not report it (Intel, desktops, no battery).
+    private var appleReportedHealth: Int?
+    private var lastHealthProbe: Date?
+    private let healthQueue = DispatchQueue(label: "com.idevtim.ChillMac.batteryHealth", qos: .utility)
+
     func startMonitoring() {
         guard timer == nil else { return }
         refresh()
@@ -57,6 +65,7 @@ final class BatteryInfo: ObservableObject {
 
         // Get detailed battery info from IORegistry
         fetchIORegistryBatteryInfo()
+        probeAppleReportedHealthIfNeeded()
     }
 
     private func fetchIORegistryBatteryInfo() {
@@ -64,27 +73,22 @@ final class BatteryInfo: ObservableObject {
         guard service != 0 else { return }
         defer { IOObjectRelease(service) }
 
-        let maxCap = getIntProperty(service, "AppleRawMaxCapacity")
+        // NominalChargeCapacity is the gauge's temperature/age-corrected full charge
+        // capacity and is what macOS bases Maximum Capacity on. AppleRawMaxCapacity is
+        // the uncorrected reading and runs several percent low, so it is only a fallback.
+        let maxCap = getIntProperty(service, "NominalChargeCapacity")
+            ?? getIntProperty(service, "AppleRawMaxCapacity")
             ?? getIntProperty(service, "MaxCapacity") ?? 0
         let designCap = getIntProperty(service, "DesignCapacity") ?? maxCap
         let cycles = getIntProperty(service, "CycleCount") ?? 0
         let tempRaw = getIntProperty(service, "Temperature") ?? 0
         let temp = Double(tempRaw) / 100.0  // centi-degrees to degrees
 
-        let health: Int
+        let computedHealth: Int
         if designCap > 0 {
-            health = min(100, Int(Double(maxCap) / Double(designCap) * 100))
+            computedHealth = min(100, Int((Double(maxCap) / Double(designCap) * 100).rounded()))
         } else {
-            health = 100
-        }
-
-        let cond: String
-        if health >= 80 {
-            cond = "Normal"
-        } else if health >= 60 {
-            cond = "Service Recommended"
-        } else {
-            cond = "Service Battery"
+            computedHealth = 100
         }
 
         DispatchQueue.main.async {
@@ -92,9 +96,71 @@ final class BatteryInfo: ObservableObject {
             self.designCapacity = designCap
             self.cycleCount = cycles
             self.temperature = temp
-            self.healthPercent = health
-            self.condition = cond
+            self.healthPercent = self.appleReportedHealth ?? computedHealth
+            self.condition = Self.conditionLabel(forHealth: self.healthPercent)
         }
+    }
+
+    private static func conditionLabel(forHealth health: Int) -> String {
+        if health >= 80 { return "Normal" }
+        if health >= 60 { return "Service Recommended" }
+        return "Service Battery"
+    }
+
+    /// Maximum Capacity is only recalculated by powerd around full-charge events, so
+    /// polling it more than a few times an hour is wasted work.
+    private func probeAppleReportedHealthIfNeeded() {
+        if let last = lastHealthProbe, Date().timeIntervalSince(last) < 900 { return }
+        lastHealthProbe = Date()
+
+        healthQueue.async { [weak self] in
+            guard let health = Self.readSystemProfilerHealth() else { return }
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.appleReportedHealth = health
+                self.healthPercent = health
+                self.condition = Self.conditionLabel(forHealth: health)
+            }
+        }
+    }
+
+    /// macOS only exposes its filtered Maximum Capacity to clients holding the private
+    /// `com.apple.private.iokit.batterydata` entitlement, so the value is unreachable
+    /// through IOPowerSources from a third-party app. system_profiler has that
+    /// entitlement, and its JSON output is the supported way to read the same number.
+    private static func readSystemProfilerHealth() -> Int? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/system_profiler")
+        process.arguments = ["SPPowerDataType", "-json"]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+        } catch {
+            return nil
+        }
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else { return nil }
+
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let entries = root["SPPowerDataType"] as? [[String: Any]]
+        else { return nil }
+
+        for entry in entries {
+            guard let info = entry["sppower_battery_health_info"] as? [String: Any],
+                  let raw = info["sppower_battery_health_maximum_capacity"] as? String
+            else { continue }
+
+            // Reported as "90%"
+            let digits = raw.prefix { $0.isNumber }
+            if let value = Int(digits) { return value }
+        }
+        return nil
     }
 
     private func getIntProperty(_ service: io_object_t, _ key: String) -> Int? {
