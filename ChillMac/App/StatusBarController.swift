@@ -7,10 +7,12 @@ final class StatusBarController: NSObject {
     private let popover: NSPopover
     private var eventMonitor: Any?
     private var settingsSub: AnyCancellable?
+    private var statusItemSubs = Set<AnyCancellable>()
     private var heightObserver: Any?
     private var detailResetObserver: Any?
     private var detailPanelObserver: Any?
     private var lastPopoverHeight: CGFloat = 0
+    private var lastStatusItemSignature: String?
 
     private let detailPanel = DetailPanelController()
     private let memoryInfo: MemoryInfo
@@ -46,10 +48,11 @@ final class StatusBarController: NSObject {
         popover.contentSize = NSSize(width: 420, height: CGFloat(AppSettings.shared.popoverHeight))
 
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "fan.fill", accessibilityDescription: "ChillMac")
+            button.imagePosition = .imageLeft
             button.action = #selector(togglePopover(_:))
             button.target = self
         }
+        updateStatusItem()
 
         // Close popover when clicking outside both the popover and detail panel
         eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
@@ -83,6 +86,7 @@ final class StatusBarController: NSObject {
                 guard let self else { return }
                 self.popover.appearance = AppSettings.shared.nsAppearance
                 self.popover.contentViewController?.view.appearance = AppSettings.shared.nsAppearance
+                self.updateStatusItem()
 
                 // Handle height changes from settings (e.g. Reset button), not during live drag
                 let newHeight = CGFloat(AppSettings.shared.popoverHeight)
@@ -93,6 +97,11 @@ final class StatusBarController: NSObject {
                 }
             }
         }
+
+        fanMonitor.$peakTemperature
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updateStatusItem() }
+            .store(in: &statusItemSubs)
 
         // Live resize during drag — bypasses AppSettings for smooth performance
         heightObserver = NotificationCenter.default.addObserver(forName: .popoverHeightChanged, object: nil, queue: .main) { [weak self] notification in
@@ -114,6 +123,30 @@ final class StatusBarController: NSObject {
             self.memoryInfo.isDetailVisible = (panelID == "memory")
             self.systemInfo.isDetailVisible = (panelID == "disk")
         }
+    }
+
+    /// Template fan always; compact temp title only when setting is on and status is Warm/Hot.
+    private func updateStatusItem() {
+        guard let button = statusItem.button else { return }
+
+        let peak = fanMonitor.peakTemperature
+        let thermal = ThermalStatus.from(peakCelsius: peak)
+        let settings = AppSettings.shared
+        let showTemp = settings.showMenuBarTemp && thermal.showsMenuBarTemperature
+        let title = showTemp
+            ? ThermalStatus.menuBarTemperatureText(celsius: peak, useFahrenheit: settings.useFahrenheit)
+            : ""
+        let signature = "\(showTemp)|\(title)|\(settings.useFahrenheit)|\(thermal.label)"
+        guard signature != lastStatusItemSignature else { return }
+        lastStatusItemSignature = signature
+
+        let image = NSImage(systemSymbolName: "fan.fill", accessibilityDescription: nil)
+        image?.isTemplate = true
+        button.image = image
+        button.title = title
+        button.imagePosition = showTemp ? .imageLeft : .imageOnly
+        button.toolTip = showTemp ? "ChillMac — \(thermal.label) \(title)" : "ChillMac"
+        button.setAccessibilityLabel(showTemp ? "ChillMac, \(thermal.label), \(title)" : "ChillMac")
     }
 
     deinit {
