@@ -267,3 +267,26 @@ private struct LegendRow: View {
         }
     }
 }
+
+#if DEBUG
+#Preview("Memory Detail — Dark") {
+    MemoryDetailView(memoryInfo: PreviewSupport.memoryInfo)
+        .previewHost(theme: .dark, frame: .detail)
+}
+
+#Preview("Memory Detail — Light") {
+    MemoryDetailView(memoryInfo: PreviewSupport.memoryInfo)
+        .previewHost(theme: .light, frame: .detail)
+}
+
+#Preview("Legend Row") {
+    let info = PreviewSupport.memoryInfo
+    return LegendRow(
+        color: .green,
+        label: "Active",
+        value: MemoryInfo.formatBytes(info.activeMemory)
+    )
+    .padding()
+    .previewHost(theme: .dark, frame: .detail)
+}
+#endif

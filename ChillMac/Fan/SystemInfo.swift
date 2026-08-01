@@ -59,6 +59,31 @@ final class SystemInfo: ObservableObject {
         refreshDynamic()
     }
 
+    #if DEBUG
+    /// Canned sample for previews/tests — skips `fetchHardwareInfo()` and timers.
+    static var previewSample: SystemInfo {
+        SystemInfo(previewSample: ())
+    }
+
+    private init(previewSample: Void) {
+        machineModel = "MacBook Pro"
+        chipName = "Apple M3 Pro"
+        ramAmount = "36 GB"
+        macOSVersion = "macOS 15.0.0"
+        diskUsage = "256 GB"
+        uptime = "2d 5h 12m"
+        diskTotalBytes = 512_110_190_592
+        diskAvailableBytes = 275_146_342_400
+        diskCategories = [
+            DiskCategory(name: "Applications", bytes: 45_000_000_000, color: .systemRed),
+            DiskCategory(name: "Downloads", bytes: 12_000_000_000, color: .systemPink),
+            DiskCategory(name: "Documents", bytes: 28_000_000_000, color: .systemBlue),
+            DiskCategory(name: "Desktop", bytes: 4_000_000_000, color: .systemGreen),
+            DiskCategory(name: "Other", bytes: 148_000_000_000, color: .systemGray),
+        ]
+    }
+    #endif
+
     func startMonitoring() {
         guard timer == nil else { return }
         refreshDynamic()

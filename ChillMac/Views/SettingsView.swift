@@ -586,3 +586,36 @@ struct SettingsView: View {
         }
     }
 }
+
+#if DEBUG
+#Preview("Settings Dark") {
+    return PreviewSupport.previewHost(theme: .dark, frame: .popover) {
+        SettingsView(
+            settings: AppSettings.shared,
+            updateChecker: PreviewSupport.updateChecker,
+            systemInfo: PreviewSupport.systemInfo,
+            fanMonitor: PreviewSupport.fanMonitor,
+            cpuInfo: PreviewSupport.cpuInfo,
+            memoryInfo: PreviewSupport.memoryInfo,
+            batteryInfo: PreviewSupport.batteryInfo,
+            onDismiss: {}
+        )
+    }
+}
+
+#Preview("Settings Light") {
+    return PreviewSupport.previewHost(theme: .light, frame: .popover) {
+        SettingsView(
+            settings: AppSettings.shared,
+            updateChecker: PreviewSupport.updateChecker,
+            systemInfo: PreviewSupport.systemInfo,
+            fanMonitor: PreviewSupport.fanMonitor,
+            cpuInfo: PreviewSupport.cpuInfo,
+            memoryInfo: PreviewSupport.memoryInfo,
+            batteryInfo: PreviewSupport.batteryInfo,
+            onDismiss: {}
+        )
+    }
+}
+#endif
+

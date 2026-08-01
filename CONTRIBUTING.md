@@ -24,7 +24,7 @@ Debug builds skip the helper's code signature check, so you don't need a Develop
 1. Fork the repo and create a branch from `main`
 2. Make your changes
 3. Make sure it builds: `xcodegen generate && xcodebuild -scheme ChillMac build`
-4. Test manually — there's no automated test suite
+4. Run unit tests: `xcodebuild -project ChillMac.xcodeproj -scheme ChillMac -destination 'platform=macOS' test`
 5. Open a PR
 
 ## Project Overview
@@ -40,7 +40,8 @@ Debug builds skip the helper's code signature check, so you don't need a Develop
 - Match the existing code style (no linter configured, just stay consistent)
 - SwiftUI views go in `ChillMac/Views/`
 - New monitors/data models go in `ChillMac/Fan/`
-- The app has zero external dependencies — let's keep it that way unless there's a strong reason
+- Use `PreviewSupport` for sample data; add in-file `#Preview` (no live SMC/XPC in canvas)
+- The app has zero external dependencies — let's keep it that way unless there's a strong reason (Swift Testing only; no third-party test libs)
 
 ## Architecture Notes
 

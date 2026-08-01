@@ -241,3 +241,21 @@ struct TemperatureDetailView: View {
         }
     }
 }
+
+#if DEBUG
+#Preview("TemperatureDetailView Dark") {
+    TemperatureDetailView(
+        monitor: PreviewSupport.fanMonitor,
+        settings: AppSettings.shared
+    )
+    .previewHost(theme: .dark, frame: .detail)
+}
+
+#Preview("TemperatureDetailView Light") {
+    TemperatureDetailView(
+        monitor: PreviewSupport.fanMonitor,
+        settings: AppSettings.shared
+    )
+    .previewHost(theme: .light, frame: .detail)
+}
+#endif

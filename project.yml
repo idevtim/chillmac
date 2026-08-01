@@ -53,6 +53,21 @@ targets:
           - "$(BUILT_PRODUCTS_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchServices/com.idevtim.ChillMac.Helper"
           - "$(BUILT_PRODUCTS_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchDaemons/com.idevtim.ChillMac.Helper.plist"
 
+  ChillMacTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: ChillMacTests
+    dependencies:
+      - target: ChillMac
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.idevtim.ChillMacTests
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Automatic
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks @loader_path/../Frameworks"
+
   com.idevtim.ChillMac.Helper:
     type: tool
     platform: macOS
@@ -71,3 +86,17 @@ targets:
         CREATE_INFOPLIST_SECTION_IN_BINARY: YES
         INFOPLIST_OTHER_PREPROCESSOR_FLAGS: ""
         OTHER_LDFLAGS: "-sectcreate __TEXT __launchd_plist $(SRCROOT)/FanControlHelper/Launchd.plist"
+
+schemes:
+  ChillMac:
+    build:
+      targets:
+        ChillMac: all
+        ChillMacTests: [test]
+    test:
+      targets:
+        - name: ChillMacTests
+          parallelizable: true
+      testPlans:
+        - path: TestPlans/Unit.xctestplan
+          defaultPlan: true
