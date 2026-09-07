@@ -11,6 +11,9 @@ final class StatusBarController: NSObject {
     private var detailResetObserver: Any?
     private var detailPanelObserver: Any?
     private var lastPopoverHeight: CGFloat = 0
+    /// When the popover was last torn down. Guards against a single click both closing the
+    /// popover and reopening it via two different handlers.
+    private var lastPopoverCloseAt: Date = .distantPast
 
     private let detailPanel = DetailPanelController()
     private let memoryInfo: MemoryInfo
@@ -55,25 +58,20 @@ final class StatusBarController: NSObject {
         eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             guard let self, self.popover.isShown else { return }
 
+            // A click on our own menu bar icon reaches this monitor as well as the button's
+            // action. Closing here would leave `togglePopover` to find a hidden popover a
+            // moment later and dutifully reopen it, so the icon could never close anything.
+            // Leave that click entirely to the button.
+            if self.statusItemContainsMouse {
+                return
+            }
+
             // Don't close if clicking inside the detail panel
             if self.detailPanel.isShown, self.detailPanel.containsMouse {
                 return
             }
 
-            self.detailPanel.close()
-            NotificationCenter.default.post(name: .popoverDidClose, object: nil)
-            self.popover.performClose(nil)
-            self.popover.contentViewController = nil
-            // Pause secondary monitors and clear visibility flags when popover closes
-            self.cpuInfo.isDetailVisible = false
-            self.memoryInfo.isDetailVisible = false
-            self.systemInfo.isDetailVisible = false
-            self.cpuInfo.stopMonitoring()
-            self.memoryInfo.stopMonitoring()
-            self.batteryInfo.stopMonitoring()
-            self.systemInfo.stopMonitoring()
-            self.fpsMonitor.stopMonitoring()
-            self.fanMonitor.isPopoverVisible = false
+            self.closePopover(sender: nil)
         }
 
         // Update popover appearance and size when settings change
@@ -131,22 +129,22 @@ final class StatusBarController: NSObject {
         }
     }
 
+    /// Screen rect of the menu bar icon, used to tell our own icon apart from a click
+    /// genuinely outside the app.
+    private var statusItemContainsMouse: Bool {
+        guard let button = statusItem.button, let window = button.window else { return false }
+        let inWindow = button.convert(button.bounds, to: nil)
+        return window.convertToScreen(inWindow).contains(NSEvent.mouseLocation)
+    }
+
     @objc private func togglePopover(_ sender: AnyObject?) {
         if popover.isShown {
-            detailPanel.close()
-            NotificationCenter.default.post(name: .popoverDidClose, object: nil)
-            popover.performClose(sender)
-            popover.contentViewController = nil
-            // Pause secondary monitors and clear visibility flags when popover closes
-            cpuInfo.isDetailVisible = false
-            memoryInfo.isDetailVisible = false
-            systemInfo.isDetailVisible = false
-            cpuInfo.stopMonitoring()
-            memoryInfo.stopMonitoring()
-            batteryInfo.stopMonitoring()
-            systemInfo.stopMonitoring()
-            fpsMonitor.stopMonitoring()
-            fanMonitor.isPopoverVisible = false
+            closePopover(sender: sender)
+        } else if Date().timeIntervalSince(lastPopoverCloseAt) < 0.25 {
+            // Something else already closed the popover for this same click. Reopening now
+            // would turn a dismissal into a flicker, which is what a click on the icon used
+            // to do. One user click means one state change.
+            return
         } else if let button = statusItem.button {
             // Resume secondary monitors when popover opens
             cpuInfo.startMonitoring()
@@ -155,6 +153,9 @@ final class StatusBarController: NSObject {
             systemInfo.startMonitoring()
             fpsMonitor.startMonitoring()
             fanMonitor.isPopoverVisible = true
+            // Re-check the helper on every open. If the user just approved ChillMac under
+            // Login Items & Extensions, this is the only thing that notices without a relaunch.
+            fanMonitor.refreshHelperState()
             AppSettings.shared.syncLaunchAtLogin()
             NotificationCenter.default.post(name: .popoverDidClose, object: nil)
             popover.contentViewController = makeHostingController()
@@ -163,6 +164,26 @@ final class StatusBarController: NSObject {
             popover.contentViewController?.view.window?.makeKeyAndOrderFront(nil)
             NotificationCenter.default.post(name: .popoverDidShow, object: nil)
         }
+    }
+
+    /// Tears the popover down and parks every monitor it was driving. Both the toolbar
+    /// button and the click-outside monitor route through here so the two paths cannot
+    /// drift apart and leave a poller running with the UI gone.
+    private func closePopover(sender: AnyObject?) {
+        lastPopoverCloseAt = Date()
+        detailPanel.close()
+        NotificationCenter.default.post(name: .popoverDidClose, object: nil)
+        popover.performClose(sender)
+        popover.contentViewController = nil
+        cpuInfo.isDetailVisible = false
+        memoryInfo.isDetailVisible = false
+        systemInfo.isDetailVisible = false
+        cpuInfo.stopMonitoring()
+        memoryInfo.stopMonitoring()
+        batteryInfo.stopMonitoring()
+        systemInfo.stopMonitoring()
+        fpsMonitor.stopMonitoring()
+        fanMonitor.isPopoverVisible = false
     }
 
     private func makeHostingController() -> NSHostingController<PopoverView> {

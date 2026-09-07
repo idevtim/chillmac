@@ -75,14 +75,20 @@ final class SystemInfo: ObservableObject {
     // MARK: - Private
 
     private func refreshDynamic(forceDiskCategories: Bool = false) {
-        // Disk usage — use volumeAvailableCapacityForImportantUsage to include purgeable space
-        let fileURL = URL(fileURLWithPath: "/")
-        if let values = try? fileURL.resourceValues(forKeys: [
-            .volumeTotalCapacityKey,
-            .volumeAvailableCapacityForImportantUsageKey
-        ]),
-           let totalBytes = values.volumeTotalCapacity.map({ Int64($0) }),
-           let availableBytes = values.volumeAvailableCapacityForImportantUsage {
+        // Disk usage — use volumeAvailableCapacityForImportantUsage to include purgeable space.
+        // That key asks the volume how much space it could reclaim, which touches the disk and
+        // can stall for hundreds of milliseconds, so it never runs on the main thread.
+        diskCategoryQueue.async { [weak self] in
+            guard let self else { return }
+            let fileURL = URL(fileURLWithPath: "/")
+            guard let values = try? fileURL.resourceValues(forKeys: [
+                .volumeTotalCapacityKey,
+                .volumeAvailableCapacityForImportantUsageKey
+            ]),
+                  let totalBytes = values.volumeTotalCapacity.map({ Int64($0) }),
+                  let availableBytes = values.volumeAvailableCapacityForImportantUsage
+            else { return }
+
             let freeTB = Double(availableBytes) / 1_000_000_000_000
             let formatted: String
             if freeTB >= 1.0 {
@@ -92,14 +98,17 @@ final class SystemInfo: ObservableObject {
                 formatted = String(format: "%.0f GB", freeGB)
             }
             DispatchQueue.main.async {
-                self.diskUsage = formatted
-                self.diskTotalBytes = totalBytes
-                self.diskAvailableBytes = availableBytes
-            }
-            // Gather category breakdown on background thread. This can be a large filesystem walk,
-            // so keep it single-flight and refresh it less often than the cheap disk capacity value.
-            if self.shouldRefreshDiskCategories(force: forceDiskCategories) {
-                self.fetchDiskCategories(totalBytes: totalBytes, availableBytes: availableBytes)
+                // Only assign on change — every @Published write invalidates the popover's
+                // view tree, and these values are usually identical poll to poll.
+                if self.diskUsage != formatted { self.diskUsage = formatted }
+                if self.diskTotalBytes != totalBytes { self.diskTotalBytes = totalBytes }
+                if self.diskAvailableBytes != availableBytes { self.diskAvailableBytes = availableBytes }
+                // Gather category breakdown on a background queue. This can be a large
+                // filesystem walk, so keep it single-flight and refresh it less often than
+                // the cheap disk capacity value. The bookkeeping it reads lives on main.
+                if self.shouldRefreshDiskCategories(force: forceDiskCategories) {
+                    self.fetchDiskCategories(totalBytes: totalBytes, availableBytes: availableBytes)
+                }
             }
         }
 
@@ -117,7 +126,7 @@ final class SystemInfo: ObservableObject {
             formatted = "\(minutes)m"
         }
         DispatchQueue.main.async {
-            self.uptime = formatted
+            if self.uptime != formatted { self.uptime = formatted }
         }
     }
 
@@ -138,9 +147,11 @@ final class SystemInfo: ObservableObject {
             process.standardError = FileHandle.nullDevice
 
             guard (try? process.run()) != nil else { return }
+            // Drain the pipe *before* waiting. system_profiler blocks once it fills the
+            // 64 KB pipe buffer, so waiting first would deadlock both processes forever.
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
             process.waitUntilExit()
 
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
             guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let items = json["SPHardwareDataType"] as? [[String: Any]],
                   let hw = items.first else { return }

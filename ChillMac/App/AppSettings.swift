@@ -116,8 +116,19 @@ final class AppSettings: ObservableObject {
         syncLaunchAtLogin()
     }
 
+    /// Reconciles the published flag with launchd's actual view of the login item.
+    ///
+    /// Called on every popover open. `SMAppService.mainApp.status` round-trips to launchd,
+    /// so it stays off the main thread, and the result is only assigned when it differs —
+    /// an unconditional write published a change on every open, which `StatusBarController`
+    /// observes and turns into popover reconfiguration work.
     func syncLaunchAtLogin() {
-        launchAtLogin = (SMAppService.mainApp.status == .enabled)
+        DispatchQueue.global(qos: .utility).async {
+            let enabled = (SMAppService.mainApp.status == .enabled)
+            DispatchQueue.main.async {
+                if self.launchAtLogin != enabled { self.launchAtLogin = enabled }
+            }
+        }
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {

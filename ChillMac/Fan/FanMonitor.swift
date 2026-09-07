@@ -6,7 +6,16 @@ final class FanMonitor: ObservableObject {
     @Published var fans: [FanInfo] = []
     @Published var sensors: [TemperatureSensor] = []
     @Published var smcError: String?
-    @Published var helperReady = false
+
+    /// What the privileged helper can currently do for us. Drives both the fan-control UI
+    /// and whether performance mode is allowed to engage.
+    @Published private(set) var helperState: HelperInstaller.HelperState = .checking
+
+    /// True only when the helper has actually answered over XPC. This used to be a stored
+    /// flag set to `true` at launch regardless of whether the daemon existed, so the popover
+    /// offered Performance Mode and manual sliders on machines where every fan command was
+    /// silently failing. Deriving it from `helperState` makes that impossible.
+    var helperReady: Bool { helperState.canControlFans }
     /// False until the first poll has published results. Lets the UI tell "still reading the
     /// SMC" apart from "this Mac genuinely has no fans" — a fanless MacBook Air must end up
     /// with the empty-state message, not a spinner that never stops.
@@ -109,6 +118,123 @@ final class FanMonitor: ObservableObject {
     /// Track whether performance curve is suspended (screen sleep/lock)
     private var performanceSuspended = false
 
+    // MARK: - Helper Readiness
+
+    /// Serial, so overlapping checks queue behind each other rather than racing launchd.
+    private let helperQueue = DispatchQueue(label: "com.idevtim.ChillMac.helperState")
+    /// Guards the automatic path only. The user-initiated install has its own flag so a
+    /// button tap is never swallowed by a background refresh that happens to be in flight.
+    private var helperRefreshInFlight = false
+    private var helperInstallInFlight = false {
+        didSet {
+            if helperBusy != helperInstallInFlight { helperBusy = helperInstallInFlight }
+        }
+    }
+
+    /// True while a registration is under way. Registering, waiting for launchd, and probing
+    /// can take several seconds, so the UI needs something to show for the button press.
+    @Published private(set) var helperBusy = false
+
+    /// Re-reads the helper's state without trying to install anything.
+    ///
+    /// Called on launch and every time the popover opens. That second call is what makes
+    /// approval recoverable: a user who enables ChillMac under Login Items & Extensions has
+    /// no way to tell the app about it, so without a re-check the app would keep insisting
+    /// the helper was missing until the next relaunch.
+    func refreshHelperState() {
+        guard !helperRefreshInFlight, !helperInstallInFlight else { return }
+        helperRefreshInFlight = true
+
+        helperQueue.async { [weak self] in
+            let state = HelperInstaller.currentState()
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.helperRefreshInFlight = false
+                self.applyHelperState(state)
+            }
+        }
+    }
+
+    /// Reads the helper's state and registers the daemon only if it has never been installed
+    /// or is out of date. States the user has to resolve themselves, approval in particular,
+    /// are reported rather than retried, because retrying them silently is what hid the
+    /// problem from the user in the first place.
+    func resolveHelperAtLaunch(completion: @escaping () -> Void) {
+        helperInstallInFlight = true
+
+        helperQueue.async { [weak self] in
+            var state = HelperInstaller.currentState()
+            NSLog("FanMonitor: helper state at launch — \(state)")
+
+            if state == .needsInstall || state == .needsUpdate {
+                state = Self.installAndSettle()
+            }
+
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.helperInstallInFlight = false
+                self.applyHelperState(state)
+                completion()
+            }
+        }
+    }
+
+    /// Registers or re-registers the daemon, then re-reads the state.
+    /// Sits behind the popover's Install / Update / Reinstall button.
+    func installHelper() {
+        guard !helperInstallInFlight else { return }
+        helperInstallInFlight = true
+
+        helperQueue.async { [weak self] in
+            let state = Self.installAndSettle()
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.helperInstallInFlight = false
+                self.applyHelperState(state)
+            }
+        }
+    }
+
+    /// Installs, then waits for the result to settle before believing it.
+    ///
+    /// Registration is asynchronous on launchd's side and `SMAppService.status` lags it by a
+    /// moment, so the first read after registering routinely reports "not installed" or "not
+    /// answering" for a helper that is a second away from serving requests. Reading once made
+    /// the button look broken: the first tap really did register the daemon, reported a stale
+    /// status, and left the user to tap again for the state that had already arrived.
+    ///
+    /// Polls until the state is conclusive: `running` means done, `needsApproval` means the
+    /// user has to act and no amount of waiting changes it. Must be called on `helperQueue`.
+    private static func installAndSettle() -> HelperInstaller.HelperState {
+        var state = HelperInstaller.install()
+        let deadline = Date().addingTimeInterval(6)
+
+        while state != .running, state != .needsApproval, Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.75)
+            state = HelperInstaller.currentState()
+        }
+        return state
+    }
+
+    /// Main thread only.
+    private func applyHelperState(_ state: HelperInstaller.HelperState) {
+        guard helperState != state else { return }
+        let couldControlFans = helperState.canControlFans
+        helperState = state
+
+        // Losing the helper mid-session leaves the fans wherever we last put them and the
+        // override caches claiming we still own them. Neither is true any more.
+        if couldControlFans && !state.canControlFans {
+            NSLog("FanMonitor: helper became unavailable (\(state)) — dropping fan overrides")
+            wasPerformanceModeActive = false
+            manualOverrides.removeAll()
+            targetOverrides.removeAll()
+            lastSentRPM.removeAll()
+            smoothedZoneTemps.removeAll()
+            if performanceCurvePercent != 0 { performanceCurvePercent = 0 }
+        }
+    }
+
     // MARK: - System Event Observers
 
     /// Call once after helper is ready. Listens for sleep/wake/lid-close to reset fans.
@@ -174,33 +300,41 @@ final class FanMonitor: ObservableObject {
     }
 
     /// Reset all fans back to auto mode.
-    /// Uses SMC fan count directly so this works even if `fans` array is empty or stale.
+    /// Uses the SMC fan count so this works even if the `fans` array is empty or stale.
     func resetAllFansToAuto() {
         guard let helper = helper else { return }
-
-        // Read fan count from SMC directly — fans array may be empty on sleep
-        let fanCount: Int
-        if let smc = try? SMCConnection() {
-            fanCount = max((try? smc.readFanCount()) ?? 0, fans.count)
-            smc.close()
-        } else {
-            fanCount = fans.count
-        }
-
-        for i in 0..<fanCount {
-            helper.setFanMode(fanIndex: i, isAuto: true) { _, _ in }
-        }
 
         wasPerformanceModeActive = false
         smoothedZoneTemps.removeAll()
         lastSentRPM.removeAll()
-        // The fans just changed hands — anything we measured before is no longer their state.
-        // Cleared on smcQueue because that's where the poll writes them.
-        invalidateMeasuredFanState()
+        let knownCount = fans.count
+        let connection = smc
+
+        // Determining the fan count means talking to IOKit, and this is called straight from
+        // sleep/lock notifications on the main thread. smcQueue owns both the connection and
+        // the cached count, so the whole lookup belongs there.
+        smcQueue.async { [weak self] in
+            guard let self else { return }
+            // The fans just changed hands — anything we measured before is no longer their
+            // state. Cleared here because this queue is where the poll writes them.
+            self.lastFullFanRead = nil
+            self.lastMeasuredTarget.removeAll()
+            self.lastMeasuredMode.removeAll()
+
+            var fanCount = self.cachedFanCount ?? 0
+            if fanCount == 0, let connection, let read = try? connection.readFanCount() {
+                self.cachedFanCount = read
+                fanCount = read
+            }
+            for i in 0..<max(fanCount, knownCount) {
+                helper.setFanMode(fanIndex: i, isAuto: true) { _, _ in }
+            }
+        }
+
         DispatchQueue.main.async {
             self.manualOverrides.removeAll()
             self.targetOverrides.removeAll()
-            self.performanceCurvePercent = 0
+            if self.performanceCurvePercent != 0 { self.performanceCurvePercent = 0 }
         }
     }
 
@@ -254,11 +388,18 @@ final class FanMonitor: ObservableObject {
     func stopMonitoring() {
         timer?.invalidate()
         timer = nil
-        smc?.close()
+        scheduledPollInterval = nil
+        // Hand the connection to smcQueue to close. A poll already dispatched there holds
+        // this same object and would otherwise issue IOKit calls on a closed port.
+        // The cached hardware constants are read on that queue too, so they go with it.
+        let closing = smc
         smc = nil
-        cachedFanCount = nil
-        cachedMinRPM.removeAll()
-        cachedMaxRPM.removeAll()
+        smcQueue.async { [weak self] in
+            closing?.close()
+            self?.cachedFanCount = nil
+            self?.cachedMinRPM.removeAll()
+            self?.cachedMaxRPM.removeAll()
+        }
         removeSystemObservers()
     }
 
@@ -268,16 +409,27 @@ final class FanMonitor: ObservableObject {
         return 10.0
     }
 
+    /// Interval the live timer was created with, so `updatePollInterval` can no-op.
+    private var scheduledPollInterval: TimeInterval?
+
     private func schedulePollTimer() {
         timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: currentPollInterval, repeats: true) { [weak self] _ in
+        scheduledPollInterval = currentPollInterval
+        let newTimer = Timer(timeInterval: currentPollInterval, repeats: true) { [weak self] _ in
             self?.poll()
         }
+        // .common, not the default mode: dragging the speed slider or resizing the popover
+        // puts the run loop in event-tracking mode, where a default-mode timer stops firing.
+        // Performance mode must keep driving the fan curve through those interactions.
+        RunLoop.main.add(newTimer, forMode: .common)
+        timer = newTimer
     }
 
-    /// Re-evaluate poll interval when conditions change
+    /// Re-evaluate poll interval when conditions change. Rescheduling restarts the countdown,
+    /// so it only happens when the interval genuinely changed — `applyPerformanceCurve` asks
+    /// on every cycle, and battery saver can leave it asking indefinitely.
     func updatePollInterval() {
-        guard timer != nil else { return }
+        guard timer != nil, currentPollInterval != scheduledPollInterval else { return }
         schedulePollTimer()
     }
 
@@ -603,7 +755,7 @@ final class FanMonitor: ObservableObject {
         // Battery saver: suppress performance mode when on battery below threshold
         let batterySaving = performanceEnabled && batterySaverShouldSuppress
         let isActive = performanceEnabled && !batterySaving
-        batterySaverActive = batterySaving
+        if batterySaverActive != batterySaving { batterySaverActive = batterySaving }
 
         guard let helper = helper else { return }
 
@@ -617,7 +769,7 @@ final class FanMonitor: ObservableObject {
             }
             manualOverrides.removeAll()
             targetOverrides.removeAll()
-            performanceCurvePercent = 0
+            if performanceCurvePercent != 0 { performanceCurvePercent = 0 }
             smoothedZoneTemps.removeAll()
             lastSentRPM.removeAll()
             // Force a fresh read now that macOS owns the fans again.
@@ -672,9 +824,14 @@ final class FanMonitor: ObservableObject {
             fanPcts[fan.id] = max(fanPcts[fan.id] ?? 0, floor)
         }
 
-        // UI shows the highest fan percentage
+        // UI shows the highest fan percentage. Thresholded for the same reason the peak
+        // temperatures are: the EMA feeding it jitters in hundredths of a percent, and every
+        // write invalidates the popover's view tree even while it is closed.
         let maxPct = fanPcts.values.max() ?? floor
-        performanceCurvePercent = maxPct * 100
+        let curvePercent = maxPct * 100
+        if abs(performanceCurvePercent - curvePercent) >= 0.1 {
+            performanceCurvePercent = curvePercent
+        }
 
         // Send each fan to its target with per-level rate limiting
         for fan in fans {
@@ -702,6 +859,49 @@ final class FanMonitor: ObservableObject {
             targetOverrides[fan.id] = rounded
             manualOverrides[fan.id] = true
             helper.setFanSpeed(fanIndex: fan.id, rpm: Int(rounded)) { _, _ in }
+        }
+    }
+
+    // MARK: - Manual Speed Coalescing
+
+    /// Pending manual target per fan, and when that fan was last sent one.
+    private var pendingManualRPM: [Int: Int] = [:]
+    private var lastManualSendAt: [Int: Date] = [:]
+    private var manualSendScheduled: Set<Int> = []
+    /// Minimum spacing between manual speed commands for one fan.
+    private static let manualSendInterval: TimeInterval = 0.15
+
+    /// Sends a manual fan speed, coalescing bursts. Dragging the slider emits a value per
+    /// 100 RPM step — dozens of privileged XPC round-trips, each one an SMC write — which
+    /// made the drag stutter and hammered the daemon. Leading edge goes out immediately so
+    /// the fan responds at once; the rest collapse into one trailing send of the final value.
+    /// Main thread only.
+    func requestManualFanSpeed(fanIndex: Int, rpm: Int, onFailure: @escaping (String) -> Void) {
+        pendingManualRPM[fanIndex] = rpm
+
+        let now = Date()
+        let elapsed = lastManualSendAt[fanIndex].map { now.timeIntervalSince($0) } ?? .greatestFiniteMagnitude
+        if elapsed >= Self.manualSendInterval {
+            flushManualFanSpeed(fanIndex: fanIndex, onFailure: onFailure)
+            return
+        }
+
+        guard !manualSendScheduled.contains(fanIndex) else { return }
+        manualSendScheduled.insert(fanIndex)
+        let delay = Self.manualSendInterval - elapsed
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self else { return }
+            self.manualSendScheduled.remove(fanIndex)
+            self.flushManualFanSpeed(fanIndex: fanIndex, onFailure: onFailure)
+        }
+    }
+
+    private func flushManualFanSpeed(fanIndex: Int, onFailure: @escaping (String) -> Void) {
+        guard let rpm = pendingManualRPM.removeValue(forKey: fanIndex), let helper else { return }
+        lastManualSendAt[fanIndex] = Date()
+        helper.setFanSpeed(fanIndex: fanIndex, rpm: rpm) { success, error in
+            guard !success else { return }
+            DispatchQueue.main.async { onFailure(error ?? "Failed to set fan speed") }
         }
     }
 

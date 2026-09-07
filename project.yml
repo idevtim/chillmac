@@ -48,6 +48,13 @@ targets:
           mkdir -p "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchDaemons"
           cp "${SRCROOT}/FanControlHelper/LaunchDaemon.plist" "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchDaemons/com.idevtim.ChillMac.Helper.plist"
         inputFiles:
+          # The helper binary has to be declared, not just the plist. Xcode skips a script
+          # phase whose declared inputs are unchanged and whose outputs exist, so with only
+          # the plist listed here a rebuilt helper was never copied into the app bundle:
+          # incremental builds kept running whatever helper the first build of the day had
+          # produced. Release builds were spared only because build-dmg.sh cleans first,
+          # which removes the outputs and forces the copy.
+          - "$(BUILT_PRODUCTS_DIR)/com.idevtim.ChillMac.Helper"
           - "$(SRCROOT)/FanControlHelper/LaunchDaemon.plist"
         outputFiles:
           - "$(BUILT_PRODUCTS_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchServices/com.idevtim.ChillMac.Helper"

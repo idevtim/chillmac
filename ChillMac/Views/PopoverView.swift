@@ -55,12 +55,16 @@ struct PopoverView: View {
         .frame(width: 420, height: liveHeight > 0 ? liveHeight : CGFloat(settings.popoverHeight))
         .environment(\.theme, theme)
         .preferredColorScheme(settings.preferredColorScheme)
+        // Every content section is gated on `appeared`, so whatever sets it has to be
+        // something that cannot be missed. `.popoverDidShow` alone could be: the controller
+        // posts it synchronously right after `popover.show(...)`, and if SwiftUI has not
+        // mounted this view yet there is no subscriber to receive it, leaving the whole
+        // popover at opacity 0 over the gradient forever. `.onAppear` fires on mount by
+        // definition, so it cannot lose that race.
+        .onAppear { revealContent() }
         .onReceive(NotificationCenter.default.publisher(for: .popoverDidShow)) { _ in
             showingSettings = false
-            appeared = false
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                appeared = true
-            }
+            revealContent()
         }
         .onReceive(NotificationCenter.default.publisher(for: .popoverDidClose)) { _ in
             appeared = false
@@ -68,6 +72,16 @@ struct PopoverView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .detailPanelChanged)) { notification in
             activePanelID = notification.userInfo?["panelID"] as? String
+        }
+    }
+
+    /// Runs the staggered fade-in. Safe to call more than once per open: both triggers fire
+    /// when the notification arrives in time, and re-entering during the 50ms window just
+    /// restarts a window that has not visibly begun.
+    private func revealContent() {
+        guard !appeared else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            appeared = true
         }
     }
 
@@ -205,13 +219,22 @@ struct PopoverView: View {
                 .opacity(appeared ? 1 : 0)
                 .animation(.easeOut(duration: 0.3).delay(0.35), value: appeared)
 
-            // Performance Mode toggle
-            if monitor.helperReady {
-                performanceModeCard
-                    .opacity(appeared ? 1 : 0)
-                    .offset(y: appeared ? 0 : 12)
-                    .animation(.easeOut(duration: 0.3).delay(0.37), value: appeared)
+            // Performance Mode toggle, or why fan control is unavailable
+            Group {
+                if monitor.helperReady {
+                    performanceModeCard
+                } else {
+                    HelperStatusCard(
+                        state: monitor.helperState,
+                        isBusy: monitor.helperBusy,
+                        onInstall: { monitor.installHelper() },
+                        onOpenLoginItems: { HelperInstaller.openLoginItemsSettings() }
+                    )
+                }
             }
+            .opacity(appeared ? 1 : 0)
+            .offset(y: appeared ? 0 : 12)
+            .animation(.easeOut(duration: 0.3).delay(0.37), value: appeared)
 
             ForEach(Array(monitor.fans.enumerated()), id: \.element.id) { index, fan in
                 FanRowView(fan: fan, helper: helper, monitor: monitor)

@@ -5,6 +5,36 @@ class HelperService: NSObject, HelperProtocol {
     private static var hasSetTestMode = false
     private static let logFile = "/tmp/ChillMacHelper.log"
 
+    /// Serialises every SMC access in the daemon. XPC delivers each client connection's
+    /// messages on its own queue and `HelperDelegate` hands out a fresh `HelperService` per
+    /// connection, so the shared connection and `hasSetTestMode` need one owner.
+    private static let smcQueue = DispatchQueue(label: "com.idevtim.ChillMac.Helper.smc")
+
+    /// One long-lived SMC connection instead of an IOServiceOpen/Close pair per command.
+    /// Performance mode issues a write per fan every 2 seconds for the machine's whole
+    /// uptime, and reopening the driver each time was the bulk of that cost.
+    /// Must only be touched on `smcQueue`.
+    private static var sharedSMC: SMCConnection?
+
+    /// Runs `body` on `smcQueue` with the shared connection, opening one on first use.
+    /// A throwing body drops the connection so the next command reopens it — otherwise a
+    /// single bad state in the driver would poison fan control until the daemon restarted.
+    private static func withSMC<T>(_ body: (SMCConnection) throws -> T) throws -> T {
+        try smcQueue.sync {
+            if sharedSMC == nil {
+                sharedSMC = try SMCConnection()
+            }
+            guard let smc = sharedSMC else { throw SMCError.failedToOpen }
+            do {
+                return try body(smc)
+            } catch {
+                sharedSMC = nil
+                smc.close()
+                throw error
+            }
+        }
+    }
+
     private static func log(_ message: String) {
         // File logging disabled — uncomment to re-enable
         // let timestamp = ISO8601DateFormatter().string(from: Date())
@@ -25,39 +55,16 @@ class HelperService: NSObject, HelperProtocol {
     func setFanSpeed(fanIndex: Int, rpm: Int, reply: @escaping (Bool, String?) -> Void) {
         HelperService.log("setFanSpeed fan=\(fanIndex) rpm=\(rpm)")
         do {
-            let smc = try SMCConnection()
-            defer { smc.close() }
+            try HelperService.withSMC { smc in
+                #if arch(arm64)
+                try HelperService.enableTestModeIfNeededLocked(smc: smc)
+                try smc.writeFanModeKey(index: fanIndex, forced: true)
+                #else
+                try HelperService.setIntelForcedMode(smc: smc, fanIndex: fanIndex, forced: true)
+                #endif
 
-            #if arch(arm64)
-            try enableTestModeIfNeeded(smc: smc)
-            HelperService.log("  writing F\(fanIndex)Md=1 (manual mode)")
-            try smc.writeFanModeKey(index: fanIndex, forced: true)
-            #else
-            try smc.writeForceMode(fanIndex: fanIndex, forced: true)
-            #endif
-
-            // Log key info for debugging encoding
-            if let info = try? smc.getKeyInfo(SMCKey.fanTargetSpeed(fanIndex)) {
-                let typeStr = fourCharCodeToString(info.dataType)
-                HelperService.log("  F\(fanIndex)Tg keyInfo: size=\(info.dataSize) type='\(typeStr)'")
+                try smc.writeFanSpeed(index: fanIndex, rpm: Double(rpm))
             }
-            if let info = try? smc.getKeyInfo(SMCKey.fanMode(fanIndex)) {
-                let typeStr = fourCharCodeToString(info.dataType)
-                HelperService.log("  F\(fanIndex)Md keyInfo: size=\(info.dataSize) type='\(typeStr)'")
-            }
-            if let info = try? smc.getKeyInfo(SMCKey.testMode) {
-                let typeStr = fourCharCodeToString(info.dataType)
-                HelperService.log("  Ftst keyInfo: size=\(info.dataSize) type='\(typeStr)'")
-            }
-
-            HelperService.log("  writing F\(fanIndex)Tg=\(rpm)")
-            try smc.writeFanSpeed(index: fanIndex, rpm: Double(rpm))
-
-            // Read back to verify writes took effect
-            let readBackTarget = (try? smc.readFanTargetSpeed(index: fanIndex)) ?? -1
-            let readBackMode = (try? smc.readFanMode(index: fanIndex)) ?? false
-            let readBackSpeed = (try? smc.readFanSpeed(index: fanIndex)) ?? -1
-            HelperService.log("  readback: target=\(readBackTarget) mode=\(readBackMode ? "manual" : "auto") actual=\(readBackSpeed)")
             reply(true, nil)
         } catch {
             HelperService.log("  FAILED: \(error)")
@@ -68,38 +75,35 @@ class HelperService: NSObject, HelperProtocol {
     func setFanMode(fanIndex: Int, isAuto: Bool, reply: @escaping (Bool, String?) -> Void) {
         HelperService.log("setFanMode fan=\(fanIndex) auto=\(isAuto)")
         do {
-            let smc = try SMCConnection()
-            defer { smc.close() }
-
-            if isAuto {
-                #if arch(arm64)
-                try smc.writeFanModeKey(index: fanIndex, forced: false)
-                let fanCount = try smc.readFanCount()
-                var anyManual = false
-                for i in 0..<fanCount {
-                    if i != fanIndex, let mode = try? smc.readFanMode(index: i), mode {
-                        anyManual = true
-                        break
+            try HelperService.withSMC { smc in
+                if isAuto {
+                    #if arch(arm64)
+                    try smc.writeFanModeKey(index: fanIndex, forced: false)
+                    let fanCount = try smc.readFanCount()
+                    var anyManual = false
+                    for i in 0..<fanCount {
+                        if i != fanIndex, let mode = try? smc.readFanMode(index: i), mode {
+                            anyManual = true
+                            break
+                        }
                     }
+                    if !anyManual {
+                        try smc.writeTestMode(enabled: false)
+                        HelperService.hasSetTestMode = false
+                        HelperService.log("  cleared test mode (all fans auto)")
+                    }
+                    #else
+                    try HelperService.setIntelForcedMode(smc: smc, fanIndex: fanIndex, forced: false)
+                    #endif
+                } else {
+                    #if arch(arm64)
+                    try HelperService.enableTestModeIfNeededLocked(smc: smc)
+                    try smc.writeFanModeKey(index: fanIndex, forced: true)
+                    #else
+                    try HelperService.setIntelForcedMode(smc: smc, fanIndex: fanIndex, forced: true)
+                    #endif
                 }
-                if !anyManual {
-                    try smc.writeTestMode(enabled: false)
-                    HelperService.hasSetTestMode = false
-                    HelperService.log("  cleared test mode (all fans auto)")
-                }
-                #else
-                try smc.writeForceMode(fanIndex: fanIndex, forced: false)
-                #endif
-            } else {
-                #if arch(arm64)
-                try enableTestModeIfNeeded(smc: smc)
-                try smc.writeFanModeKey(index: fanIndex, forced: true)
-                #else
-                try smc.writeForceMode(fanIndex: fanIndex, forced: true)
-                #endif
             }
-
-            HelperService.log("  success")
             reply(true, nil)
         } catch {
             HelperService.log("  FAILED: \(error)")
@@ -197,17 +201,60 @@ class HelperService: NSObject, HelperProtocol {
         }
     }
 
-    #if arch(arm64)
-    private func enableTestModeIfNeeded(smc: SMCConnection) throws {
-        if !HelperService.hasSetTestMode {
-            HelperService.log("  enabling test mode (Ftst=1)")
-            try smc.writeTestMode(enabled: true)
-            HelperService.hasSetTestMode = true
-            HelperService.log("  test mode enabled")
+    #if !arch(arm64)
+    /// Puts an Intel fan into (or out of) forced mode.
+    ///
+    /// Two different mechanisms exist and which one works depends on the machine. Pre-T2
+    /// Intel Macs use the legacy `FS!` force bitmask. T2 Macs (2018 and later) do not honour
+    /// `FS!` at all and instead use the per-fan `F{i}Md` key, the same one Apple Silicon
+    /// uses. Writing only `FS!` is why manual control and Performance Mode silently did
+    /// nothing on T2 hardware: the write reported success, the firmware ignored it, and the
+    /// following `F{i}Tg` target write was discarded because the fan was never forced.
+    ///
+    /// So write both and succeed if either lands. Requiring both would swap the bug from one
+    /// generation to the other, since neither machine has the other's key.
+    private static func setIntelForcedMode(smc: SMCConnection, fanIndex: Int, forced: Bool) throws {
+        var succeeded = false
+        var lastError: Error?
+
+        // Pre-T2 path.
+        do {
+            try smc.writeForceMode(fanIndex: fanIndex, forced: forced)
+            succeeded = true
+        } catch {
+            lastError = error
+        }
+
+        // T2 path.
+        do {
+            try smc.writeFanModeKey(index: fanIndex, forced: forced)
+            succeeded = true
+        } catch {
+            lastError = error
+        }
+
+        if !succeeded, let lastError {
+            log("  no usable fan mode key on this Mac: \(lastError)")
+            throw lastError
         }
     }
     #endif
 
+    #if arch(arm64)
+    /// Must be called from inside `withSMC` — it reads and writes `hasSetTestMode`,
+    /// which is owned by `smcQueue`.
+    private static func enableTestModeIfNeededLocked(smc: SMCConnection) throws {
+        guard !hasSetTestMode else { return }
+        log("  enabling test mode (Ftst=1)")
+        try smc.writeTestMode(enabled: true)
+        hasSetTestMode = true
+        log("  test mode enabled")
+    }
+    #endif
+
+    /// Called from a signal handler, so it deliberately opens its own connection rather than
+    /// going through `withSMC` — `smcQueue.sync` would deadlock if the signal landed while a
+    /// command was in flight on that queue.
     static func cleanupOnExit() {
         #if arch(arm64)
         if hasSetTestMode {

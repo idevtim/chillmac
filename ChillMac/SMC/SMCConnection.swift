@@ -4,8 +4,10 @@ import IOKit
 final class SMCConnection {
     private var connection: io_connect_t = 0
     private var isOpen = false
-    /// Cache key info (dataSize) per fourCharCode — avoids redundant getKeyInfo IOKit calls
-    private var keyInfoCache: [UInt32: UInt32] = [:]
+    /// Cache key metadata per fourCharCode — avoids redundant getKeyInfo IOKit calls.
+    /// SMC key size and type are fixed properties of the hardware, so one lookup is enough
+    /// for the life of the connection.
+    private var keyInfoCache: [UInt32: (dataSize: UInt32, dataType: UInt32)] = [:]
 
     init() throws {
         let service = IOServiceGetMatchingService(
@@ -39,24 +41,12 @@ final class SMCConnection {
     // MARK: - Low-level Read
 
     func readKey(_ key: String) throws -> SMCParamStruct {
-        var input = SMCParamStruct()
         let fcc = fourCharCode(key)
-        input.key = fcc
+        // Cached after the first lookup — skips the getKeyInfo IOKit call
+        let dataSize = try keyInfo(fcc, key).dataSize
 
-        // Check cache for dataSize to skip the getKeyInfo IOKit call
-        let dataSize: UInt32
-        if let cached = keyInfoCache[fcc] {
-            dataSize = cached
-        } else {
-            input.data8 = SMCSelector.getKeyInfo.rawValue
-            var infoOutput = SMCParamStruct()
-            let result = callSMC(&input, output: &infoOutput)
-            guard result == kIOReturnSuccess else {
-                throw SMCError.keyNotFound(key)
-            }
-            dataSize = infoOutput.keyInfo.dataSize
-            keyInfoCache[fcc] = dataSize
-        }
+        var input = SMCParamStruct()
+        input.key = fcc
 
         // Read the actual value
         input.keyInfo.dataSize = dataSize
@@ -122,24 +112,14 @@ final class SMCConnection {
     // MARK: - Write Operations (requires root)
 
     func writeKey(_ key: String, bytes: [UInt8]) throws {
-        var input = SMCParamStruct()
         let fcc = fourCharCode(key)
-        input.key = fcc
-        input.data8 = SMCSelector.getKeyInfo.rawValue
+        let info = try keyInfo(fcc, key)
 
-        var infoOutput = SMCParamStruct()
-        var result = callSMC(&input, output: &infoOutput)
-        guard result == kIOReturnSuccess else {
-            throw SMCError.keyNotFound(key)
-        }
-        // Populate cache for future readKey calls
-        keyInfoCache[fcc] = infoOutput.keyInfo.dataSize
-
-        input = SMCParamStruct()
+        var input = SMCParamStruct()
         input.key = fcc
         input.data8 = SMCSelector.writeKey.rawValue
-        input.keyInfo.dataSize = infoOutput.keyInfo.dataSize
-        input.keyInfo.dataType = infoOutput.keyInfo.dataType
+        input.keyInfo.dataSize = info.dataSize
+        input.keyInfo.dataType = info.dataType
 
         withUnsafeMutablePointer(to: &input.bytes) { ptr in
             let raw = UnsafeMutableRawPointer(ptr)
@@ -149,7 +129,7 @@ final class SMCConnection {
         }
 
         var output = SMCParamStruct()
-        result = callSMC(&input, output: &output)
+        let result = callSMC(&input, output: &output)
         guard result == kIOReturnSuccess else {
             throw SMCError.writeFailed(result)
         }
@@ -157,15 +137,27 @@ final class SMCConnection {
 
     /// Get key info (dataSize, dataType) for debugging
     func getKeyInfo(_ key: String) throws -> (dataSize: UInt32, dataType: UInt32) {
+        try keyInfo(fourCharCode(key), key)
+    }
+
+    /// Cached `getKeyInfo`. Key size and type never change for a given machine, so the
+    /// IOKit round-trip only has to happen once per key — this halves the calls made by
+    /// every read and write, which matters at a 2s poll cadence over days of uptime.
+    private func keyInfo(_ fcc: UInt32, _ key: String) throws -> (dataSize: UInt32, dataType: UInt32) {
+        if let cached = keyInfoCache[fcc] { return cached }
+
         var input = SMCParamStruct()
-        input.key = fourCharCode(key)
+        input.key = fcc
         input.data8 = SMCSelector.getKeyInfo.rawValue
+
         var output = SMCParamStruct()
         let result = callSMC(&input, output: &output)
         guard result == kIOReturnSuccess else {
             throw SMCError.keyNotFound(key)
         }
-        return (output.keyInfo.dataSize, output.keyInfo.dataType)
+        let info = (dataSize: output.keyInfo.dataSize, dataType: output.keyInfo.dataType)
+        keyInfoCache[fcc] = info
+        return info
     }
 
     /// Write fan target speed — uses correct encoding based on key's data size

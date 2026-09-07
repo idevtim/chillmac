@@ -80,13 +80,20 @@ final class MemoryInfo: ObservableObject {
                 procs = []
             }
 
+            // `active + wired + compressed` is a sum of independently sampled page counters
+            // and can momentarily exceed physicalMemory. On UInt64 a plain subtraction traps
+            // on that overflow and takes the app down, so saturate at zero instead.
+            let used = stats.active &+ stats.wired &+ stats.compressed
+            let available = self.totalMemory > used ? self.totalMemory - used : 0
+            let pressure = min(Double(used) / Double(self.totalMemory) * 100, 100)
+
             DispatchQueue.main.async {
                 self.refreshInFlight = false
                 self.activeMemory = stats.active
                 self.wiredMemory = stats.wired
                 self.compressedMemory = stats.compressed
-                self.availableMemory = self.totalMemory - stats.active - stats.wired - stats.compressed
-                self.pressurePercent = Double(stats.active + stats.wired + stats.compressed) / Double(self.totalMemory) * 100
+                self.availableMemory = available
+                self.pressurePercent = pressure
                 self.swapUsed = swap
                 if !procs.isEmpty || self.isDetailVisible {
                     self.topProcesses = procs

@@ -36,31 +36,46 @@ final class BatteryInfo: ObservableObject {
         timer = nil
     }
 
+    /// Called on main by the timer. IOPowerSources and the IORegistry both round-trip to
+    /// other processes, so the reads themselves run off-main and only the published values
+    /// come back — otherwise every poll stalls the UI for the duration of the lookup.
     private func refresh() {
+        healthQueue.async { [weak self] in
+            self?.refreshOffMain()
+        }
+    }
+
+    private func refreshOffMain() {
         guard let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
               let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() as? [CFTypeRef],
               let firstSource = sources.first,
               let info = IOPSGetPowerSourceDescription(snapshot, firstSource)?.takeUnretainedValue() as? [String: Any]
         else { return }
 
-        DispatchQueue.main.async {
-            self.currentCharge = info[kIOPSCurrentCapacityKey] as? Int ?? 0
-            self.isCharging = (info[kIOPSIsChargingKey] as? Bool) ?? false
-            self.isPluggedIn = (info[kIOPSPowerSourceStateKey] as? String) == kIOPSACPowerValue
+        let charge = info[kIOPSCurrentCapacityKey] as? Int ?? 0
+        let charging = (info[kIOPSIsChargingKey] as? Bool) ?? false
+        let pluggedIn = (info[kIOPSPowerSourceStateKey] as? String) == kIOPSACPowerValue
 
-            if let timeToEmpty = info[kIOPSTimeToEmptyKey] as? Int, timeToEmpty > 0, !self.isCharging {
-                let hours = timeToEmpty / 60
-                let mins = timeToEmpty % 60
-                self.timeRemaining = hours > 0 ? "\(hours)h \(mins)m" : "\(mins)m"
-            } else if let timeToCharge = info[kIOPSTimeToFullChargeKey] as? Int, timeToCharge > 0 {
-                let hours = timeToCharge / 60
-                let mins = timeToCharge % 60
-                self.timeRemaining = hours > 0 ? "\(hours)h \(mins)m to full" : "\(mins)m to full"
-            } else if self.currentCharge >= 100 {
-                self.timeRemaining = "Fully Charged"
-            } else {
-                self.timeRemaining = "Calculating..."
-            }
+        let remaining: String
+        if let timeToEmpty = info[kIOPSTimeToEmptyKey] as? Int, timeToEmpty > 0, !charging {
+            let hours = timeToEmpty / 60
+            let mins = timeToEmpty % 60
+            remaining = hours > 0 ? "\(hours)h \(mins)m" : "\(mins)m"
+        } else if let timeToCharge = info[kIOPSTimeToFullChargeKey] as? Int, timeToCharge > 0 {
+            let hours = timeToCharge / 60
+            let mins = timeToCharge % 60
+            remaining = hours > 0 ? "\(hours)h \(mins)m to full" : "\(mins)m to full"
+        } else if charge >= 100 {
+            remaining = "Fully Charged"
+        } else {
+            remaining = "Calculating..."
+        }
+
+        DispatchQueue.main.async {
+            if self.currentCharge != charge { self.currentCharge = charge }
+            if self.isCharging != charging { self.isCharging = charging }
+            if self.isPluggedIn != pluggedIn { self.isPluggedIn = pluggedIn }
+            if self.timeRemaining != remaining { self.timeRemaining = remaining }
         }
 
         // Get detailed battery info from IORegistry
@@ -68,6 +83,7 @@ final class BatteryInfo: ObservableObject {
         probeAppleReportedHealthIfNeeded()
     }
 
+    /// Must be called on `healthQueue`.
     private func fetchIORegistryBatteryInfo() {
         let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSmartBattery"))
         guard service != 0 else { return }
@@ -92,12 +108,14 @@ final class BatteryInfo: ObservableObject {
         }
 
         DispatchQueue.main.async {
-            self.maxCapacity = maxCap
-            self.designCapacity = designCap
-            self.cycleCount = cycles
-            self.temperature = temp
-            self.healthPercent = self.appleReportedHealth ?? computedHealth
-            self.condition = Self.conditionLabel(forHealth: self.healthPercent)
+            if self.maxCapacity != maxCap { self.maxCapacity = maxCap }
+            if self.designCapacity != designCap { self.designCapacity = designCap }
+            if self.cycleCount != cycles { self.cycleCount = cycles }
+            if abs(self.temperature - temp) >= 0.05 { self.temperature = temp }
+            let health = self.appleReportedHealth ?? computedHealth
+            if self.healthPercent != health { self.healthPercent = health }
+            let condition = Self.conditionLabel(forHealth: health)
+            if self.condition != condition { self.condition = condition }
         }
     }
 

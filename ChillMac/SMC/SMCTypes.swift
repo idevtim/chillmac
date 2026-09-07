@@ -101,6 +101,9 @@ func decodeFPE2(_ byte0: UInt8, _ byte1: UInt8) -> Double {
 
 /// Encode Double RPM → fpe2 (unsigned 14.2 fixed-point) as (byte0, byte1)
 func encodeFPE2(_ value: Double) -> (UInt8, UInt8) {
+    // NaN survives both min and max unchanged (every comparison against it is false), and
+    // UInt16(nan) traps. Screen it out before the clamp rather than after.
+    guard value.isFinite else { return (0, 0) }
     let raw = UInt16(min(max(value * 4.0, 0), Double(UInt16.max)))
     return (UInt8(raw >> 8), UInt8(raw & 0xFF))
 }
@@ -167,8 +170,10 @@ func encodeNumericValue(_ value: Double, dataType: UInt32) -> [UInt8] {
     case smcTypeFLT:
         return encodeFloat32(value)
     case smcTypeUI8, smcTypeFlag:
+        guard value.isFinite else { return [0] }
         return [UInt8(min(max(value, 0), 255))]
     case smcTypeUI16:
+        guard value.isFinite else { return [0, 0] }
         let v = UInt16(min(max(value, 0), Double(UInt16.max)))
         return [UInt8(v >> 8), UInt8(v & 0xFF)]
     default:

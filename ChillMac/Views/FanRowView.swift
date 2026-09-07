@@ -28,6 +28,18 @@ struct FanRowView: View {
         )
     }
 
+    /// Performance Mode is only genuinely in charge when the helper can carry out its
+    /// commands; the preference alone is not enough.
+    private var isPerformanceControlled: Bool {
+        settings.performanceMode && monitor.helperReady
+    }
+
+    private var modeLabel: String {
+        if isPerformanceControlled { return "Performance" }
+        guard monitor.helperReady else { return "Auto" }
+        return isManual.wrappedValue ? "Manual" : "Auto"
+    }
+
     private var sliderRange: ClosedRange<Double> {
         let lo = fan.minRPM
         let hi = fan.maxRPM
@@ -66,9 +78,12 @@ struct FanRowView: View {
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(theme.textPrimary)
 
-                    Text(settings.performanceMode ? "Performance" : (isManual.wrappedValue ? "Manual" : "Auto"))
+                    // Only claim performance/manual control when the helper can actually
+                    // deliver it. With no helper the fan is on macOS auto whatever the
+                    // Performance Mode preference says.
+                    Text(modeLabel)
                         .font(.system(size: 12))
-                        .foregroundColor(settings.performanceMode ? .orange : theme.textQuaternary)
+                        .foregroundColor(isPerformanceControlled ? .orange : theme.textQuaternary)
                 }
 
                 Spacer()
@@ -85,7 +100,25 @@ struct FanRowView: View {
             }
 
             // Manual/Auto toggle
-            if settings.performanceMode {
+            if !monitor.helperReady {
+                HStack(spacing: 8) {
+                    if monitor.helperState == .checking {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Connecting to helper…")
+                            .font(.system(size: 13))
+                            .foregroundColor(theme.textQuaternary)
+                    } else {
+                        Image(systemName: "slider.horizontal.below.rectangle")
+                            .font(.system(size: 12))
+                            .foregroundColor(theme.textQuaternary)
+                        Text("Speed control unavailable")
+                            .font(.system(size: 13))
+                            .foregroundColor(theme.textQuaternary)
+                    }
+                    Spacer()
+                }
+            } else if isPerformanceControlled {
                 HStack(spacing: 6) {
                     Image(systemName: "bolt.fill")
                         .font(.system(size: 12))
@@ -95,7 +128,7 @@ struct FanRowView: View {
                         .foregroundColor(theme.textQuaternary)
                     Spacer()
                 }
-            } else if monitor.helperReady {
+            } else {
                 HStack {
                     Toggle(isOn: isManual) {
                         EmptyView()
@@ -111,19 +144,10 @@ struct FanRowView: View {
 
                     Spacer()
                 }
-            } else {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Connecting to helper…")
-                        .font(.system(size: 13))
-                        .foregroundColor(theme.textQuaternary)
-                    Spacer()
-                }
             }
 
             // Speed slider (only in manual mode, not during performance mode)
-            if !settings.performanceMode, monitor.helperReady, isManual.wrappedValue, sliderRange.upperBound > sliderRange.lowerBound {
+            if !isPerformanceControlled, monitor.helperReady, isManual.wrappedValue, sliderRange.upperBound > sliderRange.lowerBound {
                 VStack(spacing: 6) {
                     Slider(
                         value: targetRPM,
@@ -177,14 +201,11 @@ struct FanRowView: View {
     }
 
     private func setFanSpeed(rpm: Int) {
-        helper.setFanSpeed(fanIndex: fan.id, rpm: rpm) { success, error in
-            DispatchQueue.main.async {
-                if !success {
-                    errorMessage = error ?? "Failed to set fan speed"
-                } else {
-                    errorMessage = nil
-                }
-            }
+        errorMessage = nil
+        // Routed through the monitor so a slider drag collapses into a couple of privileged
+        // writes instead of one per 100 RPM step.
+        monitor.requestManualFanSpeed(fanIndex: fan.id, rpm: rpm) { message in
+            errorMessage = message
         }
     }
 }

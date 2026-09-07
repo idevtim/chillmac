@@ -11,9 +11,13 @@ final class HelperConnection {
     func connect() -> HelperProtocol? {
         lock.lock()
         defer { lock.unlock() }
+        return proxy(for: liveConnection())
+    }
 
+    /// The live connection, created on first use. Must be called with `lock` held.
+    private func liveConnection() -> NSXPCConnection {
         if let conn = _connection {
-            return proxy(for: conn)
+            return conn
         }
 
         let conn = NSXPCConnection(
@@ -21,6 +25,9 @@ final class HelperConnection {
             options: .privileged
         )
         conn.remoteObjectInterface = NSXPCInterface(with: HelperProtocol.self)
+        // Authenticate the daemon before talking to it. Must be set before `resume`, and
+        // exactly once per connection.
+        HelperConnection.pinToHelperSignature(conn)
         conn.invalidationHandler = { [weak self] in
             NSLog("HelperConnection: XPC connection invalidated")
             self?.clear(conn)
@@ -30,7 +37,66 @@ final class HelperConnection {
         }
         conn.resume()
         _connection = conn
-        return proxy(for: conn)
+        return conn
+    }
+
+    /// Sets every fan back to auto and waits briefly for the helper to confirm.
+    ///
+    /// Called from `applicationWillTerminate`, so the wait is bounded on purpose. An earlier
+    /// version used `synchronousRemoteObjectProxy`, which blocks the main thread with no
+    /// timeout: when the daemon cannot start, nothing ever replies and the app becomes
+    /// unquittable except through Force Quit. Getting the fans back to auto matters, but not
+    /// enough to trade away the ability to quit.
+    ///
+    /// Each fan settles exactly once, on whichever comes first, the reply or the proxy's
+    /// error handler, so a dead connection returns immediately instead of burning the
+    /// whole timeout.
+    func setFansToAutoAndWait(fanCount: Int, timeout: TimeInterval = 1.5) {
+        guard fanCount > 0 else { return }
+
+        lock.lock()
+        let conn = liveConnection()
+        lock.unlock()
+
+        let group = DispatchGroup()
+        let settleLock = NSLock()
+        var settled = Set<Int>()
+
+        func settle(_ index: Int) {
+            settleLock.lock()
+            let isFirst = settled.insert(index).inserted
+            settleLock.unlock()
+            if isFirst { group.leave() }
+        }
+
+        for i in 0..<fanCount {
+            group.enter()
+            guard let proxy = conn.remoteObjectProxyWithErrorHandler({ error in
+                NSLog("HelperConnection: fan %d reset at quit failed: %@", i, error.localizedDescription)
+                settle(i)
+            }) as? HelperProtocol else {
+                settle(i)
+                continue
+            }
+            proxy.setFanMode(fanIndex: i, isAuto: true) { _, _ in settle(i) }
+        }
+
+        if group.wait(timeout: .now() + timeout) == .timedOut {
+            NSLog("HelperConnection: fan reset at quit timed out after %.1fs", timeout)
+        }
+    }
+
+    /// Requires the daemon on the other end to be the helper this build shipped with.
+    /// Shared with `HelperInstaller`, which opens its own connection for the version probe.
+    /// A build with no team identity (local ad-hoc signing) has nothing to pin against and
+    /// connects unpinned — the helper does the same, and refuses everyone outside DEBUG.
+    static func pinToHelperSignature(_ connection: NSXPCConnection) {
+        switch XPCSecurity.policy(forIdentifier: XPCSecurity.helperIdentifier) {
+        case .require(let requirement):
+            connection.setCodeSigningRequirement(requirement)
+        case .cannotVerify:
+            NSLog("HelperConnection: no team identifier on this build; helper identity unverified")
+        }
     }
 
     private func proxy(for conn: NSXPCConnection) -> HelperProtocol? {

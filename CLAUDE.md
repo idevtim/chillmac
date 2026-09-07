@@ -94,11 +94,12 @@ ChillMac/
   SMC/              - IOKit bridge (SMCConnection, SMCTypes, SMCKeys)
   XPC/              - HelperConnection (client), HelperInstaller
 FanControlHelper/
-  main.swift        - Helper daemon entry point
-  HelperDelegate.swift - XPC listener + code signature validation
+  main.swift        - Helper daemon entry point; installs the client signing requirement
+  HelperDelegate.swift - XPC listener delegate
   HelperService.swift  - Privileged fan control operations
 Shared/
   HelperProtocol.swift - XPC protocol shared between app and helper
+  XPCSecurity.swift    - Code signing requirements both ends pin each other to
 scripts/
   build-dmg.sh      - Release pipeline: build, sign, DMG, notarize, staple
 ```
@@ -109,7 +110,8 @@ scripts/
 - **StatusBarController** shows fan RPM in menu bar, manages NSPopover + detail panels
 - **DetailPanelController** manages floating NSPanels adjacent to the main popover
 - **SMCConnection** wraps IOKit calls; uses fixed-point encoding (fpe2 for RPM, sp78 for temperature)
-- **HelperDelegate** validates caller code signature before accepting XPC connections
+- **XPCSecurity** builds the code signing requirement both ends pin each other to (team derived from the running binary, with the shipped team as a floor)
+- The helper's listener enforces that requirement, so XPC rejects unauthorized callers before **HelperDelegate** is consulted
 - Apple Silicon uses `Ftst` (test mode) key to bypass thermalmonitord; signal handlers ensure cleanup on exit
 - `#if DEBUG` allows unsigned helper connections during development
 - Fans always reset to auto mode on app launch
