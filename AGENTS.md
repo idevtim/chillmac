@@ -118,7 +118,9 @@ scripts/
   launch constraints SIGKILL the bundled daemon when duplicate bundle IDs with mismatched
   signatures are present (`CODESIGNING 4, Launch Constraint Violation`), so the helper is
   registered and approved but never runs. Stale Xcode DerivedData builds are enough to
-  cause it, and it looks exactly like broken fan control. `build-dmg.sh` warns about it;
+  cause it, and it looks exactly like broken fan control. Copies sharing one Developer ID
+  signature have been observed to coexist safely; ad-hoc Debug builds beside a signed one
+  are the dangerous case. `build-dmg.sh` warns about it;
   if the helper will not start, check `/Library/Logs/DiagnosticReports` before anything else
 - Fans always reset to auto mode on app launch
 - Detail panels (CPU, Memory, Battery, Disk) open as floating NSPanels to the left of the main popover

@@ -35,6 +35,33 @@ enum PerformanceLevel: String, CaseIterable {
     }
 }
 
+/// How the menu bar reports temperature alongside the fan icon.
+enum MenuBarTemperatureMode: String, CaseIterable {
+    /// Fan icon only. The default: the menu bar is shared space, so ChillMac does not
+    /// take more of it than asked.
+    case off
+    /// Stays quiet while the Mac is thermally Good, appears once it is Warm or Hot.
+    case whenWarm
+    /// Always shown.
+    case always
+
+    var label: String {
+        switch self {
+        case .off: return "Off"
+        case .whenWarm: return "When Warm"
+        case .always: return "Always"
+        }
+    }
+
+    var explanation: String {
+        switch self {
+        case .off: return "Fan icon only"
+        case .whenWarm: return "Only once the Mac is warm or hot"
+        case .always: return "Always show the hottest sensor"
+        }
+    }
+}
+
 enum AppearanceMode: String, CaseIterable {
     case system
     case light
@@ -77,6 +104,12 @@ final class AppSettings: ObservableObject {
     @AppStorage("forcePerformanceOnBattery") var forcePerformanceOnBattery = false
     @AppStorage("keepFansOnScreenSleep") var keepFansOnScreenSleep = false
     @AppStorage("showFPS") var showFPS = false
+    @AppStorage("menuBarTemperature") var menuBarTemperature: MenuBarTemperatureMode = .off
+
+    /// On AC, keep fans under app control through display sleep, lock and system sleep, so
+    /// closing the lid in clamshell does not hand them back to macOS. Off by default: it
+    /// leaves fans in manual mode across events where macOS would otherwise take over.
+    @AppStorage("keepFansClosedOnPower") var keepFansClosedOnPower = false
 
     static let popoverMinHeight: CGFloat = 400
     static let popoverMaxHeight: CGFloat = 900
@@ -143,6 +176,13 @@ final class AppSettings: ObservableObject {
             NSLog("Launch at login failed: \(error)")
             syncLaunchAtLogin()
         }
+    }
+
+    /// Compact form for the status item, e.g. "78°". No unit letter and no decimal: the
+    /// menu bar is shared space and the popover carries the precise reading.
+    func formatMenuBarTemperature(_ celsius: Double) -> String {
+        let value = useFahrenheit ? celsius * 9.0 / 5.0 + 32.0 : celsius
+        return "\(Int(value.rounded()))°"
     }
 
     func formatTemperature(_ celsius: Double) -> String {

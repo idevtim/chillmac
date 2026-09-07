@@ -152,21 +152,18 @@ struct PopoverView: View {
         .animation(.easeOut(duration: 0.3), value: appeared)
     }
 
+    /// Shared with the menu bar via `ThermalStatus`, so "Warm" means the same in both places.
     private var thermalStatus: String {
-        guard !monitor.sensors.isEmpty else { return "Good" }
+        guard !monitor.sensors.isEmpty else { return ThermalStatus.good.label }
         let maxTemp = monitor.sensors.map(\.temperature).max() ?? 0
-        if maxTemp >= 90 { return "Hot" }
-        if maxTemp >= 75 { return "Warm" }
-        return "Good"
+        return ThermalStatus.forTemperature(maxTemp).label
     }
 
     private var thermalStatusColor: Color {
-        guard !monitor.sensors.isEmpty else { return .green }
         let isLight = (settings.preferredColorScheme ?? colorScheme) == .light
+        guard !monitor.sensors.isEmpty else { return ThermalStatus.good.color(isLight: isLight) }
         let maxTemp = monitor.sensors.map(\.temperature).max() ?? 0
-        if maxTemp >= 90 { return .red }
-        if maxTemp >= 75 { return isLight ? Color(red: 0.80, green: 0.45, blue: 0.0) : .orange }
-        return .green
+        return ThermalStatus.forTemperature(maxTemp).color(isLight: isLight)
     }
 
     private var maxTempDisplay: String {

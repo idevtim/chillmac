@@ -89,9 +89,10 @@ check_duplicate_bundles() {
   while IFS= read -r path; do
     [ -n "$path" ] && echo "     $path"
   done <<< "$dupes"
-  echo "   macOS will SIGKILL the privileged helper while these exist, and fan control"
-  echo "   will silently do nothing after you install this build. Remove them before"
-  echo "   testing, leaving only the copy in /Applications."
+  echo "   If any of these is signed differently from the build you install (an ad-hoc"
+  echo "   Debug build is the usual case), macOS SIGKILLs the privileged helper and fan"
+  echo "   control silently does nothing. Copies sharing this Developer ID signature have"
+  echo "   been observed to be harmless, but the safe state is one copy in /Applications."
 }
 check_duplicate_bundles
 

@@ -285,6 +285,33 @@ struct SettingsView: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
+
+                Divider()
+                    .background(theme.dividerSubtle)
+
+                HStack {
+                    Image(systemName: "powerplug")
+                        .font(.system(size: 16))
+                        .foregroundColor(theme.textTertiary)
+                        .frame(width: 24)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Keep Fans When Closed on Power")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(theme.textPrimary)
+                        Text("Clamshell on AC. Fans stay as set through lid close, lock and sleep")
+                            .font(.system(size: 11))
+                            .foregroundColor(theme.textQuaternary)
+                    }
+                    Spacer()
+                    Toggle(isOn: $settings.keepFansClosedOnPower) {
+                        EmptyView()
+                    }
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .tint(.orange)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
             }
             .background(theme.cardBg)
             .cornerRadius(12)
@@ -318,6 +345,38 @@ struct SettingsView: View {
                     .toggleStyle(.switch)
                     .controlSize(.small)
                     .tint(.teal)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+
+                Divider()
+                    .background(theme.dividerSubtle)
+
+                // Menu bar temperature
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Image(systemName: "thermometer.medium")
+                            .font(.system(size: 16))
+                            .foregroundColor(theme.textTertiary)
+                            .frame(width: 24)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Temperature in Menu Bar")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(theme.textPrimary)
+                            Text(settings.menuBarTemperature.explanation)
+                                .font(.system(size: 11))
+                                .foregroundColor(theme.textQuaternary)
+                        }
+                        Spacer()
+                    }
+
+                    Picker("", selection: $settings.menuBarTemperature) {
+                        ForEach(MenuBarTemperatureMode.allCases, id: \.self) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)

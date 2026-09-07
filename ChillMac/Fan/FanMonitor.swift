@@ -255,9 +255,32 @@ final class FanMonitor: ObservableObject {
         dnc.addObserver(self, selector: #selector(handleScreenUnlocked), name: NSNotification.Name("com.apple.screenIsUnlocked"), object: nil)
     }
 
+    /// Whether fans should stay under app control across display sleep, screen lock or
+    /// system sleep, rather than being handed back to macOS.
+    ///
+    /// "Keep on power" is scoped to AC deliberately. Leaving fans pinned at a fixed RPM is
+    /// cheap when plugged in and expensive on battery, so on battery this falls through to
+    /// the plain screen-sleep preference and nothing changes.
+    private func shouldKeepFansDuringSleep() -> Bool {
+        if AppSettings.shared.keepFansClosedOnPower, PowerSource.isOnAC {
+            return true
+        }
+        return AppSettings.shared.keepFansOnScreenSleep
+    }
+
     @objc private func handleSleep() {
-        NSLog("FanMonitor: system going to sleep — resetting fans to auto")
+        // Set regardless: no fan commands should go out while the machine is down, whether
+        // or not we keep the speeds we already set.
         systemAsleep = true
+
+        // Closing the lid in clamshell posts this even when the Mac stays awake on an
+        // external display, and resetting here is what undid "keep fans" for that setup.
+        if shouldKeepFansDuringSleep() {
+            NSLog("FanMonitor: system sleep — keeping fans as set (user preference)")
+            return
+        }
+
+        NSLog("FanMonitor: system going to sleep — resetting fans to auto")
         resetAllFansToAuto()
     }
 
@@ -268,7 +291,7 @@ final class FanMonitor: ObservableObject {
     }
 
     @objc private func handleScreenSleep() {
-        if AppSettings.shared.keepFansOnScreenSleep {
+        if shouldKeepFansDuringSleep() {
             NSLog("FanMonitor: screen sleep — keeping fans active (user preference)")
             return
         }
@@ -284,7 +307,7 @@ final class FanMonitor: ObservableObject {
     }
 
     @objc private func handleScreenLocked() {
-        if AppSettings.shared.keepFansOnScreenSleep {
+        if shouldKeepFansDuringSleep() {
             NSLog("FanMonitor: screen locked — keeping fans active (user preference)")
             return
         }
@@ -359,17 +382,9 @@ final class FanMonitor: ObservableObject {
     private func checkBatterySaver(policy: BatterySaverPolicy) -> Bool {
         guard policy.enabled, !policy.forcePerformanceOnBattery else { return false }
 
-        guard let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
-              let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() as? [CFTypeRef],
-              let firstSource = sources.first,
-              let info = IOPSGetPowerSourceDescription(snapshot, firstSource)?.takeUnretainedValue() as? [String: Any]
-        else { return false }
-
-        let isOnAC = (info[kIOPSPowerSourceStateKey] as? String) == kIOPSACPowerValue
-        if isOnAC { return false }
-
-        let charge = info[kIOPSCurrentCapacityKey] as? Int ?? 100
-        return charge <= policy.threshold
+        guard let power = PowerSource.current() else { return false }
+        if power.isOnAC { return false }
+        return power.charge <= policy.threshold
     }
 
     func startMonitoring() {

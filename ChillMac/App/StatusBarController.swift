@@ -7,6 +7,9 @@ final class StatusBarController: NSObject {
     private let popover: NSPopover
     private var eventMonitor: Any?
     private var settingsSub: AnyCancellable?
+    private var menuBarTempSub: AnyCancellable?
+    /// Last string pushed to the status item, so identical values never touch AppKit.
+    private var lastStatusTitle = ""
     private var heightObserver: Any?
     private var detailResetObserver: Any?
     private var detailPanelObserver: Any?
@@ -52,7 +55,14 @@ final class StatusBarController: NSObject {
             button.image = NSImage(systemSymbolName: "fan.fill", accessibilityDescription: "ChillMac")
             button.action = #selector(togglePopover(_:))
             button.target = self
+            button.imagePosition = .imageLeading
         }
+
+        // Peak temperature drives the menu bar label. It keeps updating while the popover is
+        // closed, which is exactly when the menu bar is the only thing the user can see.
+        menuBarTempSub = fanMonitor.$peakTemperature
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] temp in self?.updateStatusItemTitle(peak: temp) }
 
         // Close popover when clicking outside both the popover and detail panel
         eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
@@ -81,6 +91,8 @@ final class StatusBarController: NSObject {
                 guard let self else { return }
                 self.popover.appearance = AppSettings.shared.nsAppearance
                 self.popover.contentViewController?.view.appearance = AppSettings.shared.nsAppearance
+                // Mode and °F/°C both change the label without the temperature moving.
+                self.updateStatusItemTitle(peak: self.fanMonitor.peakTemperature)
 
                 // Handle height changes from settings (e.g. Reset button), not during live drag
                 let newHeight = CGFloat(AppSettings.shared.popoverHeight)
@@ -127,6 +139,35 @@ final class StatusBarController: NSObject {
         if let observer = detailPanelObserver {
             NotificationCenter.default.removeObserver(observer)
         }
+    }
+
+    /// Renders the menu bar label for `peak`.
+    ///
+    /// Deliberately text-only. A status item is expected to be a template image that adapts
+    /// to the wallpaper and to Dark Mode, and `contentTintColor` on `NSStatusBarButton` does
+    /// not survive that reliably, so heat is conveyed by the digits appearing at all rather
+    /// than by colour.
+    private func updateStatusItemTitle(peak: Double) {
+        guard let button = statusItem.button else { return }
+
+        let title: String
+        switch AppSettings.shared.menuBarTemperature {
+        case .off:
+            title = ""
+        case .always:
+            title = peak > 0 ? " " + AppSettings.shared.formatMenuBarTemperature(peak) : ""
+        case .whenWarm:
+            // Nothing until the Mac is actually warm, so the bar stays quiet at idle.
+            title = (peak > 0 && ThermalStatus.forTemperature(peak) != .good)
+                ? " " + AppSettings.shared.formatMenuBarTemperature(peak)
+                : ""
+        }
+
+        // The status item resizes when its title changes, which nudges every icon to its
+        // left. Only touch it when the rendered string actually differs.
+        guard title != lastStatusTitle else { return }
+        lastStatusTitle = title
+        button.title = title
     }
 
     /// Screen rect of the menu bar icon, used to tell our own icon apart from a click
