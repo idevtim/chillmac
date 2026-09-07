@@ -3,6 +3,26 @@
     <channel>
         <title>ChillMac</title>
         <item>
+            <title>1.9.1</title>
+            <pubDate>Mon, 07 Sep 2026 12:09:40 -0400</pubDate>
+            <link>https://github.com/idevtim/chillmac</link>
+            <sparkle:fullReleaseNotesLink>https://github.com/idevtim/chillmac/releases</sparkle:fullReleaseNotesLink>
+            <sparkle:version>1.9.1</sparkle:version>
+            <sparkle:shortVersionString>1.9.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[## Highlights
+
+Two things you can now switch on: the current temperature beside the menu bar icon, and keeping fans under ChillMac's control when you close the lid while plugged in. Both are off by default, so nothing changes unless you want it to.
+
+## Added
+
+- **Temperature in the menu bar.** Settings, under Display. "When Warm" leaves the menu bar alone until the Mac actually heats up and shows the reading only then, matching the Good / Warm / Hot wording in the main window. "Always" keeps it there the whole time. It follows your °F/°C setting, and stays plain text so it looks right on any wallpaper and in both light and dark menu bars
+- **Keep Fans When Closed on Power.** Settings, under Fan Control. While on AC, fans stay exactly as ChillMac set them through closing the lid, locking the screen and sleeping, instead of being handed straight back to macOS. Useful for a docked Mac driving an external display. On battery nothing changes, so closing the lid away from a charger still returns the fans to automatic
+]]></description>
+            <enclosure url="https://github.com/idevtim/chillmac/releases/download/v1.9.1/ChillMac-1.9.1.zip" length="2483466" type="application/octet-stream" sparkle:edSignature="hKquJw5wYJJ4uv2fv7kz/NzHftAnJLoTHzGLxEeAYCh2ucc2KpLRbso0eXxFZDVlQl/gFJZwi1fFesxxn1eIBQ=="/>
+        </item>
+        <item>
             <title>1.9.0</title>
             <pubDate>Mon, 07 Sep 2026 10:48:41 -0400</pubDate>
             <link>https://github.com/idevtim/chillmac</link>
@@ -50,45 +70,6 @@ This release re-registers that helper, so macOS will ask you to approve ChillMac
 - **Max Capacity (mAh).** Now derived from the same measurement as the health percentage, so the two agree
 ]]></description>
             <enclosure url="https://github.com/idevtim/chillmac/releases/download/v1.8.2/ChillMac-1.8.2.zip" length="2428480" type="application/octet-stream" sparkle:edSignature="GEqDgU3Drys+2MwqV1jDGoXugYSXmmkmpJPLnsMff/SxGeAL6PFrc0cx4tTvNE/tP86tGTTMJgAyFkY2jQ4JBA=="/>
-        </item>
-        <item>
-            <title>1.8.1</title>
-            <pubDate>Fri, 31 Jul 2026 14:13:58 -0400</pubDate>
-            <link>https://github.com/idevtim/chillmac</link>
-            <sparkle:fullReleaseNotesLink>https://github.com/idevtim/chillmac/releases</sparkle:fullReleaseNotesLink>
-            <sparkle:version>1.8.1</sparkle:version>
-            <sparkle:shortVersionString>1.8.1</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[## Highlights
-
-Fan control didn't work on recent installs, and this fixes it.
-
-ChillMac changes fan speeds through a small privileged helper that runs in the background. On any reasonably recent install, that helper was never actually getting installed — the app asked macOS to register it at every launch, the request failed, and the failure only went to the system log. Nothing in the interface said anything was wrong. Sliders moved, Performance Mode looked engaged, and no fan ever changed speed.
-
-Monitoring was never affected — temperatures, CPU, memory, battery and fan RPM readouts were always accurate, because reading doesn't need the helper. Only changing fan speed did.
-
-## Fixed
-
-- **The privileged helper now installs correctly.** The app bundle was missing the launch daemon definition that macOS reads to install it, so registration failed every time with "Unable to read plist". The definition is now built into the app, and the helper registers, starts on demand and answers normally
-
-## After updating
-
-macOS may ask you to approve ChillMac's background helper. If fan control still does nothing after this update, open **System Settings → General → Login Items & Extensions** and make sure ChillMac is enabled under "Allow in the Background".
-
-## If you've used ChillMac since its early releases
-
-Very early versions installed the helper a different way, leaving files in `/Library`. That older copy still claims the same identifier, which blocks the new one from registering — so if fan control is still dead after updating and approving, remove the leftovers and restart ChillMac:
-
-```
-sudo launchctl bootout system/com.idevtim.ChillMac.Helper
-sudo rm -f /Library/LaunchDaemons/com.idevtim.ChillMac.Helper.plist
-sudo rm -f /Library/PrivilegedHelperTools/com.idevtim.ChillMac.Helper
-```
-
-Most people won't need this. If ChillMac was installed recently, skip it.
-]]></description>
-            <enclosure url="https://github.com/idevtim/chillmac/releases/download/v1.8.1/ChillMac-1.8.1.zip" length="2422184" type="application/octet-stream" sparkle:edSignature="zOtamWRv4uLf0Pnin6CrLgJeduo/HLTaR7wwL2U2QlAspZ//qPtHxGZPo0xTUiJyBxwYAm9oUnJwAutm6x0aBg=="/>
         </item>
     </channel>
 </rss>
