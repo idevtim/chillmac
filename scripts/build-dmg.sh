@@ -48,6 +48,53 @@ BUILD_DIR="$PROJECT_DIR/build"
 DERIVED_DIR="$BUILD_DIR/DerivedData"
 APP_PATH="$BUILD_DIR/$APP_NAME.app"
 DMG_PATH="$BUILD_DIR/$APP_NAME.dmg"
+
+# ─── Pre-flight: duplicate app bundles ──────────────────────────────────────
+# macOS launch constraints refuse to start a bundled daemon when several copies of the
+# same bundle identifier exist on disk with mismatched signatures. The helper is then
+# SIGKILLed the instant launchd starts it (CODESIGNING 4, "Launch Constraint Violation"),
+# leaving a daemon that is registered, approved, and never running. It presents exactly
+# like broken fan control, and the app cannot tell the difference either.
+#
+# Stale Xcode DerivedData builds are enough to trigger it, so this is easy to hit and
+# very hard to recognise. Warn rather than fail: duplicates do not affect the DMG being
+# produced here, only the experience of installing and testing it afterwards.
+check_duplicate_bundles() {
+  # Newline-delimited throughout: app paths can contain spaces, so nothing here may rely
+  # on word splitting.
+  local candidates
+  candidates=$( { mdfind "kMDItemCFBundleIdentifier == 'com.idevtim.ChillMac'" 2>/dev/null || true
+                  # Spotlight skips .noindex and can lag, so sweep Xcode's output directly.
+                  find "$HOME/Library/Developer/Xcode/DerivedData" -maxdepth 7 \
+                       -name "$APP_NAME.app" -type d -prune 2>/dev/null || true
+                } | sort -u )
+
+  local dupes=""
+  while IFS= read -r path; do
+    [ -z "$path" ] && continue
+    # Ignore this script's own build output; it is removed and rebuilt every run.
+    case "$path" in "$BUILD_DIR"/*) continue ;; esac
+    # /Applications is where the app is supposed to live. One copy there is the healthy
+    # state, not a duplicate, and warning about it would train the warning away.
+    case "$path" in "/Applications/$APP_NAME.app") continue ;; esac
+    dupes="${dupes}${path}"$'\n'
+  done <<< "$candidates"
+
+  if [ -z "$dupes" ]; then
+    echo "✓ No duplicate app bundles on disk"
+    return 0
+  fi
+
+  echo "⚠️  Other copies of $APP_NAME.app found on this Mac:"
+  while IFS= read -r path; do
+    [ -n "$path" ] && echo "     $path"
+  done <<< "$dupes"
+  echo "   macOS will SIGKILL the privileged helper while these exist, and fan control"
+  echo "   will silently do nothing after you install this build. Remove them before"
+  echo "   testing, leaving only the copy in /Applications."
+}
+check_duplicate_bundles
+
 # Sparkle downloads a zip, not the dmg. Kept in its own directory because
 # generate_appcast treats that directory as the archive set it maintains.
 UPDATES_DIR="$BUILD_DIR/updates"

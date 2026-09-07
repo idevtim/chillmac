@@ -114,6 +114,12 @@ scripts/
 - The helper's listener enforces that requirement, so XPC rejects unauthorized callers before **HelperDelegate** is consulted
 - Apple Silicon uses `Ftst` (test mode) key to bypass thermalmonitord; signal handlers ensure cleanup on exit
 - `#if DEBUG` allows unsigned helper connections during development
+- **Only one copy of ChillMac.app may exist on disk while testing fan control.** macOS
+  launch constraints SIGKILL the bundled daemon when duplicate bundle IDs with mismatched
+  signatures are present (`CODESIGNING 4, Launch Constraint Violation`), so the helper is
+  registered and approved but never runs. Stale Xcode DerivedData builds are enough to
+  cause it, and it looks exactly like broken fan control. `build-dmg.sh` warns about it;
+  if the helper will not start, check `/Library/Logs/DiagnosticReports` before anything else
 - Fans always reset to auto mode on app launch
 - Detail panels (CPU, Memory, Battery, Disk) open as floating NSPanels to the left of the main popover
 
