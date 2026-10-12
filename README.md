@@ -44,6 +44,16 @@ A free, open-source macOS menu bar app for monitoring your system and controllin
 
 The DMG is signed, notarized, and stapled by Apple — Gatekeeper will let it through.
 
+### Homebrew
+
+```sh
+brew install --cask idevtim/tap/chillmac
+```
+
+Same signed build, from the tap. ChillMac updates itself through Sparkle afterwards, so
+`brew upgrade` leaves it alone unless you pass `--greedy`. `brew uninstall --zap --cask chillmac`
+stops the fan control helper and removes ChillMac's settings.
+
 ### Build from source
 
 **Requirements:**
