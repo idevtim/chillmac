@@ -7,6 +7,11 @@ import Sparkle
 /// EdDSA signature check, bundle swap, relaunch. This wrapper exists for two reasons: to
 /// expose `updateAvailable` to the popover badge, and to pull the update window forward,
 /// which an `LSUIElement` app has to ask for explicitly.
+///
+/// Scheduled checks use Sparkle's gentle reminders: a background check that finds an update
+/// does not throw a window in the user's face. It badges the menu bar icon and puts an
+/// Update button at the top of the popover instead, and Sparkle's own window only appears
+/// once the user asks for it.
 final class UpdateController: NSObject, ObservableObject, SPUUpdaterDelegate, SPUStandardUserDriverDelegate {
 
     /// True once a check has found a newer version. Drives the popover badge.
@@ -93,7 +98,26 @@ final class UpdateController: NSObject, ObservableObject, SPUUpdaterDelegate, SP
         DispatchQueue.main.async { self.isChecking = false }
     }
 
+    /// "Skip This Version" means the user has seen it and declined. Keeping the badge up
+    /// after that would nag about a version they have explicitly dismissed.
+    func updater(_ updater: SPUUpdater, userDidMake choice: SPUUserUpdateChoice, forUpdate updateItem: SUAppcastItem, state: SPUUserUpdateState) {
+        guard choice == .skip else { return }
+        DispatchQueue.main.async {
+            self.updateAvailable = false
+            self.latestVersion = nil
+        }
+    }
+
     // MARK: - SPUStandardUserDriverDelegate
+
+    var supportsGentleScheduledUpdateReminders: Bool { true }
+
+    /// Background checks never open Sparkle's window on their own. A menu bar app has no
+    /// natural moment to interrupt the user, so the badge does the telling and the window
+    /// waits until the user clicks Update.
+    func standardUserDriverShouldHandleShowingScheduledUpdate(_ update: SUAppcastItem, andInImmediateFocus immediateFocus: Bool) -> Bool {
+        false
+    }
 
     /// Sparkle is about to show something. Make sure the app is frontmost first.
     func standardUserDriverWillShowModalAlert() {

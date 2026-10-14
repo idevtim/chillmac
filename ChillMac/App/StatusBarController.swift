@@ -8,6 +8,7 @@ final class StatusBarController: NSObject {
     private var eventMonitor: Any?
     private var settingsSub: AnyCancellable?
     private var menuBarTempSub: AnyCancellable?
+    private var updateBadgeSub: AnyCancellable?
     /// Last string pushed to the status item, so identical values never touch AppKit.
     private var lastStatusTitle = ""
     private var heightObserver: Any?
@@ -52,7 +53,7 @@ final class StatusBarController: NSObject {
         popover.contentSize = NSSize(width: 420, height: CGFloat(AppSettings.shared.popoverHeight))
 
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "fan.fill", accessibilityDescription: "ChillMac")
+            button.image = Self.fanImage
             button.action = #selector(togglePopover(_:))
             button.target = self
             button.imagePosition = .imageLeading
@@ -63,6 +64,15 @@ final class StatusBarController: NSObject {
         menuBarTempSub = fanMonitor.$peakTemperature
             .receive(on: DispatchQueue.main)
             .sink { [weak self] temp in self?.updateStatusItemTitle(peak: temp) }
+
+        // Badge the icon when a background check finds a newer version. The menu bar is the
+        // only part of the app visible most of the time, so this is where the news has to go.
+        updateBadgeSub = updateController.$updateAvailable
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] available in
+                self?.statusItem.button?.image = available ? Self.badgedFanImage : Self.fanImage
+            }
 
         // Close popover when clicking outside both the popover and detail panel
         eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
@@ -140,6 +150,35 @@ final class StatusBarController: NSObject {
             NotificationCenter.default.removeObserver(observer)
         }
     }
+
+    private static let fanImage = NSImage(systemSymbolName: "fan.fill", accessibilityDescription: "ChillMac")
+
+    /// The fan with a small download arrow in its bottom-right corner, signalling that an
+    /// update is waiting.
+    ///
+    /// Stays a template image, like the plain fan, so it still adapts to the wallpaper and
+    /// to Dark Mode. A ring is cut out of the fan around the badge, which is what keeps the
+    /// two shapes apart at menu bar size without relying on colour.
+    private static let badgedFanImage: NSImage? = {
+        guard let fan = NSImage(systemSymbolName: "fan.fill", accessibilityDescription: "ChillMac, update available"),
+              let arrow = NSImage(systemSymbolName: "arrow.down.circle.fill", accessibilityDescription: nil)
+        else { return fanImage }
+
+        let size = fan.size
+        let diameter = (size.height * 0.5).rounded()
+        let image = NSImage(size: size, flipped: false) { rect in
+            fan.draw(in: rect)
+            let badge = NSRect(x: rect.maxX - diameter, y: rect.minY, width: diameter, height: diameter)
+            NSGraphicsContext.current?.compositingOperation = .destinationOut
+            NSBezierPath(ovalIn: badge.insetBy(dx: -1.5, dy: -1.5)).fill()
+            NSGraphicsContext.current?.compositingOperation = .sourceOver
+            arrow.draw(in: badge)
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = "ChillMac, update available"
+        return image
+    }()
 
     /// Renders the menu bar label for `peak`.
     ///
@@ -243,7 +282,8 @@ final class StatusBarController: NSObject {
                 onDiskTap: { [weak self] in self?.toggleDiskPanel() },
                 onBatteryTap: { [weak self] in self?.toggleBatteryPanel() },
                 onCpuTap: { [weak self] in self?.toggleCpuPanel() },
-                onTemperatureTap: { [weak self] in self?.toggleTemperaturePanel() }
+                onTemperatureTap: { [weak self] in self?.toggleTemperaturePanel() },
+                onInstallUpdate: { [weak self] in self?.installUpdate() }
             )
         )
         let height = CGFloat(AppSettings.shared.popoverHeight)
@@ -251,6 +291,13 @@ final class StatusBarController: NSObject {
         hosting.view.appearance = AppSettings.shared.nsAppearance
         popover.contentSize = NSSize(width: 420, height: height)
         return hosting
+    }
+
+    /// Closes the popover before handing off to Sparkle, so its update window is not left
+    /// sitting underneath a popover the user has finished with.
+    private func installUpdate() {
+        closePopover(sender: nil)
+        updateController.checkForUpdates()
     }
 
     private func toggleMemoryPanel() {

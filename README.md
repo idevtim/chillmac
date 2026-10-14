@@ -6,7 +6,7 @@
 
 A free, open-source macOS menu bar app for monitoring your system and controlling fan speeds. Keep your Mac chilly.
 
-**[Download the latest release](https://github.com/idevtim/chillmac/releases/latest)**
+**[Download ChillMac.dmg](https://github.com/idevtim/chillmac/releases/latest/download/ChillMac.dmg)** · [All releases](https://github.com/idevtim/chillmac/releases)
 
 ## Screenshots
 
@@ -30,14 +30,14 @@ A free, open-source macOS menu bar app for monitoring your system and controllin
 - **Battery Monitor** — Charge gauge, health percentage, cycle count, and temperature
 - **Disk Monitor** — Storage breakdown by category with SSD temperature
 - **Temperature Sensors** — Color-coded readings for CPU, GPU, memory, SSD, battery, and more
-- **Auto-Update** — Checks for new releases from GitHub and notifies you in-app
+- **Auto-Update** — Checks for new releases in the background, badges the menu bar icon, and installs in one click
 - Apple Silicon and Intel Mac support
 
 ## Install
 
 ### Download (recommended)
 
-1. Grab `ChillMac.dmg` from the [latest release](https://github.com/idevtim/chillmac/releases/latest)
+1. [Download `ChillMac.dmg`](https://github.com/idevtim/chillmac/releases/latest/download/ChillMac.dmg) (always the latest release)
 2. Open the DMG and drag ChillMac to Applications
 3. Launch ChillMac — it'll appear in your menu bar
 4. On first launch, you'll be prompted for admin credentials to install the fan control helper

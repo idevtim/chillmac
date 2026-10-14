@@ -17,12 +17,12 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.9.1</string>
+    <string>1.10.0</string>
     <!-- Sparkle compares releases on CFBundleVersion, so this must increase every
          release. build-dmg.sh syncs it to CFBundleShortVersionString before building
          to keep the two from drifting apart. -->
     <key>CFBundleVersion</key>
-    <string>1.9.1</string>
+    <string>1.10.0</string>
     <key>LSMinimumSystemVersion</key>
     <string>$(MACOSX_DEPLOYMENT_TARGET)</string>
     <key>LSUIElement</key>
@@ -41,6 +41,10 @@
     <string>TDnC5yMZcwQ8x4jjkJFyxK7yJF+z34NhMk4BanAiij0=</string>
     <key>SUEnableAutomaticChecks</key>
     <true/>
+    <!-- Background check every 6 hours (Sparkle's default is daily). A menu bar app can
+         stay running for weeks, and the icon badge is only as fresh as the last check. -->
+    <key>SUScheduledCheckInterval</key>
+    <integer>21600</integer>
     <key>SMPrivilegedExecutables</key>
     <dict>
         <key>com.idevtim.ChillMac.Helper</key>

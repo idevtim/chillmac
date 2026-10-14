@@ -16,6 +16,7 @@ struct PopoverView: View {
     var onBatteryTap: (() -> Void)?
     var onCpuTap: (() -> Void)?
     var onTemperatureTap: (() -> Void)?
+    var onInstallUpdate: (() -> Void)?
 
     @State private var appeared = false
     @State private var showingSettings = false
@@ -95,6 +96,12 @@ struct PopoverView: View {
             } else {
                 ScrollView(.vertical, showsIndicators: settings.showScrollIndicators) {
                     VStack(spacing: 12) {
+                        if updateController.updateAvailable, let version = updateController.latestVersion {
+                            UpdateBannerView(version: version) { onInstallUpdate?() }
+                                .opacity(appeared ? 1 : 0)
+                                .animation(.easeOut(duration: 0.3), value: appeared)
+                        }
+
                         // System info cards
                         systemInfoCards
 
