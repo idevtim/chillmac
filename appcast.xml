@@ -3,6 +3,27 @@
     <channel>
         <title>ChillMac</title>
         <item>
+            <title>1.10.0</title>
+            <pubDate>Wed, 14 Oct 2026 10:58:57 -0400</pubDate>
+            <link>https://github.com/idevtim/chillmac</link>
+            <sparkle:fullReleaseNotesLink>https://github.com/idevtim/chillmac/releases</sparkle:fullReleaseNotesLink>
+            <sparkle:version>1.10.0</sparkle:version>
+            <sparkle:shortVersionString>1.10.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[## Highlights
+
+ChillMac now tells you when a new version is out without interrupting you. A small download badge appears on the menu bar fan, and opening ChillMac shows an Update button right at the top, no trip to Settings needed.
+
+## Added
+
+- **Update badge in the menu bar.** ChillMac checks for new versions every few hours in the background. When one is found, the fan icon gets a small download arrow in its corner. Choosing "Skip This Version" clears it
+- **Update button on the main screen.** A card at the top of the popover names the new version and installs it in one click. ChillMac relaunches itself when it's done
+- **Install with Homebrew.** `brew install --cask idevtim/tap/chillmac` now works, and Homebrew installs keep updating themselves like any other copy
+]]></description>
+            <enclosure url="https://github.com/idevtim/chillmac/releases/download/v1.10.0/ChillMac-1.10.0.zip" length="2470682" type="application/octet-stream" sparkle:edSignature="rv91uC4wJ7hnCuZD8XdUbNU6Fl6Dz0m50xH5EWndqN1alcZQzQcdSxAjUZA1bLcxKKvhCkvbLxlF9Sl0l5m/Dw=="/>
+        </item>
+        <item>
             <title>1.9.1</title>
             <pubDate>Mon, 07 Sep 2026 12:09:40 -0400</pubDate>
             <link>https://github.com/idevtim/chillmac</link>
@@ -52,24 +73,6 @@ This release re-registers that helper, so macOS will ask you to approve ChillMac
 - **Smoother sliders and lighter background work.** Setting a fan speed takes a fraction of the work it used to, dragging a slider sends a couple of commands instead of one per step, and battery and disk readings moved off the main thread
 ]]></description>
             <enclosure url="https://github.com/idevtim/chillmac/releases/download/v1.9.0/ChillMac-1.9.0.zip" length="2467944" type="application/octet-stream" sparkle:edSignature="jRGXryXdSCSYUXjgxiMrEqKUlFMf9vnf972+KHJvvlaWJt6iJDWTrJOhlHgrlyePZmOYsyies+RXM9NFDeLEDA=="/>
-        </item>
-        <item>
-            <title>1.8.2</title>
-            <pubDate>Fri, 31 Jul 2026 21:55:23 -0400</pubDate>
-            <link>https://github.com/idevtim/chillmac</link>
-            <sparkle:fullReleaseNotesLink>https://github.com/idevtim/chillmac/releases</sparkle:fullReleaseNotesLink>
-            <sparkle:version>1.8.2</sparkle:version>
-            <sparkle:shortVersionString>1.8.2</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[Battery health now matches the number macOS reports.
-
-## Fixed
-
-- **Battery health percentage.** ChillMac was calculating it from the raw gauge reading and coming out several percent low. It now reads the same value System Settings shows
-- **Max Capacity (mAh).** Now derived from the same measurement as the health percentage, so the two agree
-]]></description>
-            <enclosure url="https://github.com/idevtim/chillmac/releases/download/v1.8.2/ChillMac-1.8.2.zip" length="2428480" type="application/octet-stream" sparkle:edSignature="GEqDgU3Drys+2MwqV1jDGoXugYSXmmkmpJPLnsMff/SxGeAL6PFrc0cx4tTvNE/tP86tGTTMJgAyFkY2jQ4JBA=="/>
         </item>
     </channel>
 </rss>
