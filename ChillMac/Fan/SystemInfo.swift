@@ -55,6 +55,11 @@ final class SystemInfo: ObservableObject {
         // Machine model & chip — async via system_profiler
         fetchHardwareInfo()
 
+        if let cached = Self.loadCategoryCache() {
+            diskCategories = cached.categories
+            deniedFolders = cached.denied
+        }
+
         // Disk & uptime — compute now, then poll
         refreshDynamic()
     }
@@ -169,49 +174,20 @@ final class SystemInfo: ObservableObject {
     private func fetchDiskCategories(totalBytes: Int64, availableBytes: Int64) {
         diskCategoryRefreshInFlight = true
         diskCategoryQueue.async { [weak self] in
-            let fm = FileManager.default
-            let home = fm.homeDirectoryForCurrentUser
-
-            /// Returns (size, denied). A folder is "denied" when we cannot enumerate it at all.
-            func directorySize(_ url: URL) -> (Int64, Bool) {
-                guard fm.isReadableFile(atPath: url.path),
-                      let enumerator = fm.enumerator(at: url, includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey], options: [.skipsHiddenFiles]) else {
-                    return (0, true)
-                }
-                var total: Int64 = 0
-                for case let fileURL as URL in enumerator {
-                    autoreleasepool {
-                        guard let values = try? fileURL.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey]),
-                              values.isRegularFile == true,
-                              let size = values.totalFileAllocatedSize else { return }
-                        total += Int64(size)
-                    }
-                }
-                return (total, false)
-            }
-
-            let (appsSize, appsDenied) = directorySize(URL(fileURLWithPath: "/Applications"))
-            let (downloadsSize, downloadsDenied) = directorySize(home.appendingPathComponent("Downloads"))
-            let (documentsSize, documentsDenied) = directorySize(home.appendingPathComponent("Documents"))
-            let (desktopSize, desktopDenied) = directorySize(home.appendingPathComponent("Desktop"))
+            let home = FileManager.default.homeDirectoryForCurrentUser
+            let folders = Self.categoryFolders.map { $0.path ?? home.appendingPathComponent($0.name).path }
+            let sizes = FolderSizer.sizes(of: folders)
 
             let usedBytes = totalBytes - availableBytes
-            let categorized = appsSize + downloadsSize + documentsSize + desktopSize
-            let otherSize = max(0, usedBytes - categorized)
+            let categorized = sizes.reduce(Int64(0)) { $0 + ($1 ?? 0) }
+            var entries = zip(Self.categoryFolders, sizes).map { folder, size in
+                (name: folder.name, bytes: size ?? 0, denied: size == nil)
+            }
+            entries.append((name: "Other", bytes: max(0, usedBytes - categorized), denied: false))
 
-            var denied = Set<String>()
-            if appsDenied { denied.insert("Applications") }
-            if downloadsDenied { denied.insert("Downloads") }
-            if documentsDenied { denied.insert("Documents") }
-            if desktopDenied { denied.insert("Desktop") }
-
-            let categories: [DiskCategory] = [
-                DiskCategory(name: "Applications", bytes: appsSize, color: .systemRed, denied: appsDenied),
-                DiskCategory(name: "Downloads", bytes: downloadsSize, color: .systemPink, denied: downloadsDenied),
-                DiskCategory(name: "Documents", bytes: documentsSize, color: .systemBlue, denied: documentsDenied),
-                DiskCategory(name: "Desktop", bytes: desktopSize, color: .systemGreen, denied: desktopDenied),
-                DiskCategory(name: "Other", bytes: otherSize, color: .systemGray),
-            ]
+            let categories = Self.makeCategories(entries)
+            let denied = Set(entries.filter(\.denied).map(\.name))
+            Self.saveCategoryCache(entries)
 
             DispatchQueue.main.async {
                 guard let self else { return }
@@ -222,6 +198,51 @@ final class SystemInfo: ObservableObject {
                 self.deniedFolders = denied
             }
         }
+    }
+
+    // MARK: - Disk Categories
+
+    /// Folders broken out in the Disk panel. Nil path means the folder of that name in home.
+    private static let categoryFolders: [(name: String, path: String?)] = [
+        ("Applications", "/Applications"),
+        ("Downloads", nil),
+        ("Documents", nil),
+        ("Desktop", nil),
+    ]
+
+    private static let categoryColors: [String: NSColor] = [
+        "Applications": .systemRed,
+        "Downloads": .systemPink,
+        "Documents": .systemBlue,
+        "Desktop": .systemGreen,
+        "Other": .systemGray,
+    ]
+
+    private static func makeCategories(_ entries: [(name: String, bytes: Int64, denied: Bool)]) -> [DiskCategory] {
+        entries.map {
+            DiskCategory(name: $0.name, bytes: $0.bytes, color: categoryColors[$0.name] ?? .systemGray, denied: $0.denied)
+        }
+    }
+
+    // The last breakdown is kept across launches, so the Disk panel opens with figures from
+    // the previous measurement while a fresh one runs, instead of a spinner for several
+    // seconds on every first open.
+
+    private static let categoryCacheKey = "diskCategoryCache"
+
+    private static func saveCategoryCache(_ entries: [(name: String, bytes: Int64, denied: Bool)]) {
+        let plist = entries.map { ["name": $0.name, "bytes": $0.bytes, "denied": $0.denied] as [String: Any] }
+        UserDefaults.standard.set(plist, forKey: categoryCacheKey)
+    }
+
+    private static func loadCategoryCache() -> (categories: [DiskCategory], denied: Set<String>)? {
+        guard let plist = UserDefaults.standard.array(forKey: categoryCacheKey) as? [[String: Any]] else { return nil }
+        let entries = plist.compactMap { item -> (name: String, bytes: Int64, denied: Bool)? in
+            guard let name = item["name"] as? String, let bytes = (item["bytes"] as? NSNumber)?.int64Value else { return nil }
+            return (name, bytes, item["denied"] as? Bool ?? false)
+        }
+        guard !entries.isEmpty else { return nil }
+        return (makeCategories(entries), Set(entries.filter(\.denied).map(\.name)))
     }
 
     static func formatDiskBytes(_ bytes: Int64) -> String {
