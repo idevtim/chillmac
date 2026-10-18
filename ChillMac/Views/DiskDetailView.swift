@@ -5,257 +5,147 @@ struct DiskDetailView: View {
     @ObservedObject var monitor: FanMonitor
     @ObservedObject var settings: AppSettings
     @Environment(\.theme) private var theme
-    @State private var panelHeight: CGFloat = CGFloat(AppSettings.shared.detailPanelHeight)
 
     var body: some View {
-        ZStack {
-            theme.backgroundGradient
+        DetailPanelScaffold(title: volumeName) {
+            PanelHero(
+                status: status.text,
+                statusColor: status.color,
+                value: systemInfo.diskTotalBytes > 0 ? SystemInfo.formatDiskBytes(systemInfo.diskAvailableBytes) : "—",
+                context: systemInfo.diskTotalBytes > 0 ? "free of \(SystemInfo.formatDiskBytes(systemInfo.diskTotalBytes))" : ""
+            )
 
-            VStack(alignment: .leading, spacing: 0) {
-                Text("Macintosh HD")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(theme.textPrimary)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 18)
-                    .padding(.bottom, 14)
+            if categoriesLoaded {
+                stackedBar
+                    .padding(.horizontal, 4)
+                categoryList
+            } else {
+                PanelLoadingView(message: "Calculating disk usage…", minHeight: 80)
+            }
 
-                ScrollView(.vertical, showsIndicators: settings.showScrollIndicators) {
-                    VStack(spacing: 16) {
-                        donutSection
-                        healthCards
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 16)
-                }
+            VStack(spacing: 0) {
+                PanelValueRow(
+                    icon: "thermometer.medium",
+                    iconColor: diskTempColor,
+                    title: "SSD temperature",
+                    value: avgDiskTemp > 0 ? "\(diskTempLabel) · \(settings.formatTemperature(avgDiskTemp))" : "No data",
+                    valueColor: avgDiskTemp > 0 ? diskTempColor : nil
+                )
+            }
+            .cardBackground(theme)
 
-                PanelResizeHandle(panelHeight: $panelHeight) {
-                    AppSettings.shared.detailPanelHeight = Double(panelHeight)
-                }
+            if categoriesLoaded && !systemInfo.deniedFolders.isEmpty {
+                limitedAccessNotice
             }
         }
-        .frame(width: 370, height: panelHeight)
     }
 
-    // MARK: - Donut Chart
-
-    private var usedBytes: Int64 {
-        systemInfo.diskTotalBytes - systemInfo.diskAvailableBytes
+    /// Name of the startup volume, "Macintosh HD" on almost every Mac.
+    private var volumeName: String {
+        (try? URL(fileURLWithPath: "/").resourceValues(forKeys: [.volumeNameKey]).volumeName) ?? "Macintosh HD"
     }
+
+    // MARK: - Status
+
+    private var freeFraction: Double {
+        guard systemInfo.diskTotalBytes > 0 else { return 1 }
+        return Double(systemInfo.diskAvailableBytes) / Double(systemInfo.diskTotalBytes)
+    }
+
+    private var status: (text: String, color: Color) {
+        if freeFraction < 0.15 { return ("Running low", theme.orange) }
+        return ("Lots of room left", theme.blue)
+    }
+
+    // MARK: - Categories
 
     private var categoriesLoaded: Bool {
         !systemInfo.diskCategories.isEmpty
     }
 
-    private var donutSection: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 14) {
-                ZStack {
-                    Circle()
-                        .stroke(theme.ringTrack, lineWidth: 20)
-
-                    if categoriesLoaded {
-                        // Draw category arcs
-                        ForEach(Array(arcSegments.enumerated()), id: \.offset) { _, segment in
-                            Circle()
-                                .trim(from: segment.start, to: segment.end)
-                                .stroke(segment.color, style: StrokeStyle(lineWidth: 20, lineCap: .butt))
-                                .rotationEffect(.degrees(-90))
-                        }
-                    }
-
-                    VStack(spacing: 2) {
-                        if categoriesLoaded {
-                            Text(SystemInfo.formatDiskBytes(systemInfo.diskAvailableBytes))
-                                .font(.system(size: 18, weight: .bold, design: .rounded))
-                                .foregroundColor(theme.textPrimary)
-                            Text("of \(SystemInfo.formatDiskBytes(systemInfo.diskTotalBytes)) available")
-                                .font(.system(size: 9))
-                                .foregroundColor(theme.textTertiary)
-                        } else {
-                            ProgressView()
-                                .controlSize(.small)
-                        }
-                    }
+    private var stackedBar: some View {
+        GeometryReader { geo in
+            let total = Double(max(systemInfo.diskTotalBytes, 1))
+            let visible = systemInfo.diskCategories.filter { $0.bytes > 0 && !$0.denied }
+            let usable = max(geo.size.width - CGFloat(visible.count) * 2, 0)
+            HStack(spacing: 2) {
+                ForEach(visible) { cat in
+                    Rectangle()
+                        .fill(Color(nsColor: cat.color))
+                        .frame(width: usable * CGFloat(Double(cat.bytes) / total))
                 }
-                .padding(12)
-                .frame(width: 160, height: 160)
-
-                VStack(alignment: .leading, spacing: 10) {
-                    if categoriesLoaded {
-                        ForEach(systemInfo.diskCategories) { cat in
-                            DiskLegendRow(
-                                color: Color(nsColor: cat.color),
-                                label: cat.name,
-                                value: cat.denied ? "No Access" : SystemInfo.formatDiskBytes(cat.bytes),
-                                denied: cat.denied
-                            )
-                        }
-                    } else {
-                        VStack(spacing: 6) {
-                            Text("Calculating disk usage…")
-                                .font(.system(size: 12))
-                                .foregroundColor(theme.textQuaternary)
-                        }
-                        .frame(maxHeight: .infinity)
-                    }
-                }
+                Spacer(minLength: 0)
             }
-            .padding(.vertical, 4)
-
-            if categoriesLoaded && !systemInfo.deniedFolders.isEmpty {
-                permissionBanner
-            }
+            .background(theme.track)
+            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
+        .frame(height: 14)
     }
 
-    // MARK: - Permission Banner
-
-    private var permissionBanner: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "lock.shield")
-                .font(.system(size: 16))
-                .foregroundColor(.orange)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Limited access")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(theme.textPrimary)
-                Text("\(systemInfo.deniedFolders.sorted().joined(separator: ", ")) need permission.")
-                    .font(.system(size: 11))
-                    .foregroundColor(theme.textQuaternary)
-                    .lineLimit(2)
+    private var categoryList: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(systemInfo.diskCategories.enumerated()), id: \.element.id) { index, cat in
+                if index > 0 { CardDivider() }
+                HStack(spacing: 10) {
+                    Circle()
+                        .fill(cat.denied ? theme.track : Color(nsColor: cat.color))
+                        .frame(width: 8, height: 8)
+                    Text(cat.name)
+                        .font(.system(size: 13))
+                        .foregroundColor(cat.denied ? theme.textQuaternary : theme.textPrimary)
+                    Spacer()
+                    if cat.denied {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(theme.textQuaternary)
+                    }
+                    Text(cat.denied ? "Not counted" : SystemInfo.formatDiskBytes(cat.bytes))
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundColor(cat.denied ? theme.textQuaternary : theme.textSecondary)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
             }
-
-            Spacer()
-
-            Button(action: openPrivacySettings) {
-                Text("Grant Access")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Color.orange)
-                    .cornerRadius(6)
-            }
-            .buttonStyle(.plain)
         }
-        .padding(12)
-        .background(theme.cardBg)
-        .cornerRadius(12)
+        .cardBackground(theme)
+    }
+
+    // MARK: - Limited Access
+
+    private var limitedAccessNotice: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 14))
+                .foregroundColor(theme.textTertiary)
+                .padding(.top, 1)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Some folders aren’t counted")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(theme.textPrimary)
+                Text("macOS needs your permission before ChillMac can measure \(systemInfo.deniedFolders.sorted().joined(separator: ", ")).")
+                    .font(.system(size: 11))
+                    .foregroundColor(theme.textTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Allow access…", action: openPrivacySettings)
+                    .buttonStyle(.plain)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(theme.teal)
+                    .padding(.top, 2)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(theme.textQuaternary.opacity(0.6), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+        )
     }
 
     private func openPrivacySettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
             NSWorkspace.shared.open(url)
         }
-    }
-
-    private struct ArcSegment {
-        let start: CGFloat
-        let end: CGFloat
-        let color: Color
-    }
-
-    private var arcSegments: [ArcSegment] {
-        let total = Double(systemInfo.diskTotalBytes)
-        guard total > 0 else { return [] }
-
-        var segments: [ArcSegment] = []
-        var cumulative: CGFloat = 0
-
-        for cat in systemInfo.diskCategories {
-            let fraction = CGFloat(Double(cat.bytes) / total)
-            let end = cumulative + fraction
-            segments.append(ArcSegment(start: cumulative, end: end, color: Color(nsColor: cat.color)))
-            cumulative = end
-        }
-
-        return segments
-    }
-
-    // MARK: - Health & Usage Cards
-
-    private var healthCards: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: "internaldrive")
-                        .font(.system(size: 14))
-                        .foregroundColor(usageColor)
-                    Text("Usage")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(theme.textPrimary)
-                    Spacer()
-                }
-
-                Text(usagePercent)
-                    .font(.system(size: 20, weight: .bold, design: .monospaced))
-                    .foregroundColor(usageColor)
-
-                Text(usageDescription)
-                    .font(.system(size: 11))
-                    .foregroundColor(theme.textQuaternary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Spacer(minLength: 0)
-            }
-            .padding(14)
-            .frame(maxHeight: .infinity)
-            .background(theme.cardBg)
-            .cornerRadius(12)
-
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: "thermometer.medium")
-                        .font(.system(size: 14))
-                        .foregroundColor(diskTempColor)
-                    Text("SSD Temp")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(theme.textPrimary)
-                    Spacer()
-                }
-
-                Text(settings.formatTemperature(avgDiskTemp))
-                    .font(.system(size: 20, weight: .bold, design: .monospaced))
-                    .foregroundColor(diskTempColor)
-
-                Text(diskTempDescription)
-                    .font(.system(size: 11))
-                    .foregroundColor(theme.textQuaternary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Spacer(minLength: 0)
-            }
-            .padding(14)
-            .frame(maxHeight: .infinity)
-            .background(theme.cardBg)
-            .cornerRadius(12)
-        }
-        .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private var usagePercent: String {
-        guard systemInfo.diskTotalBytes > 0 else { return "0%" }
-        let pct = Double(usedBytes) / Double(systemInfo.diskTotalBytes) * 100
-        return String(format: "%.0f%%", pct)
-    }
-
-    private var usageColor: Color {
-        guard systemInfo.diskTotalBytes > 0 else { return .green }
-        let pct = Double(usedBytes) / Double(systemInfo.diskTotalBytes) * 100
-        if pct >= 90 { return .red }
-        if pct >= 75 { return .orange }
-        return .green
-    }
-
-    private var usageDescription: String {
-        guard systemInfo.diskTotalBytes > 0 else { return "Checking disk..." }
-        let pct = Double(usedBytes) / Double(systemInfo.diskTotalBytes) * 100
-        if pct >= 90 { return "Disk space is critically low." }
-        if pct >= 75 { return "Consider freeing up some space." }
-        return "Plenty of storage available."
     }
 
     // MARK: - Disk Temperature
@@ -272,48 +162,14 @@ struct DiskDetailView: View {
     }
 
     private var diskTempColor: Color {
-        if avgDiskTemp >= 55 { return .red }
-        if avgDiskTemp >= 45 { return .orange }
-        return .green
+        if avgDiskTemp >= 55 { return theme.red }
+        if avgDiskTemp >= 45 { return theme.orange }
+        return theme.green
     }
 
-    private var diskTempDescription: String {
-        guard avgDiskTemp > 0 else { return "No temperature data." }
-        if avgDiskTemp >= 55 { return "SSD is running hot." }
-        if avgDiskTemp >= 45 { return "SSD temperature is warm." }
-        return "SSD temperature is normal."
-    }
-}
-
-// MARK: - Legend Row
-
-private struct DiskLegendRow: View {
-    let color: Color
-    let label: String
-    let value: String
-    var denied: Bool = false
-    @Environment(\.theme) private var theme
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(denied ? Color.gray.opacity(0.4) : color)
-                .frame(width: 10, height: 10)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(label)
-                    .font(.system(size: 12))
-                    .foregroundColor(denied ? theme.textQuaternary : theme.textSecondary)
-                HStack(spacing: 4) {
-                    if denied {
-                        Image(systemName: "lock.fill")
-                            .font(.system(size: 10))
-                            .foregroundColor(.orange)
-                    }
-                    Text(value)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(denied ? .orange : theme.textPrimary)
-                }
-            }
-        }
+    private var diskTempLabel: String {
+        if avgDiskTemp >= 55 { return "Hot" }
+        if avgDiskTemp >= 45 { return "Warm" }
+        return "Normal"
     }
 }

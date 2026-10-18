@@ -159,14 +159,17 @@ final class FanMonitor: ObservableObject {
     /// or is out of date. States the user has to resolve themselves, approval in particular,
     /// are reported rather than retried, because retrying them silently is what hid the
     /// problem from the user in the first place.
-    func resolveHelperAtLaunch(completion: @escaping () -> Void) {
+    ///
+    /// `installIfMissing` is false on a first run: onboarding explains the helper before
+    /// asking for it, and registering here would put the macOS approval prompt up first.
+    func resolveHelperAtLaunch(installIfMissing: Bool = true, completion: @escaping () -> Void) {
         helperInstallInFlight = true
 
         helperQueue.async { [weak self] in
             var state = HelperInstaller.currentState()
             NSLog("FanMonitor: helper state at launch — \(state)")
 
-            if state == .needsInstall || state == .needsUpdate {
+            if (state == .needsInstall && installIfMissing) || state == .needsUpdate {
                 state = Self.installAndSettle()
             }
 
@@ -232,6 +235,7 @@ final class FanMonitor: ObservableObject {
             lastSentRPM.removeAll()
             smoothedZoneTemps.removeAll()
             if performanceCurvePercent != 0 { performanceCurvePercent = 0 }
+            if AppSettings.shared.coolingMode == .manual { AppSettings.shared.coolingMode = .auto }
         }
     }
 
@@ -358,6 +362,88 @@ final class FanMonitor: ObservableObject {
             self.manualOverrides.removeAll()
             self.targetOverrides.removeAll()
             if self.performanceCurvePercent != 0 { self.performanceCurvePercent = 0 }
+            // Manual speeds live only in the overrides just cleared, so the mode goes with
+            // them. Smart is left alone: the curve picks the fans back up on resume.
+            if AppSettings.shared.coolingMode == .manual { AppSettings.shared.coolingMode = .auto }
+        }
+    }
+
+    // MARK: - Cooling Mode
+
+    /// Hands the fans to `mode`. The one entry point for the popover's Cooling control and
+    /// onboarding, so `coolingMode` and `performanceMode` cannot drift apart.
+    ///
+    /// Leaving Smart for Manual has to disarm the curve here rather than on the next poll:
+    /// the poll would see Smart just switched off, put every fan back on auto and wipe the
+    /// overrides Manual had just set up. Main thread only.
+    func setCoolingMode(_ mode: CoolingMode) {
+        let settings = AppSettings.shared
+        guard settings.coolingMode != mode || settings.performanceMode != (mode == .smart) else { return }
+
+        settings.coolingMode = mode
+        settings.performanceMode = (mode == .smart)
+        updatePollInterval()
+
+        switch mode {
+        case .auto:
+            resetAllFansToAuto()
+        case .smart:
+            // The curve takes over on the next poll. Fans already in manual stay there and
+            // are moved to the curve's target rather than bouncing through auto.
+            resumePerformanceImmediately()
+        case .manual:
+            wasPerformanceModeActive = false
+            smoothedZoneTemps.removeAll()
+            lastSentRPM.removeAll()
+            if performanceCurvePercent != 0 { performanceCurvePercent = 0 }
+            if batterySaverActive { batterySaverActive = false }
+            for fan in fans {
+                takeManualControl(of: fan)
+            }
+        }
+    }
+
+    /// Puts one fan in manual mode at a speed it can already be heard at: the target Smart
+    /// was holding, else its current speed, else its minimum.
+    private func takeManualControl(of fan: FanInfo) {
+        guard let helper else { return }
+        let initialRPM = targetOverrides[fan.id] ?? (fan.currentRPM > fan.minRPM ? fan.currentRPM : fan.minRPM)
+        manualOverrides[fan.id] = true
+        targetOverrides[fan.id] = initialRPM
+
+        helper.setFanMode(fanIndex: fan.id, isAuto: false) { [weak self] success, error in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                guard success else {
+                    NSLog("FanMonitor: manual mode failed for fan \(fan.id) — \(error ?? "unknown")")
+                    self.manualOverrides[fan.id] = false
+                    self.targetOverrides[fan.id] = nil
+                    return
+                }
+                self.requestManualFanSpeed(fanIndex: fan.id, rpm: Int(initialRPM)) { _ in }
+            }
+        }
+    }
+
+    /// Hands the fans back to macOS, then unregisters the helper. Behind Settings › Manage.
+    func removeHelper() {
+        guard !helperInstallInFlight else { return }
+        helperInstallInFlight = true
+        setCoolingMode(.auto)
+        let fanCount = fans.count
+        let connection = helper
+
+        helperQueue.async { [weak self] in
+            // Waits for the replies: unregistering stops the daemon, and a reset still in
+            // flight at that point would leave the fans pinned at their last speed.
+            connection?.setFansToAutoAndWait(fanCount: fanCount)
+            HelperInstaller.unregister()
+            let state = HelperInstaller.currentState()
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.helperInstallInFlight = false
+                self.applyHelperState(state)
+            }
         }
     }
 

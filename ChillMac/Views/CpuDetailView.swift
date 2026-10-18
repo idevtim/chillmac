@@ -6,144 +6,103 @@ struct CpuDetailView: View {
     @ObservedObject var monitor: FanMonitor
     @ObservedObject var settings: AppSettings
     @Environment(\.theme) private var theme
-    @State private var panelHeight: CGFloat = CGFloat(AppSettings.shared.detailPanelHeight)
+
+    /// CpuInfo samples every 2s.
+    private static let sampleInterval: Double = 2
 
     var body: some View {
-        ZStack {
-            theme.backgroundGradient
+        DetailPanelScaffold(title: systemInfo.chipName == "..." ? "CPU" : systemInfo.chipName) {
+            PanelHero(
+                status: status.text,
+                statusColor: status.color,
+                value: cpuInfo.history.isEmpty ? "—" : "\(Int(cpuInfo.totalUsage.rounded()))%",
+                context: "in use",
+                trailing: historyCaption
+            )
 
-            VStack(alignment: .leading, spacing: 0) {
-                Text(systemInfo.chipName)
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(theme.textPrimary)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 18)
-                    .padding(.bottom, 14)
-
-                ScrollView(.vertical, showsIndicators: settings.showScrollIndicators) {
-                    VStack(spacing: 16) {
-                        graphSection
-                        infoCards
-                        topConsumersSection
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 16)
-                }
-
-                PanelResizeHandle(panelHeight: $panelHeight) {
-                    AppSettings.shared.detailPanelHeight = Double(panelHeight)
-                }
-            }
+            graphCard
+            infoCards
+            topConsumersSection
         }
-        .frame(width: 370, height: panelHeight)
     }
 
-    // MARK: - Graph + Breakdown
+    // MARK: - Status
 
-    private var graphSection: some View {
-        HStack(alignment: .top, spacing: 14) {
-            // Line chart. Usage is a delta between two polls, so nothing can be drawn until
-            // the second one lands — roughly 4s after the popover first opens.
-            VStack(alignment: .leading, spacing: 4) {
-                if cpuInfo.history.isEmpty {
-                    PanelLoadingView(message: "Measuring…", minHeight: 100)
-                } else {
-                    CpuGraphView(history: cpuInfo.history, userHistory: cpuInfo.userHistory, systemHistory: cpuInfo.systemHistory)
-                        .frame(height: 100)
-                }
-            }
-            .frame(maxWidth: .infinity)
-
-            // Breakdown
-            VStack(alignment: .leading, spacing: 12) {
-                UsageRow(color: .teal, value: usageValue(100 - cpuInfo.totalUsage), label: "Available")
-                UsageRow(color: .blue, value: usageValue(cpuInfo.userPercent), label: "User")
-                UsageRow(color: .orange, value: usageValue(cpuInfo.systemPercent), label: "System")
-            }
-            .frame(width: 100)
-        }
-        .padding(16)
-        .background(theme.cardBg)
-        .cornerRadius(14)
+    private var status: (text: String, color: Color) {
+        if cpuInfo.totalUsage < 25 { return ("Light load", theme.teal) }
+        if cpuInfo.totalUsage < 70 { return ("Busy", theme.yellow) }
+        return ("Working hard", theme.orange)
     }
 
-    /// Dashes out the breakdown until the first delta exists — "0.0 %" before any
-    /// measurement reads as a real reading rather than a pending one.
-    private func usageValue(_ value: Double) -> String {
-        cpuInfo.history.isEmpty ? "—" : String(format: "%.1f %%", value)
+    private var historyCaption: String? {
+        guard cpuInfo.history.count > 1 else { return nil }
+        let minutes = max(1, Int((Double(cpuInfo.history.count) * Self.sampleInterval / 60).rounded()))
+        return minutes == 1 ? "Last minute" : "Last \(minutes) minutes"
+    }
+
+    // MARK: - Graph
+
+    private var graphCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Usage is a delta between two polls, so nothing can be drawn until the second
+            // one lands, roughly 4s after the popover first opens.
+            if cpuInfo.history.count < 2 {
+                PanelLoadingView(message: "Measuring…", minHeight: 72)
+            } else {
+                CpuGraphView(history: cpuInfo.history, color: theme.teal, fill: theme.soft(theme.teal))
+                    .frame(height: 72)
+            }
+
+            HStack(spacing: 14) {
+                legendItem(color: theme.teal, label: "Apps", value: cpuInfo.userPercent)
+                legendItem(color: theme.blue, label: "macOS", value: cpuInfo.systemPercent)
+                legendItem(color: theme.track, label: "Idle", value: cpuInfo.idlePercent)
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(14)
+        .cardBackground(theme)
+    }
+
+    private func legendItem(color: Color, label: String, value: Double) -> some View {
+        HStack(spacing: 5) {
+            Circle().fill(color).frame(width: 8, height: 8)
+            Text(label)
+                .foregroundColor(theme.textTertiary)
+            Text(cpuInfo.history.isEmpty ? "—" : "\(Int(value.rounded()))%")
+                .fontWeight(.semibold)
+                .foregroundColor(theme.textPrimary)
+        }
+        .font(.system(size: 12))
     }
 
     // MARK: - Info Cards
 
     private var infoCards: some View {
-        HStack(alignment: .top, spacing: 12) {
-            // Uptime
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: "clock.arrow.circlepath")
-                        .font(.system(size: 14))
-                        .foregroundColor(.mint)
-                    Text("Uptime")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(theme.textPrimary)
-                    Spacer()
-                }
-
-                Text(systemInfo.uptime)
-                    .font(.system(size: 20, weight: .bold, design: .monospaced))
-                    .foregroundColor(.mint)
-
-                Text(uptimeDescription)
-                    .font(.system(size: 11))
-                    .foregroundColor(theme.textQuaternary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Spacer(minLength: 0)
-            }
-            .padding(14)
-            .frame(maxHeight: .infinity)
-            .background(theme.cardBg)
-            .cornerRadius(12)
-
-            // CPU Temperature
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: "thermometer.medium")
-                        .font(.system(size: 14))
-                        .foregroundColor(cpuTempColor)
-                    Text("CPU Temp")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(theme.textPrimary)
-                    Spacer()
-                }
-
-                Text(settings.formatTemperature(avgCpuTemp))
-                    .font(.system(size: 20, weight: .bold, design: .monospaced))
-                    .foregroundColor(cpuTempColor)
-
-                Text(cpuTempDescription)
-                    .font(.system(size: 11))
-                    .foregroundColor(theme.textQuaternary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Spacer(minLength: 0)
-            }
-            .padding(14)
-            .frame(maxHeight: .infinity)
-            .background(theme.cardBg)
-            .cornerRadius(12)
+        HStack(spacing: 12) {
+            miniCard(
+                title: "Temperature",
+                value: avgCpuTemp > 0 ? settings.formatTemperature(avgCpuTemp) : "—",
+                color: avgCpuTemp > 0 ? theme.tempColor(avgCpuTemp) : theme.textSecondary
+            )
+            miniCard(title: "On since restart", value: systemInfo.uptime, color: theme.textPrimary)
         }
-        .fixedSize(horizontal: false, vertical: true)
     }
 
-    private var uptimeDescription: String {
-        let seconds = Int(ProcessInfo.processInfo.systemUptime)
-        let days = seconds / 86400
-        if days >= 7 { return "Consider restarting." }
-        if days >= 1 { return "System running normally." }
-        return "Recently started."
+    private func miniCard(title: String, value: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.system(size: 11))
+                .foregroundColor(theme.textTertiary)
+            Text(value)
+                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .foregroundColor(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .cardBackground(theme)
     }
 
     private var cpuTempSensors: [TemperatureSensor] {
@@ -156,113 +115,39 @@ struct CpuDetailView: View {
         return sensors.map(\.temperature).reduce(0, +) / Double(sensors.count)
     }
 
-    private var cpuTempColor: Color {
-        if avgCpuTemp >= 90 { return .red }
-        if avgCpuTemp >= 70 { return .orange }
-        return .green
-    }
-
-    private var cpuTempDescription: String {
-        guard avgCpuTemp > 0 else { return "No data available." }
-        if avgCpuTemp >= 90 { return "CPU is running hot." }
-        if avgCpuTemp >= 70 { return "Warm but within range." }
-        return "Within normal range."
-    }
-
     // MARK: - Top Consumers
 
     private var topConsumersSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("TOP CONSUMERS")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(theme.textTertiary)
-                .tracking(1.2)
-                .padding(.leading, 4)
-                .padding(.top, 4)
+        VStack(alignment: .leading, spacing: 8) {
+            CardSectionHeader(title: "Using the most")
 
             VStack(spacing: 0) {
-                HStack {
-                    Text("Application")
-                        .font(.system(size: 12))
-                        .foregroundColor(theme.textQuaternary)
-                    Spacer()
-                    Text("CPU %")
-                        .font(.system(size: 12))
-                        .foregroundColor(theme.textQuaternary)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-
                 if cpuInfo.topProcesses.isEmpty {
                     PanelLoadingView(message: "Sampling processes…")
-                        .padding(.bottom, 6)
                 }
-
+                let top = cpuInfo.topProcesses.map(\.cpuPercent).max() ?? 0
                 ForEach(cpuInfo.topProcesses) { proc in
-                    HStack(spacing: 10) {
-                        if let icon = proc.icon {
-                            Image(nsImage: icon)
-                                .resizable()
-                                .frame(width: 24, height: 24)
-                                .cornerRadius(5)
-                        } else {
-                            Image(systemName: "app.fill")
-                                .font(.system(size: 20))
-                                .foregroundColor(.teal.opacity(0.5))
-                                .frame(width: 24, height: 24)
-                        }
-
-                        Text(proc.name)
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(theme.textPrimary)
-                            .lineLimit(1)
-
-                        Spacer()
-
-                        Text(String(format: "%.1f", proc.cpuPercent))
-                            .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                            .foregroundColor(.teal)
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 6)
+                    TopConsumerRow(
+                        icon: proc.icon,
+                        name: proc.name,
+                        fraction: top > 0 ? proc.cpuPercent / top : 0,
+                        value: String(format: "%.1f%%", proc.cpuPercent),
+                        color: theme.teal
+                    )
                 }
             }
-            .background(theme.cardBgSecondary)
-            .cornerRadius(12)
+            .padding(.vertical, 4)
+            .cardBackground(theme)
         }
     }
 }
 
 // MARK: - Supporting Views
 
-private struct UsageRow: View {
-    let color: Color
-    let value: String
-    let label: String
-    @Environment(\.theme) private var theme
-
-    var body: some View {
-        HStack(spacing: 6) {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(color)
-                .frame(width: 4, height: 28)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(value)
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(theme.textPrimary)
-                Text(label)
-                    .font(.system(size: 11))
-                    .foregroundColor(theme.textTertiary)
-            }
-        }
-    }
-}
-
 struct CpuGraphView: View {
     let history: [Double]
-    let userHistory: [Double]
-    let systemHistory: [Double]
-    @Environment(\.theme) private var theme
+    let color: Color
+    let fill: Color
 
     var body: some View {
         GeometryReader { geo in
@@ -270,42 +155,11 @@ struct CpuGraphView: View {
             let h = geo.size.height
 
             ZStack(alignment: .bottomLeading) {
-                // Grid lines
-                ForEach(0..<4) { i in
-                    let y = h * CGFloat(i) / 3
-                    Path { path in
-                        path.move(to: CGPoint(x: 0, y: y))
-                        path.addLine(to: CGPoint(x: w, y: y))
-                    }
-                    .stroke(theme.gridLine, lineWidth: 0.5)
-                }
-
-                // User fill + line
-                if userHistory.count >= 2 {
-                    fillPath(data: userHistory, w: w, h: h)
-                        .fill(
-                            LinearGradient(
-                                colors: [.blue.opacity(0.3), .blue.opacity(0.05)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                    smoothPath(data: userHistory, w: w, h: h)
-                        .stroke(Color.blue, lineWidth: 1.5)
-                }
-
-                // System fill + line
-                if systemHistory.count >= 2 {
-                    fillPath(data: systemHistory, w: w, h: h)
-                        .fill(
-                            LinearGradient(
-                                colors: [.orange.opacity(0.3), .orange.opacity(0.05)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                    smoothPath(data: systemHistory, w: w, h: h)
-                        .stroke(Color.orange, lineWidth: 1.5)
+                if history.count >= 2 {
+                    fillPath(data: history, w: w, h: h)
+                        .fill(LinearGradient(colors: [fill, fill.opacity(0.2)], startPoint: .top, endPoint: .bottom))
+                    smoothPath(data: history, w: w, h: h)
+                        .stroke(color, style: StrokeStyle(lineWidth: 1.75, lineCap: .round, lineJoin: .round))
                 }
             }
         }

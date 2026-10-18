@@ -20,6 +20,9 @@ final class StatusBarController: NSObject {
     private var lastPopoverCloseAt: Date = .distantPast
 
     private let detailPanel = DetailPanelController()
+    private lazy var onboarding = OnboardingWindowController(fanMonitor: fanMonitor) { [weak self] in
+        self?.openPopover()
+    }
     private let memoryInfo: MemoryInfo
     private let systemInfo: SystemInfo
     private let batteryInfo: BatteryInfo
@@ -54,6 +57,7 @@ final class StatusBarController: NSObject {
 
         if let button = statusItem.button {
             button.image = Self.fanImage
+            button.imageScaling = .scaleNone
             button.action = #selector(togglePopover(_:))
             button.target = self
             button.imagePosition = .imageLeading
@@ -151,7 +155,7 @@ final class StatusBarController: NSObject {
         }
     }
 
-    private static let fanImage = NSImage(systemSymbolName: "fan.fill", accessibilityDescription: "ChillMac")
+    private static let fanImage = NSImage.fanMarkTemplate(pointSize: 16)
 
     /// The fan with a small download arrow in its bottom-right corner, signalling that an
     /// update is waiting.
@@ -160,8 +164,8 @@ final class StatusBarController: NSObject {
     /// to Dark Mode. A ring is cut out of the fan around the badge, which is what keeps the
     /// two shapes apart at menu bar size without relying on colour.
     private static let badgedFanImage: NSImage? = {
-        guard let fan = NSImage(systemSymbolName: "fan.fill", accessibilityDescription: "ChillMac, update available"),
-              let arrow = NSImage(systemSymbolName: "arrow.down.circle.fill", accessibilityDescription: nil)
+        let fan = NSImage.fanMarkTemplate(pointSize: 16, accessibilityDescription: "ChillMac, update available")
+        guard let arrow = NSImage(systemSymbolName: "arrow.down.circle.fill", accessibilityDescription: nil)
         else { return fanImage }
 
         let size = fan.size
@@ -217,6 +221,26 @@ final class StatusBarController: NSObject {
         return window.convertToScreen(inWindow).contains(NSEvent.mouseLocation)
     }
 
+    /// Shows onboarding on a genuinely new install. A Mac that already has the helper
+    /// registered has run ChillMac before, so an upgrade does not get the welcome. Called
+    /// once the launch-time helper check has an answer.
+    func handleFirstLaunch() {
+        let settings = AppSettings.shared
+        guard !settings.hasCompletedOnboarding else { return }
+        let ranBefore = fanMonitor.helperState != .needsInstall
+            || UserDefaults.standard.object(forKey: "popoverHeight") != nil
+        if ranBefore {
+            settings.hasCompletedOnboarding = true
+        } else {
+            onboarding.show()
+        }
+    }
+
+    func showOnboarding() {
+        closePopover(sender: nil)
+        onboarding.show()
+    }
+
     @objc private func togglePopover(_ sender: AnyObject?) {
         if popover.isShown {
             closePopover(sender: sender)
@@ -225,7 +249,14 @@ final class StatusBarController: NSObject {
             // would turn a dismissal into a flicker, which is what a click on the icon used
             // to do. One user click means one state change.
             return
-        } else if let button = statusItem.button {
+        } else {
+            openPopover()
+        }
+    }
+
+    private func openPopover() {
+        guard !popover.isShown else { return }
+        if let button = statusItem.button {
             // Resume secondary monitors when popover opens
             cpuInfo.startMonitoring()
             memoryInfo.startMonitoring()
@@ -283,7 +314,8 @@ final class StatusBarController: NSObject {
                 onBatteryTap: { [weak self] in self?.toggleBatteryPanel() },
                 onCpuTap: { [weak self] in self?.toggleCpuPanel() },
                 onTemperatureTap: { [weak self] in self?.toggleTemperaturePanel() },
-                onInstallUpdate: { [weak self] in self?.installUpdate() }
+                onInstallUpdate: { [weak self] in self?.installUpdate() },
+                onShowWelcome: { [weak self] in self?.showOnboarding() }
             )
         )
         let height = CGFloat(AppSettings.shared.popoverHeight)

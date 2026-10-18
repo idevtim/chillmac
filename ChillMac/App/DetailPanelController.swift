@@ -60,8 +60,8 @@ final class DetailPanelController {
                 DetailPanelCloseButton { [weak self] in
                     self?.close()
                 }
-                .padding(.top, 16)
-                .padding(.trailing, 14)
+                .padding(.top, 20)
+                .padding(.trailing, 16)
             }
         )
 
@@ -159,10 +159,14 @@ struct DetailPanelCloseButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "xmark.circle.fill")
-                .font(.system(size: 20))
-                .foregroundColor(theme.textQuaternary)
+            Image(systemName: "xmark")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(theme.textSecondary)
+                .frame(width: 26, height: 26)
+                .background(Circle().fill(theme.ringTrack))
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Close")
     }
 }

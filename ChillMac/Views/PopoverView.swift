@@ -17,12 +17,14 @@ struct PopoverView: View {
     var onCpuTap: (() -> Void)?
     var onTemperatureTap: (() -> Void)?
     var onInstallUpdate: (() -> Void)?
+    var onShowWelcome: (() -> Void)?
 
     @State private var appeared = false
     @State private var showingSettings = false
     @State private var liveHeight: CGFloat = 0
     @State private var dragStartHeight: CGFloat = 0
     @State private var activePanelID: String?
+    @State private var badgeHovered = false
     @Environment(\.colorScheme) private var colorScheme
 
     private var theme: AppTheme {
@@ -41,7 +43,8 @@ struct PopoverView: View {
                     fanMonitor: monitor,
                     cpuInfo: cpuInfo,
                     memoryInfo: memoryInfo,
-                    batteryInfo: batteryInfo
+                    batteryInfo: batteryInfo,
+                    onShowWelcome: onShowWelcome
                 ) {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         showingSettings = false
@@ -88,33 +91,31 @@ struct PopoverView: View {
 
     private var mainContent: some View {
         VStack(spacing: 0) {
-            // Header
             headerSection
 
             if let error = monitor.smcError {
                 errorSection(error)
             } else {
                 ScrollView(.vertical, showsIndicators: settings.showScrollIndicators) {
-                    VStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 14) {
                         if updateController.updateAvailable, let version = updateController.latestVersion {
                             UpdateBannerView(version: version) { onInstallUpdate?() }
                                 .opacity(appeared ? 1 : 0)
                                 .animation(.easeOut(duration: 0.3), value: appeared)
                         }
 
-                        // System info cards
-                        systemInfoCards
+                        vitalsCard
+                            .opacity(appeared ? 1 : 0)
+                            .offset(y: appeared ? 0 : 12)
+                            .animation(.easeOut(duration: 0.3).delay(0.05), value: appeared)
 
-                        // Fan cards
-                        fansSection
+                        coolingSection
                     }
                     .padding(.horizontal, 16)
-                    .padding(.top, 12)
                     .padding(.bottom, 16)
                 }
             }
 
-            // Footer
             footerSection
         }
     }
@@ -122,290 +123,195 @@ struct PopoverView: View {
     // MARK: - Header
 
     private var headerSection: some View {
-        HStack(alignment: .top) {
+        HStack(alignment: .center, spacing: 14) {
             VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 8) {
-                    Text("System Temp:")
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundColor(theme.textPrimary)
+                Text(machineLine)
+                    .font(.system(size: 12))
+                    .foregroundColor(theme.textTertiary)
+                    .lineLimit(1)
 
-                    Text(thermalStatus)
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundColor(thermalStatusColor)
-                }
+                Text(statusTitle)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundColor(theme.textPrimary)
 
-                Text(systemInfo.machineModel)
-                    .font(.system(size: 14))
+                Text(statusSubtitle)
+                    .font(.system(size: 13))
                     .foregroundColor(theme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
-            Spacer()
+            Spacer(minLength: 0)
 
-            Image(systemName: "laptopcomputer")
-                .font(.system(size: 40))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [.green, .teal],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
+            temperatureBadge
         }
         .padding(.horizontal, 20)
         .padding(.top, 18)
-        .padding(.bottom, 12)
+        .padding(.bottom, 14)
         .opacity(appeared ? 1 : 0)
         .offset(y: appeared ? 0 : 8)
         .animation(.easeOut(duration: 0.3), value: appeared)
     }
 
-    /// Shared with the menu bar via `ThermalStatus`, so "Warm" means the same in both places.
-    private var thermalStatus: String {
-        guard !monitor.sensors.isEmpty else { return ThermalStatus.good.label }
-        let maxTemp = monitor.sensors.map(\.temperature).max() ?? 0
-        return ThermalStatus.forTemperature(maxTemp).label
+    /// "MacBook Pro · Apple M3 Max". Stands in for the old Processor card.
+    private var machineLine: String {
+        [systemInfo.machineModel, systemInfo.chipName]
+            .filter { $0 != "..." && !$0.isEmpty }
+            .joined(separator: " · ")
     }
 
-    private var thermalStatusColor: Color {
-        let isLight = (settings.preferredColorScheme ?? colorScheme) == .light
-        guard !monitor.sensors.isEmpty else { return ThermalStatus.good.color(isLight: isLight) }
-        let maxTemp = monitor.sensors.map(\.temperature).max() ?? 0
-        return ThermalStatus.forTemperature(maxTemp).color(isLight: isLight)
+    private var peakTemperature: Double? {
+        monitor.sensors.map(\.temperature).max()
     }
 
-    private var maxTempDisplay: String {
-        guard !monitor.sensors.isEmpty,
-              let maxTemp = monitor.sensors.map(\.temperature).max() else {
-            return "--"
+    /// Shared with the menu bar via `ThermalStatus`, so "warm" means the same in both places.
+    private var thermalStatus: ThermalStatus {
+        ThermalStatus.forTemperature(peakTemperature ?? 0)
+    }
+
+    private var statusTitle: String {
+        switch thermalStatus {
+        case .good: return "Running cool"
+        case .warm: return "Getting warm"
+        case .hot: return "Running hot"
         }
-        return settings.formatTemperature(maxTemp)
     }
 
-    // MARK: - System Info Cards
+    private var statusSubtitle: String {
+        guard monitor.helperReady else { return "macOS is handling the fans." }
+        let level = settings.performanceLevel
+        switch (thermalStatus, settings.coolingMode) {
+        case (.good, _):
+            return "Nothing to do — fans are quiet."
+        case (.warm, .smart):
+            return "Smart cooling is on it."
+        case (.warm, .manual):
+            return "Fans are holding the speed you set."
+        case (.warm, .auto):
+            return "Smart cooling can bring it down."
+        case (.hot, .smart) where level == .high || level == .max:
+            return "Fans are working hard to cool it down."
+        case (.hot, _):
+            return "Try Smart cooling on Cool or Max."
+        }
+    }
 
-    private var systemInfoCards: some View {
-        let columns = [
-            GridItem(.flexible(), spacing: 12),
-            GridItem(.flexible(), spacing: 12)
+    private var temperatureBadge: some View {
+        let color = theme.tempColor(peakTemperature ?? 0)
+        return Button(action: { onTemperatureTap?() }) {
+            VStack(alignment: .trailing, spacing: 2) {
+                HStack(spacing: 4) {
+                    Image(systemName: "thermometer.medium")
+                        .font(.system(size: 20))
+                    Text(peakTemperature.map(settings.formatBadgeTemperature) ?? "--")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                }
+                .foregroundColor(color)
+
+                HStack(spacing: 2) {
+                    Text("Hottest sensor")
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                }
+                .font(.system(size: 11))
+                .foregroundColor(theme.textTertiary)
+            }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .background(activePanelID == "temperature" || badgeHovered ? theme.cardBgHover : theme.cardBg)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { badgeHovered = $0 }
+        .animation(.easeInOut(duration: 0.15), value: badgeHovered)
+    }
+
+    // MARK: - Vitals
+
+    private var vitalsCard: some View {
+        let usedMemory = memoryInfo.activeMemory + memoryInfo.wiredMemory + memoryInfo.compressedMemory
+        let totalMemory = memoryInfo.totalMemory
+        let diskTotal = systemInfo.diskTotalBytes
+        let diskUsed = diskTotal - systemInfo.diskAvailableBytes
+
+        let rows: [VitalRow.Model] = [
+            .init(id: "cpu", icon: "cpu", label: "CPU", color: theme.teal,
+                  fraction: cpuInfo.totalUsage / 100,
+                  value: "\(Int(cpuInfo.totalUsage.rounded()))% busy", onTap: onCpuTap),
+            .init(id: "memory", icon: "memorychip", label: "Memory", color: theme.green,
+                  fraction: totalMemory > 0 ? Double(usedMemory) / Double(totalMemory) : 0,
+                  value: "\(Self.wholeGB(usedMemory)) of \(Self.wholeGB(totalMemory)) GB", onTap: onMemoryTap),
+            .init(id: "battery", icon: "battery.100", label: "Battery", color: theme.yellow,
+                  fraction: Double(batteryInfo.currentCharge) / 100,
+                  value: "\(batteryInfo.currentCharge)% · \(batteryState)", onTap: onBatteryTap),
+            .init(id: "disk", icon: "internaldrive", label: "Disk", color: theme.blue,
+                  fraction: diskTotal > 0 ? Double(diskUsed) / Double(diskTotal) : 0,
+                  value: diskTotal > 0 ? "\(SystemInfo.formatDiskBytes(systemInfo.diskAvailableBytes)) free" : "…",
+                  onTap: onDiskTap),
         ]
 
-        let cards: [(icon: String, title: String, subtitle: String, accent: Color, panelID: String?, onTap: (() -> Void)?)] = [
-            ("cpu", systemInfo.chipName, "Processor", .teal, nil, nil),
-            ("memorychip", systemInfo.ramAmount, "Memory", .green, "memory", onMemoryTap),
-            ("internaldrive", systemInfo.diskUsage, "Disk Available", .blue, "disk", onDiskTap),
-            ("battery.100", "\(batteryInfo.currentCharge)%", batteryInfo.isCharging ? "Charging" : "Battery", .yellow, "battery", onBatteryTap),
-            ("cpu", String(format: "%.0f%%", cpuInfo.totalUsage), "CPU", .teal, "cpu", onCpuTap),
-            ("thermometer.medium", maxTempDisplay, "Temperatures", thermalStatusColor, "temperature", onTemperatureTap),
-        ]
-
-        return LazyVGrid(columns: columns, spacing: 12) {
-            ForEach(Array(cards.enumerated()), id: \.offset) { index, card in
-                InfoCard(
-                    icon: card.icon,
-                    title: card.title,
-                    subtitle: card.subtitle,
-                    accent: card.accent,
-                    isActive: card.panelID != nil && card.panelID == activePanelID,
-                    onTap: card.onTap
-                )
-                .opacity(appeared ? 1 : 0)
-                .offset(y: appeared ? 0 : 12)
-                .animation(.easeOut(duration: 0.3).delay(0.05 + Double(index) * 0.05), value: appeared)
+        return VStack(spacing: 0) {
+            ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                if index > 0 { CardDivider() }
+                VitalRow(model: row, isActive: activePanelID == row.id)
             }
         }
+        .padding(.vertical, 4)
+        .cardBackground(theme)
     }
 
-    // MARK: - Fans
+    private var batteryState: String {
+        if batteryInfo.isCharging { return "charging" }
+        if batteryInfo.isPluggedIn { return batteryInfo.currentCharge >= 100 ? "charged" : "plugged in" }
+        return "on battery"
+    }
 
-    private var fansSection: some View {
+    private static func wholeGB(_ bytes: UInt64) -> Int {
+        Int((Double(bytes) / 1_073_741_824).rounded())
+    }
+
+    // MARK: - Cooling
+
+    private var coolingSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            CardSectionHeader(title: "Fans")
+            CardSectionHeader(title: "Cooling")
                 .opacity(appeared ? 1 : 0)
-                .animation(.easeOut(duration: 0.3).delay(0.35), value: appeared)
+                .animation(.easeOut(duration: 0.3).delay(0.1), value: appeared)
 
-            // Performance Mode toggle, or why fan control is unavailable
             Group {
                 if monitor.helperReady {
-                    performanceModeCard
+                    CoolingCard(monitor: monitor, settings: settings)
                 } else {
-                    HelperStatusCard(
-                        state: monitor.helperState,
-                        isBusy: monitor.helperBusy,
-                        onInstall: { monitor.installHelper() },
-                        onOpenLoginItems: { HelperInstaller.openLoginItemsSettings() }
-                    )
+                    VStack(spacing: 12) {
+                        HelperStatusCard(
+                            state: monitor.helperState,
+                            isBusy: monitor.helperBusy,
+                            onInstall: { monitor.installHelper() },
+                            onOpenLoginItems: { HelperInstaller.openLoginItemsSettings() },
+                            isCollapsed: $settings.helperInviteCollapsed
+                        )
+                        readOnlyFans
+                    }
                 }
             }
             .opacity(appeared ? 1 : 0)
             .offset(y: appeared ? 0 : 12)
-            .animation(.easeOut(duration: 0.3).delay(0.37), value: appeared)
+            .animation(.easeOut(duration: 0.3).delay(0.15), value: appeared)
+        }
+    }
 
-            ForEach(Array(monitor.fans.enumerated()), id: \.element.id) { index, fan in
-                FanRowView(fan: fan, helper: helper, monitor: monitor)
-                    .opacity(appeared ? 1 : 0)
-                    .offset(y: appeared ? 0 : 12)
-                    .animation(.easeOut(duration: 0.3).delay(0.4 + Double(index) * 0.05), value: appeared)
-            }
-
+    /// Fans while macOS owns them: name, "macOS", RPM. Nothing to adjust.
+    private var readOnlyFans: some View {
+        VStack(spacing: 0) {
             if monitor.fans.isEmpty {
-                Group {
-                    // Until the first poll publishes, an empty array only means "not read
-                    // yet" — claiming "No fans detected" there would be wrong on every Mac.
-                    if !monitor.hasCompletedFirstPoll && monitor.smcError == nil {
-                        PanelLoadingView(message: "Reading fans…", minHeight: 24)
-                            .padding(14)
-                    } else {
-                        HStack {
-                            Image(systemName: "fan.slash")
-                                .font(.system(size: 16))
-                                .foregroundColor(theme.textQuaternary)
-                            Text("No fans detected")
-                                .font(.system(size: 14))
-                                .foregroundColor(theme.textQuaternary)
-                        }
-                        .padding(14)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .center)
-                .background(theme.cardBgSecondary)
-                .cornerRadius(12)
-                .opacity(appeared ? 1 : 0)
-                .animation(.easeOut(duration: 0.3).delay(0.4), value: appeared)
+                FanListPlaceholder(monitor: monitor)
+            }
+            ForEach(Array(monitor.fans.enumerated()), id: \.element.id) { index, fan in
+                if index > 0 { CardDivider() }
+                FanRowView(fan: fan, monitor: monitor, mode: nil)
             }
         }
-    }
-
-    // MARK: - Performance Mode
-
-    private var performanceModeCard: some View {
-        VStack(spacing: 10) {
-            HStack {
-                Image(systemName: settings.performanceMode ? "bolt.fill" : "bolt")
-                    .font(.system(size: 18))
-                    .foregroundColor(settings.performanceMode ? .orange : theme.textQuaternary)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Performance Mode")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(theme.textPrimary)
-                    Text(settings.performanceMode ? settings.performanceLevel.description : "Fan curve to keep temps low")
-                        .font(.system(size: 11))
-                        .foregroundColor(theme.textQuaternary)
-                }
-
-                Spacer()
-
-                Toggle(isOn: $settings.performanceMode) {
-                    EmptyView()
-                }
-                .toggleStyle(.switch)
-                .controlSize(.small)
-                .tint(.orange)
-            }
-
-            if settings.performanceMode {
-                VStack(spacing: 10) {
-                    // Battery saver active indicator
-                    if monitor.batterySaverActive {
-                        HStack(spacing: 6) {
-                            Image(systemName: "battery.25")
-                                .font(.system(size: 13))
-                                .foregroundColor(.yellow)
-                            Text("Battery saver — fans set to auto")
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(.yellow)
-                            Spacer()
-                            Button(action: { settings.forcePerformanceOnBattery = true }) {
-                                Text("Override")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundColor(.orange)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        .padding(8)
-                        .background(Color.yellow.opacity(0.1))
-                        .cornerRadius(8)
-                    }
-
-                    // Level picker
-                    Picker("Level", selection: $settings.performanceLevel) {
-                        ForEach(PerformanceLevel.allCases, id: \.self) { level in
-                            Text(level.label).tag(level)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-
-                    HStack(spacing: 12) {
-                        // Peak temp indicator
-                        HStack(spacing: 4) {
-                            Image(systemName: "thermometer.medium")
-                                .font(.system(size: 11))
-                                .foregroundColor(perfTempColor)
-                            Text(settings.formatTemperature(monitor.peakTemperature))
-                                .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                                .foregroundColor(perfTempColor)
-                        }
-
-                        // Fan curve percentage
-                        HStack(spacing: 4) {
-                            Image(systemName: "fan.fill")
-                                .font(.system(size: 11))
-                                .foregroundColor(perfAccentColor)
-                            Text(monitor.performanceCurvePercent >= 1
-                                 ? String(format: "%.0f%%", monitor.performanceCurvePercent)
-                                 : "Min")
-                                .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                                .foregroundColor(perfAccentColor)
-                        }
-
-                        Spacer()
-
-                        // Curve bar
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                Capsule()
-                                    .fill(theme.ringTrack)
-                                Capsule()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [.green, .yellow, .orange, .red],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                    )
-                                    .frame(width: geo.size.width * max(0.02, monitor.performanceCurvePercent / 100))
-                                    .animation(.easeInOut(duration: 0.5), value: monitor.performanceCurvePercent)
-                            }
-                        }
-                        .frame(height: 6)
-                        .frame(maxWidth: 100)
-                    }
-                }
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-        }
-        .padding(14)
-        .background(theme.cardBg.overlay(Color.orange.opacity(settings.performanceMode ? 0.08 : 0)))
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(settings.performanceMode ? Color.orange.opacity(0.4) : Color.clear, lineWidth: 1)
-        )
-        .animation(.easeInOut(duration: 0.2), value: settings.performanceMode)
-    }
-
-    private var perfAccentColor: Color {
-        let isLight = (settings.preferredColorScheme ?? colorScheme) == .light
-        return isLight ? Color(red: 0.80, green: 0.45, blue: 0.0) : .orange
-    }
-
-    private var perfTempColor: Color {
-        let t = monitor.peakTemperature
-        let isLight = (settings.preferredColorScheme ?? colorScheme) == .light
-        if t >= 85 { return .red }
-        if t >= 70 { return isLight ? Color(red: 0.80, green: 0.45, blue: 0.0) : .orange }
-        if t >= 55 { return isLight ? Color(red: 0.75, green: 0.55, blue: 0.0) : .yellow }
-        return .green
+        .cardBackground(theme)
     }
 
     // MARK: - Error
@@ -449,9 +355,12 @@ struct PopoverView: View {
                         .font(.system(size: 13, weight: .medium, design: .monospaced))
                         .foregroundColor(theme.textQuaternary)
                 } else {
-                    Text("ChillMac")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(theme.textQuaternary)
+                    HStack(spacing: 6) {
+                        FanMarkView(size: 16)
+                        Text("ChillMac")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(theme.textQuaternary)
+                    }
                 }
 
                 Spacer()
@@ -534,78 +443,58 @@ struct CardSectionHeader: View {
     }
 }
 
-struct InfoCard: View {
-    let icon: String
-    let title: String
-    let subtitle: String
-    var accent: Color = .blue
-    var isActive: Bool = false
-    var onTap: (() -> Void)? = nil
+/// One line of the vitals card: icon, label, bar, value, chevron. Opens a detail panel.
+struct VitalRow: View {
+    struct Model: Identifiable {
+        let id: String
+        let icon: String
+        let label: String
+        let color: Color
+        let fraction: Double
+        let value: String
+        let onTap: (() -> Void)?
+    }
+
+    let model: Model
+    var isActive = false
 
     @State private var isHovered = false
     @Environment(\.theme) private var theme
 
-    private var isClickable: Bool { onTap != nil }
-
     var body: some View {
-        Group {
-            if let onTap {
-                Button(action: onTap) { cardContent }
-                    .buttonStyle(.plain)
-                    .onHover { isHovered = $0 }
-            } else {
-                cardContent
-            }
-        }
-        .animation(.easeInOut(duration: 0.2), value: isActive)
-    }
+        Button(action: { model.onTap?() }) {
+            HStack(spacing: 12) {
+                Image(systemName: model.icon)
+                    .font(.system(size: 17))
+                    .foregroundColor(model.color)
+                    .frame(width: 22)
 
-    private var cardBackground: Color {
-        if isActive { return theme.cardBgHover }
-        if isClickable && isHovered { return theme.cardBgHover }
-        if isClickable { return theme.cardBgClickable }
-        return theme.cardBg
-    }
-
-    private var borderOpacity: Double {
-        if isActive { return 0.7 }
-        if isHovered { return 0.6 }
-        return 0.4
-    }
-
-    private var cardContent: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 22))
-                .foregroundColor(accent)
-                .frame(width: 28)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.system(size: 14, weight: .semibold))
+                Text(model.label)
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundColor(theme.textPrimary)
+                    .frame(width: 72, alignment: .leading)
+
+                ProgressBar(fraction: model.fraction, color: model.color)
+
+                Text(model.value)
+                    .font(.system(size: 13))
+                    .foregroundColor(theme.textSecondary)
                     .lineLimit(1)
+                    .frame(width: 108, alignment: .trailing)
 
-                Text(subtitle)
-                    .font(.system(size: 12))
-                    .foregroundColor(theme.textTertiary)
-            }
-
-            Spacer()
-
-            if isClickable {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(isHovered || isActive ? theme.textSecondary : theme.textSubtle)
+                    .foregroundColor(isHovered || isActive ? theme.textSecondary : theme.textQuaternary)
             }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+            .background(isActive || isHovered ? theme.cardBgHover : Color.clear)
+            .contentShape(Rectangle())
         }
-        .padding(14)
-        .background(cardBackground)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(isClickable ? accent.opacity(borderOpacity) : Color.clear, lineWidth: isActive ? 1.5 : 1)
-        )
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .animation(.easeInOut(duration: 0.15), value: isHovered)
+        .animation(.easeInOut(duration: 0.2), value: isActive)
     }
 }
 

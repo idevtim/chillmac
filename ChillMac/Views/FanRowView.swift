@@ -1,22 +1,13 @@
 import SwiftUI
 
+/// One fan inside the Cooling card. `mode` is who currently drives the fan; nil means the
+/// helper is unavailable and the row is read-only.
 struct FanRowView: View {
     let fan: FanInfo
-    let helper: HelperConnection
     @ObservedObject var monitor: FanMonitor
-    @ObservedObject private var settings = AppSettings.shared
+    let mode: CoolingMode?
     @State private var errorMessage: String?
     @Environment(\.theme) private var theme
-
-    private var isManual: Binding<Bool> {
-        Binding(
-            get: { monitor.manualOverrides[fan.id] ?? false },
-            set: { newValue in
-                monitor.manualOverrides[fan.id] = newValue
-                setFanMode(manual: newValue)
-            }
-        )
-    }
 
     private var targetRPM: Binding<Double> {
         Binding(
@@ -26,18 +17,6 @@ struct FanRowView: View {
                 setFanSpeed(rpm: Int(newValue))
             }
         )
-    }
-
-    /// Performance Mode is only genuinely in charge when the helper can carry out its
-    /// commands; the preference alone is not enough.
-    private var isPerformanceControlled: Bool {
-        settings.performanceMode && monitor.helperReady
-    }
-
-    private var modeLabel: String {
-        if isPerformanceControlled { return "Performance" }
-        guard monitor.helperReady else { return "Auto" }
-        return isManual.wrappedValue ? "Manual" : "Auto"
     }
 
     private var sliderRange: ClosedRange<Double> {
@@ -53,18 +32,43 @@ struct FanRowView: View {
     }
 
     private var rpmColor: Color {
-        if rpmPercent > 0.8 { return .red }
-        if rpmPercent > 0.5 { return .orange }
-        return .green
+        if rpmPercent > 0.8 { return theme.red }
+        if rpmPercent > 0.5 { return theme.orange }
+        return theme.green
+    }
+
+    /// Share of the fan's range the current target asks for.
+    private var targetPercent: Int {
+        guard fan.maxRPM > fan.minRPM else { return 0 }
+        let target = monitor.targetOverrides[fan.id] ?? fan.targetRPM
+        return Int(((target - fan.minRPM) / (fan.maxRPM - fan.minRPM) * 100).rounded())
+    }
+
+    private var ownerLine: (text: String, color: Color) {
+        switch mode {
+        case nil:
+            return ("macOS", theme.textQuaternary)
+        case .auto:
+            return ("Run by macOS", theme.textTertiary)
+        case .smart:
+            if monitor.batterySaverActive { return ("Battery saver · run by macOS", theme.yellow) }
+            let pct = targetPercent
+            return (pct < 1 ? "Smart cooling · idling" : "Smart cooling · \(pct)%", theme.orange)
+        case .manual:
+            return ("Fixed at \(max(targetPercent, 0))%", theme.textTertiary)
+        }
+    }
+
+    private var showsSlider: Bool {
+        mode == .manual && monitor.manualOverrides[fan.id] == true && sliderRange.upperBound > sliderRange.lowerBound
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Top row: icon, name, RPM
-            HStack {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
                 Image(systemName: "fan.fill")
                     .font(.system(size: 20))
-                    .foregroundColor(fan.currentRPM > 0 ? .green : theme.textSubtle)
+                    .foregroundColor(fan.currentRPM > 0 ? theme.green : theme.textSubtle)
                     .rotationEffect(.degrees(fan.currentRPM > 0 ? 360 : 0))
                     .animation(
                         fan.currentRPM > 0
@@ -73,131 +77,57 @@ struct FanRowView: View {
                         value: fan.currentRPM > 0
                     )
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 1) {
                     Text(fan.name)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(theme.textPrimary)
-
-                    // Only claim performance/manual control when the helper can actually
-                    // deliver it. With no helper the fan is on macOS auto whatever the
-                    // Performance Mode preference says.
-                    Text(modeLabel)
-                        .font(.system(size: 12))
-                        .foregroundColor(isPerformanceControlled ? .orange : theme.textQuaternary)
+                    Text(ownerLine.text)
+                        .font(.system(size: 11))
+                        .foregroundColor(ownerLine.color)
                 }
 
                 Spacer()
 
-                HStack(alignment: .firstTextBaseline, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 3) {
                     Text("\(Int(fan.currentRPM.rounded()))")
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
                         .foregroundColor(rpmColor)
                     Text("RPM")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundColor(theme.textTertiary)
-                }
-                .frame(width: 110, alignment: .trailing)
-            }
-
-            // Manual/Auto toggle
-            if !monitor.helperReady {
-                HStack(spacing: 8) {
-                    if monitor.helperState == .checking {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text("Connecting to helper…")
-                            .font(.system(size: 13))
-                            .foregroundColor(theme.textQuaternary)
-                    } else {
-                        Image(systemName: "slider.horizontal.below.rectangle")
-                            .font(.system(size: 12))
-                            .foregroundColor(theme.textQuaternary)
-                        Text("Speed control unavailable")
-                            .font(.system(size: 13))
-                            .foregroundColor(theme.textQuaternary)
-                    }
-                    Spacer()
-                }
-            } else if isPerformanceControlled {
-                HStack(spacing: 6) {
-                    Image(systemName: "bolt.fill")
-                        .font(.system(size: 12))
-                        .foregroundColor(.orange)
-                    Text("Controlled by Performance Mode")
-                        .font(.system(size: 13))
-                        .foregroundColor(theme.textQuaternary)
-                    Spacer()
-                }
-            } else {
-                HStack {
-                    Toggle(isOn: isManual) {
-                        EmptyView()
-                    }
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .tint(.green)
-                    .animation(monitor.manualOverrides[fan.id] != nil ? .default : nil, value: isManual.wrappedValue)
-
-                    Text(isManual.wrappedValue ? "Manual Control" : "Automatic")
-                        .font(.system(size: 13))
-                        .foregroundColor(theme.textTertiary)
-
-                    Spacer()
                 }
             }
 
-            // Speed slider (only in manual mode, not during performance mode)
-            if !isPerformanceControlled, monitor.helperReady, isManual.wrappedValue, sliderRange.upperBound > sliderRange.lowerBound {
-                VStack(spacing: 6) {
-                    Slider(
-                        value: targetRPM,
-                        in: sliderRange,
-                        step: 100
-                    )
-                    .tint(.green)
+            if showsSlider {
+                VStack(spacing: 4) {
+                    Slider(value: targetRPM, in: sliderRange, step: 100)
+                        .tint(theme.green)
+                        .controlSize(.small)
 
                     HStack {
-                        Text("\(Int(fan.minRPM))")
+                        Text("Quietest")
                         Spacer()
-                        Text("Target: \(Int(targetRPM.wrappedValue)) RPM")
+                        Text("\(Int(targetRPM.wrappedValue).formatted()) RPM")
                             .fontWeight(.medium)
+                            .foregroundColor(theme.textSecondary)
                         Spacer()
-                        Text("\(Int(fan.maxRPM))")
+                        Text("Fastest")
                     }
                     .font(.system(size: 11))
                     .foregroundColor(theme.textQuaternary)
                 }
+                .padding(.leading, 30)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
             if let error = errorMessage {
                 Text(error)
                     .font(.system(size: 12))
-                    .foregroundColor(.red)
+                    .foregroundColor(theme.red)
             }
         }
-        .padding(14)
-        .background(theme.cardBg)
-        .cornerRadius(12)
-    }
-
-    private func setFanMode(manual: Bool) {
-        helper.setFanMode(fanIndex: fan.id, isAuto: !manual) { success, error in
-            DispatchQueue.main.async {
-                if !success {
-                    errorMessage = error ?? "Failed to set fan mode"
-                    monitor.manualOverrides[fan.id] = !manual
-                } else {
-                    errorMessage = nil
-                    if manual {
-                        // Initialize slider to current RPM (or minRPM if fans aren't spinning)
-                        let initialRPM = fan.currentRPM > fan.minRPM ? fan.currentRPM : fan.minRPM
-                        monitor.targetOverrides[fan.id] = initialRPM
-                        // Immediately send the target so the fan actually spins
-                        setFanSpeed(rpm: Int(initialRPM))
-                    }
-                }
-            }
-        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
     }
 
     private func setFanSpeed(rpm: Int) {
