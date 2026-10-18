@@ -8,6 +8,8 @@ final class SMCConnection {
     /// SMC key size and type are fixed properties of the hardware, so one lookup is enough
     /// for the life of the connection.
     private var keyInfoCache: [UInt32: (dataSize: UInt32, dataType: UInt32)] = [:]
+    /// Resolved fan mode key per fan. See `fanModeKey(_:)`.
+    private var fanModeKeyCache: [Int: String] = [:]
 
     init() throws {
         let service = IOServiceGetMatchingService(
@@ -93,8 +95,24 @@ final class SMCConnection {
     }
 
     func readFanMode(index: Int) throws -> Bool {
-        let output = try readKey(SMCKey.fanMode(index))
+        let output = try readKey(fanModeKey(index))
         return output.bytes.0 != 0
+    }
+
+    /// The fan's mode key. M1 to M4 spell it `F{i}Md`; M5 spells it `F{i}md`, and has no
+    /// `F{i}Md` at all, so writing the M1 spelling there can never take effect.
+    func fanModeKey(_ index: Int) -> String {
+        if let cached = fanModeKeyCache[index] { return cached }
+        let upper = SMCKey.fanMode(index)
+        let lower = SMCKey.fanModeLowercase(index)
+        let key = (try? getKeyInfo(upper)) == nil && (try? getKeyInfo(lower)) != nil ? lower : upper
+        fanModeKeyCache[index] = key
+        return key
+    }
+
+    /// Whether the SMC has `key`. M5 has no `Ftst`, for example.
+    func hasKey(_ key: String) -> Bool {
+        (try? getKeyInfo(key)) != nil
     }
 
     // MARK: - Temperature Reads
@@ -133,6 +151,13 @@ final class SMCConnection {
         guard result == kIOReturnSuccess else {
             throw SMCError.writeFailed(result)
         }
+        // The IOKit call succeeding only means the request reached the SMC. The SMC's own
+        // verdict is in `result`, and a refused write (key locked by thermalmonitord, not
+        // writable, wrong size) comes back here. Ignoring it made fan control report
+        // success while the fans stayed on automatic.
+        guard output.result == 0 else {
+            throw SMCError.writeRejected(key, output.result)
+        }
     }
 
     /// Get key info (dataSize, dataType) for debugging
@@ -152,7 +177,9 @@ final class SMCConnection {
 
         var output = SMCParamStruct()
         let result = callSMC(&input, output: &output)
-        guard result == kIOReturnSuccess else {
+        // A missing key also returns kIOReturnSuccess, with the SMC's code in `result` and a
+        // zero size. Caching that would turn every later write to the key into a no-op.
+        guard result == kIOReturnSuccess, output.result == 0 else {
             throw SMCError.keyNotFound(key)
         }
         let info = (dataSize: output.keyInfo.dataSize, dataType: output.keyInfo.dataType)
@@ -177,8 +204,13 @@ final class SMCConnection {
     }
 
     /// Write per-fan mode key (F{i}Md) — used on Apple Silicon
+    /// Raw fan mode: 0 automatic, 1 forced, 3 held by thermalmonitord (M3 and later).
+    func readFanModeByte(index: Int) throws -> UInt8 {
+        try readKey(fanModeKey(index)).bytes.0
+    }
+
     func writeFanModeKey(index: Int, forced: Bool) throws {
-        try writeKey(SMCKey.fanMode(index), bytes: [forced ? 1 : 0])
+        try writeKey(fanModeKey(index), bytes: [forced ? 1 : 0])
     }
 
     /// Write FS! force bitmask — used on Intel
