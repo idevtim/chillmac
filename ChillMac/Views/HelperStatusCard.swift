@@ -1,69 +1,123 @@
 import SwiftUI
 
-/// Shown in place of the Performance Mode card when the privileged helper cannot control
-/// fans. Without this the popover offered a Performance Mode toggle and manual sliders that
-/// looked live but did nothing, and a user whose helper was merely awaiting approval had no
-/// indication of that and no way to act on it from inside the app.
+/// Shown in place of the Cooling control when the privileged helper cannot control fans.
+///
+/// Written as an invitation rather than a warning: monitoring works without the helper, so
+/// nothing is broken, and the old orange "not installed" card read as an error. It still has
+/// to explain each state and offer the one action that resolves it, or a user whose helper
+/// is merely awaiting approval has no way to find that out from inside the app.
 struct HelperStatusCard: View {
     let state: HelperInstaller.HelperState
     let isBusy: Bool
     let onInstall: () -> Void
     let onOpenLoginItems: () -> Void
+    @Binding var isCollapsed: Bool
 
     @Environment(\.theme) private var theme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                if state == .checking {
-                    ProgressView().controlSize(.small)
-                } else {
-                    Image(systemName: icon)
-                        .font(.system(size: 18))
-                        .foregroundColor(.orange)
-                }
+        Group {
+            if state == .checking {
+                checkingRow
+            } else if isCollapsed {
+                collapsedRow
+            } else {
+                expandedCard
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardBackground(theme)
+        .animation(.easeInOut(duration: 0.2), value: isCollapsed)
+    }
 
-                VStack(alignment: .leading, spacing: 2) {
+    private var checkingRow: some View {
+        HStack(spacing: 10) {
+            ProgressView().controlSize(.small)
+            Text("Checking fan control…")
+                .font(.system(size: 13))
+                .foregroundColor(theme.textSecondary)
+        }
+        .padding(14)
+    }
+
+    private var collapsedRow: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "fan.fill")
+                .font(.system(size: 14))
+                .foregroundColor(theme.teal)
+            Text("Fan control is off")
+                .font(.system(size: 13))
+                .foregroundColor(theme.textSecondary)
+            Spacer()
+            Button("Set up…") { isCollapsed = false }
+                .buttonStyle(.plain)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(theme.teal)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+    }
+
+    private var expandedCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 17))
+                    .foregroundColor(theme.teal)
+                    .frame(width: 36, height: 36)
+                    .background(theme.soft(theme.teal))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 3) {
                     Text(title)
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(theme.textPrimary)
                     Text(explanation)
-                        .font(.system(size: 11))
-                        .foregroundColor(theme.textQuaternary)
+                        .font(.system(size: 12))
+                        .foregroundColor(theme.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-
-                Spacer(minLength: 0)
             }
 
-            if isBusy {
-                HStack(spacing: 8) {
+            if state == .needsInstall {
+                VStack(alignment: .leading, spacing: 5) {
+                    checkRow("Only touches fan speed — nothing else")
+                    checkRow("Fans go back to automatic when you quit")
+                    checkRow("Remove it anytime in Settings")
+                }
+                .padding(.leading, 48)
+            }
+
+            HStack(spacing: 14) {
+                if isBusy {
                     ProgressView().controlSize(.small)
-                    Text("Installing…")
+                    Text(state == .needsApproval ? "Waiting…" : "Installing…")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(theme.textTertiary)
+                } else if let action {
+                    Button(action.label, action: action.perform)
+                        .buttonStyle(PrimaryButtonStyle(color: theme.teal))
+                    Button("Not now") { isCollapsed = true }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 13))
+                        .foregroundColor(theme.textSecondary)
                 }
-            } else if let action {
-                Button(action: action.perform) {
-                    Text(action.label)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.orange)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.orange.opacity(0.15))
-                        .cornerRadius(8)
-                }
-                .buttonStyle(.plain)
             }
+            .padding(.leading, 48)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(theme.cardBg)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(state == .checking ? Color.clear : Color.orange.opacity(0.35), lineWidth: 1)
-        )
+        .padding(16)
+    }
+
+    private func checkRow(_ text: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "checkmark")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(theme.green)
+                .frame(width: 15)
+            Text(text)
+                .font(.system(size: 12))
+                .foregroundColor(theme.textSecondary)
+        }
     }
 
     // MARK: - Copy
@@ -76,36 +130,34 @@ struct HelperStatusCard: View {
     private var icon: String {
         switch state {
         case .needsApproval: return "hand.raised.fill"
-        case .unresponsive: return "exclamationmark.triangle.fill"
-        default: return "bolt.slash.fill"
+        case .unresponsive: return "arrow.clockwise"
+        default: return "fan.fill"
         }
     }
 
     private var title: String {
         switch state {
         case .checking: return "Checking fan control…"
-        case .running: return "Fan control ready"
-        case .needsApproval: return "Fan control needs approval"
-        case .needsInstall: return "Fan control not installed"
-        case .needsUpdate: return "Fan control needs updating"
-        case .unresponsive: return "Fan control not responding"
+        case .running: return "Fan control is on"
+        case .needsApproval: return "Almost there — approve in System Settings"
+        case .needsInstall: return "Want cooler, quieter fans?"
+        case .needsUpdate: return "Fan control needs a quick update"
+        case .unresponsive: return "Fan control isn’t responding"
         }
     }
 
     private var explanation: String {
         switch state {
-        case .checking:
-            return "Looking for the privileged helper."
-        case .running:
-            return "The helper is running."
+        case .checking, .running:
+            return ""
         case .needsApproval:
-            return "Enable ChillMac under Login Items & Extensions, then reopen this window."
+            return "Turn on ChillMac under Login Items & Extensions › Allow in the Background. ChillMac notices as soon as you do."
         case .needsInstall:
-            return "ChillMac needs a privileged helper to set fan speeds. Monitoring works without it."
+            return "Monitoring works as-is. To change fan speeds, ChillMac needs a one-time permission."
         case .needsUpdate:
             return "The installed helper is from an older version of ChillMac."
         case .unresponsive:
-            return "The helper is installed but is not answering. Reinstalling usually fixes this."
+            return "The helper is installed but not answering. Reinstalling usually fixes this."
         }
     }
 
@@ -116,11 +168,11 @@ struct HelperStatusCard: View {
         case .needsApproval:
             return Action(label: "Open Login Items", perform: onOpenLoginItems)
         case .needsInstall:
-            return Action(label: "Install Helper", perform: onInstall)
+            return Action(label: "Set up fan control", perform: onInstall)
         case .needsUpdate:
-            return Action(label: "Update Helper", perform: onInstall)
+            return Action(label: "Update", perform: onInstall)
         case .unresponsive:
-            return Action(label: "Reinstall Helper", perform: onInstall)
+            return Action(label: "Reinstall", perform: onInstall)
         }
     }
 }

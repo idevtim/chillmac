@@ -14,12 +14,16 @@ final class StatusBarController: NSObject {
     private var heightObserver: Any?
     private var detailResetObserver: Any?
     private var detailPanelObserver: Any?
-    private var lastPopoverHeight: CGFloat = 0
+    /// Panel most recently opened, for the deferred start of its polling.
+    private var visiblePanelID: String?
     /// When the popover was last torn down. Guards against a single click both closing the
     /// popover and reopening it via two different handlers.
     private var lastPopoverCloseAt: Date = .distantPast
 
     private let detailPanel = DetailPanelController()
+    private lazy var onboarding = OnboardingWindowController(fanMonitor: fanMonitor) { [weak self] in
+        self?.openPopover()
+    }
     private let memoryInfo: MemoryInfo
     private let systemInfo: SystemInfo
     private let batteryInfo: BatteryInfo
@@ -54,9 +58,12 @@ final class StatusBarController: NSObject {
 
         if let button = statusItem.button {
             button.image = Self.fanImage
+            button.imageScaling = .scaleNone
             button.action = #selector(togglePopover(_:))
             button.target = self
             button.imagePosition = .imageLeading
+            // Equal-width digits, so the item keeps its width as the temperature changes.
+            button.font = NSFont.monospacedDigitSystemFont(ofSize: button.font?.pointSize ?? NSFont.systemFontSize, weight: .regular)
         }
 
         // Peak temperature drives the menu bar label. It keeps updating while the popover is
@@ -95,7 +102,6 @@ final class StatusBarController: NSObject {
         }
 
         // Update popover appearance and size when settings change
-        lastPopoverHeight = CGFloat(AppSettings.shared.popoverHeight)
         settingsSub = AppSettings.shared.objectWillChange.sink { [weak self] _ in
             DispatchQueue.main.async {
                 guard let self else { return }
@@ -103,14 +109,8 @@ final class StatusBarController: NSObject {
                 self.popover.contentViewController?.view.appearance = AppSettings.shared.nsAppearance
                 // Mode and °F/°C both change the label without the temperature moving.
                 self.updateStatusItemTitle(peak: self.fanMonitor.peakTemperature)
-
-                // Handle height changes from settings (e.g. Reset button), not during live drag
-                let newHeight = CGFloat(AppSettings.shared.popoverHeight)
-                if self.popover.isShown && abs(newHeight - self.lastPopoverHeight) >= 1 {
-                    let clamped = min(max(newHeight, AppSettings.popoverMinHeight), AppSettings.popoverMaxHeight)
-                    self.popover.contentSize = NSSize(width: 420, height: clamped)
-                    self.lastPopoverHeight = clamped
-                }
+                // Height changes (the Reset button, fitting to content) arrive from the
+                // popover itself as `.popoverHeightChanged`, since only it knows the fitted size.
             }
         }
 
@@ -118,7 +118,6 @@ final class StatusBarController: NSObject {
         heightObserver = NotificationCenter.default.addObserver(forName: .popoverHeightChanged, object: nil, queue: .main) { [weak self] notification in
             guard let self, let height = notification.userInfo?["height"] as? CGFloat else { return }
             self.popover.contentSize = NSSize(width: 420, height: height)
-            self.lastPopoverHeight = height
         }
 
         // Close detail panel when height is reset from settings
@@ -126,13 +125,32 @@ final class StatusBarController: NSObject {
             self?.detailPanel.close()
         }
 
-        // Gate expensive polling to only run when the relevant detail panel is visible
+        // Gate expensive polling to only run when the relevant detail panel is visible.
+        //
+        // Turning a panel's polling on is deferred until its 0.25s slide-in has finished.
+        // Becoming visible makes the CPU and Memory monitors snapshot every running app and
+        // its icon on the main thread, and their results then relayout the panel, and doing
+        // either mid-animation made the panel stutter as it opened. Turning polling off is
+        // immediate.
         detailPanelObserver = NotificationCenter.default.addObserver(forName: .detailPanelChanged, object: nil, queue: .main) { [weak self] notification in
             guard let self else { return }
             let panelID = notification.userInfo?["panelID"] as? String
-            self.cpuInfo.isDetailVisible = (panelID == "cpu")
-            self.memoryInfo.isDetailVisible = (panelID == "memory")
-            self.systemInfo.isDetailVisible = (panelID == "disk")
+            self.visiblePanelID = panelID
+            if panelID != "cpu" { self.cpuInfo.isDetailVisible = false }
+            if panelID != "memory" { self.memoryInfo.isDetailVisible = false }
+            if panelID != "disk" { self.systemInfo.isDetailVisible = false }
+            guard let panelID else { return }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                // The user may have closed or switched panels in the meantime.
+                guard let self, self.visiblePanelID == panelID else { return }
+                switch panelID {
+                case "cpu": self.cpuInfo.isDetailVisible = true
+                case "memory": self.memoryInfo.isDetailVisible = true
+                case "disk": self.systemInfo.isDetailVisible = true
+                default: break
+                }
+            }
         }
     }
 
@@ -151,7 +169,7 @@ final class StatusBarController: NSObject {
         }
     }
 
-    private static let fanImage = NSImage(systemSymbolName: "fan.fill", accessibilityDescription: "ChillMac")
+    private static let fanImage = NSImage.fanMarkTemplate(pointSize: 16)
 
     /// The fan with a small download arrow in its bottom-right corner, signalling that an
     /// update is waiting.
@@ -160,8 +178,8 @@ final class StatusBarController: NSObject {
     /// to Dark Mode. A ring is cut out of the fan around the badge, which is what keeps the
     /// two shapes apart at menu bar size without relying on colour.
     private static let badgedFanImage: NSImage? = {
-        guard let fan = NSImage(systemSymbolName: "fan.fill", accessibilityDescription: "ChillMac, update available"),
-              let arrow = NSImage(systemSymbolName: "arrow.down.circle.fill", accessibilityDescription: nil)
+        let fan = NSImage.fanMarkTemplate(pointSize: 16, accessibilityDescription: "ChillMac, update available")
+        guard let arrow = NSImage(systemSymbolName: "arrow.down.circle.fill", accessibilityDescription: nil)
         else { return fanImage }
 
         let size = fan.size
@@ -217,6 +235,26 @@ final class StatusBarController: NSObject {
         return window.convertToScreen(inWindow).contains(NSEvent.mouseLocation)
     }
 
+    /// Shows onboarding on a genuinely new install. A Mac that already has the helper
+    /// registered has run ChillMac before, so an upgrade does not get the welcome. Called
+    /// once the launch-time helper check has an answer.
+    func handleFirstLaunch() {
+        let settings = AppSettings.shared
+        guard !settings.hasCompletedOnboarding else { return }
+        let ranBefore = fanMonitor.helperState != .needsInstall
+            || UserDefaults.standard.object(forKey: "popoverHeight") != nil
+        if ranBefore {
+            settings.hasCompletedOnboarding = true
+        } else {
+            onboarding.show()
+        }
+    }
+
+    func showOnboarding() {
+        closePopover(sender: nil)
+        onboarding.show()
+    }
+
     @objc private func togglePopover(_ sender: AnyObject?) {
         if popover.isShown {
             closePopover(sender: sender)
@@ -225,7 +263,14 @@ final class StatusBarController: NSObject {
             // would turn a dismissal into a flicker, which is what a click on the icon used
             // to do. One user click means one state change.
             return
-        } else if let button = statusItem.button {
+        } else {
+            openPopover()
+        }
+    }
+
+    private func openPopover() {
+        guard !popover.isShown else { return }
+        if let button = statusItem.button {
             // Resume secondary monitors when popover opens
             cpuInfo.startMonitoring()
             memoryInfo.startMonitoring()
@@ -283,10 +328,11 @@ final class StatusBarController: NSObject {
                 onBatteryTap: { [weak self] in self?.toggleBatteryPanel() },
                 onCpuTap: { [weak self] in self?.toggleCpuPanel() },
                 onTemperatureTap: { [weak self] in self?.toggleTemperaturePanel() },
-                onInstallUpdate: { [weak self] in self?.installUpdate() }
+                onInstallUpdate: { [weak self] in self?.installUpdate() },
+                onShowWelcome: { [weak self] in self?.showOnboarding() }
             )
         )
-        let height = CGFloat(AppSettings.shared.popoverHeight)
+        let height = AppSettings.shared.fittedPopoverHeight ?? CGFloat(AppSettings.shared.popoverHeight)
         hosting.view.frame = NSRect(x: 0, y: 0, width: 420, height: height)
         hosting.view.appearance = AppSettings.shared.nsAppearance
         popover.contentSize = NSSize(width: 420, height: height)

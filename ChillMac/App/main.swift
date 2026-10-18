@@ -36,9 +36,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // needs to (or may) assert that fan control works.
         fanMonitor.helper = helperConnection
         fanMonitor.setupSystemObservers()
-        fanMonitor.resolveHelperAtLaunch { [weak self] in
+        let needsOnboarding = !AppSettings.shared.hasCompletedOnboarding
+        fanMonitor.resolveHelperAtLaunch(installIfMissing: !needsOnboarding) { [weak self] in
             // Fans always start on auto. Only worth asking once the helper can answer.
             DispatchQueue.global(qos: .utility).async { self?.resetFansToAuto() }
+            if needsOnboarding { self?.statusBarController?.handleFirstLaunch() }
         }
     }
 

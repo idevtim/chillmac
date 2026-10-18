@@ -60,8 +60,8 @@ final class DetailPanelController {
                 DetailPanelCloseButton { [weak self] in
                     self?.close()
                 }
-                .padding(.top, 16)
-                .padding(.trailing, 14)
+                .padding(.top, 20)
+                .padding(.trailing, 16)
             }
         )
 
@@ -79,6 +79,12 @@ final class DetailPanelController {
             display: false
         )
         panel.alphaValue = 0
+
+        // Lay out and draw the SwiftUI content once before anything moves. Otherwise its
+        // first layout and render land inside the slide-in, and a heavy panel (the CPU graph
+        // in particular) stalls the opening frames so the panel jumps in rather than sliding.
+        hostingView.layoutSubtreeIfNeeded()
+        panel.displayIfNeeded()
         panel.orderFront(nil)
         self.panel = panel
 
@@ -159,10 +165,10 @@ struct DetailPanelCloseButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "xmark.circle.fill")
-                .font(.system(size: 20))
-                .foregroundColor(theme.textQuaternary)
+            Image(systemName: "xmark")
+                .font(.system(size: 11, weight: .bold))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(HoverIconButtonStyle(diameter: 26, restingFill: theme.ringTrack, tint: theme.textSecondary))
+        .accessibilityLabel("Close")
     }
 }

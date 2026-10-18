@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct AppTheme {
+    let isLight: Bool
     let bgGradientTop: Color
     let bgGradientBottom: Color
 
@@ -22,6 +23,7 @@ struct AppTheme {
     let ringTrack: Color
 
     static let dark = AppTheme(
+        isLight: false,
         bgGradientTop: Color(red: 0.06, green: 0.12, blue: 0.20),
         bgGradientBottom: Color(red: 0.04, green: 0.08, blue: 0.14),
         textPrimary: .white,
@@ -41,6 +43,7 @@ struct AppTheme {
     )
 
     static let light = AppTheme(
+        isLight: true,
         bgGradientTop: Color(red: 0.94, green: 0.95, blue: 0.97),
         bgGradientBottom: Color(red: 0.89, green: 0.91, blue: 0.94),
         textPrimary: Color(red: 0.08, green: 0.08, blue: 0.10),
@@ -61,6 +64,36 @@ struct AppTheme {
 
     static func forScheme(_ scheme: ColorScheme) -> AppTheme {
         scheme == .dark ? .dark : .light
+    }
+
+    // MARK: - Accents
+    //
+    // System colours in dark mode. In light mode each is darkened so it still reads as text
+    // on the pale gradient, the same reasoning the old `perfAccentColor` applied to orange.
+
+    var green: Color { isLight ? Color(red: 0.118, green: 0.620, blue: 0.275) : Color(red: 0.188, green: 0.820, blue: 0.345) }
+    var teal: Color { isLight ? Color(red: 0.055, green: 0.592, blue: 0.678) : Color(red: 0.251, green: 0.784, blue: 0.878) }
+    var blue: Color { isLight ? Color(red: 0.0, green: 0.478, blue: 1.0) : Color(red: 0.039, green: 0.518, blue: 1.0) }
+    var yellow: Color { isLight ? Color(red: 0.722, green: 0.525, blue: 0.0) : Color(red: 1.0, green: 0.839, blue: 0.039) }
+    var orange: Color { isLight ? Color(red: 0.800, green: 0.451, blue: 0.0) : Color(red: 1.0, green: 0.624, blue: 0.039) }
+    var red: Color { isLight ? Color(red: 0.898, green: 0.208, blue: 0.169) : Color(red: 1.0, green: 0.271, blue: 0.227) }
+
+    /// Accent at the low opacity used for icon chips and selected chip backgrounds.
+    func soft(_ accent: Color) -> Color { accent.opacity(isLight ? 0.12 : 0.15) }
+
+    /// Hairline between rows inside a card.
+    var rowDivider: Color { isLight ? Color.black.opacity(0.07) : Color.white.opacity(0.08) }
+    /// Unfilled part of a progress bar.
+    var track: Color { isLight ? Color.black.opacity(0.08) : Color.white.opacity(0.10) }
+    /// Background of segmented controls and unselected chips.
+    var segmentedBg: Color { isLight ? Color.black.opacity(0.06) : Color.white.opacity(0.08) }
+
+    /// `<55` green, `<70` yellow, `<85` orange, else red.
+    func tempColor(_ celsius: Double) -> Color {
+        if celsius >= 85 { return red }
+        if celsius >= 70 { return orange }
+        if celsius >= 55 { return yellow }
+        return green
     }
 
     var backgroundGradient: LinearGradient {

@@ -4,505 +4,157 @@ struct SettingsView: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var updateController: UpdateController
     let systemInfo: SystemInfo
-    let fanMonitor: FanMonitor
+    @ObservedObject var fanMonitor: FanMonitor
     let cpuInfo: CpuInfo
     let memoryInfo: MemoryInfo
     let batteryInfo: BatteryInfo
+    var onShowWelcome: (() -> Void)?
     @Environment(\.theme) private var theme
     let onDismiss: () -> Void
 
+    @State private var showingAdvanced = false
+    @State private var showingHelperActions = false
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header
-            HStack {
-                Text("Settings")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(theme.textPrimary)
-
-                Spacer()
-
-                Button(action: onDismiss) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(theme.textQuaternary)
+        ZStack {
+            if showingAdvanced {
+                AdvancedSettingsView(settings: settings, systemInfo: systemInfo) {
+                    withAnimation(.easeInOut(duration: 0.2)) { showingAdvanced = false }
                 }
-                .buttonStyle(.plain)
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+            } else {
+                mainPage
+                    .transition(.move(edge: .leading).combined(with: .opacity))
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 18)
-            .padding(.bottom, 14)
-
-            ScrollView(.vertical, showsIndicators: settings.showScrollIndicators) {
-                VStack(spacing: 16) {
-                    generalSection
-                    updatesSection
-                    appearanceSection
-                    temperatureSection
-                    batterySaverSection
-                    fanControlSection
-                    displaySection
-                    diagnosticsSection
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 16)
-            }
-
-            Spacer()
-
-            // Version
-            HStack {
-                Spacer()
-                Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?")")
-                    .font(.system(size: 11))
-                    .foregroundColor(theme.textQuaternary)
-                Spacer()
-            }
-            .padding(.bottom, 12)
         }
         .onAppear {
             updateController.refreshUpdateStatus()
         }
     }
 
-    // MARK: - Updates
+    private var mainPage: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SettingsHeader(title: "Settings", onBack: onDismiss)
 
-    private var updatesSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("UPDATES")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(theme.textTertiary)
-                .tracking(1.2)
-                .padding(.leading, 4)
-
-            VStack(spacing: 0) {
-                HStack {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 16))
-                        .foregroundColor(theme.textTertiary)
-                        .frame(width: 24)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Current Version")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(theme.textPrimary)
-                        Text("v\(updateController.currentVersion)")
-                            .font(.system(size: 11))
-                            .foregroundColor(theme.textQuaternary)
-                    }
-                    Spacer()
-                    Button(action: {
-                        updateController.checkForUpdates()
-                    }) {
-                        if updateController.isChecking {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            Text("Check")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.teal)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(updateController.isChecking || !updateController.canCheckForUpdates)
+            ScrollView(.vertical, showsIndicators: settings.showScrollIndicators) {
+                VStack(alignment: .leading, spacing: 14) {
+                    helperStatusRow
+                    generalSection
+                    menuBarSection
+                    coolingSection
+                    aboutSection
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-
-                if updateController.updateAvailable, let version = updateController.latestVersion {
-                    Divider()
-                        .background(theme.dividerSubtle)
-
-                    HStack {
-                        Image(systemName: "gift.fill")
-                            .font(.system(size: 16))
-                            .foregroundColor(.teal)
-                            .frame(width: 24)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("v\(version) Available")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(theme.textPrimary)
-                            Text("Installs and relaunches automatically")
-                                .font(.system(size: 11))
-                                .foregroundColor(theme.textQuaternary)
-                        }
-                        Spacer()
-                        // Hands off to Sparkle, which downloads, verifies the signature,
-                        // swaps the bundle and relaunches — no browser round trip.
-                        Button(action: { updateController.checkForUpdates() }) {
-                            Text("Update")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 5)
-                                .background(Color.teal)
-                                .cornerRadius(8)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                } else if updateController.hasChecked && !updateController.updateAvailable {
-                    Divider()
-                        .background(theme.dividerSubtle)
-
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 16))
-                            .foregroundColor(.green)
-                            .frame(width: 24)
-                        Text("You're up to date")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(theme.textPrimary)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
             }
-            .background(theme.cardBg)
-            .cornerRadius(12)
+        }
+    }
+
+    // MARK: - Helper
+
+    private var helperIsHealthy: Bool { fanMonitor.helperState == .running }
+
+    private var helperStatusRow: some View {
+        VStack(spacing: 0) {
+            helperSummary
+            if showingHelperActions {
+                CardDivider()
+                HelperActions(monitor: fanMonitor)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .cardBackground(theme)
+        .animation(.easeInOut(duration: 0.2), value: showingHelperActions)
+    }
+
+    private var helperSummary: some View {
+        HStack(spacing: 10) {
+            Circle()
+                .fill(helperIsHealthy ? theme.green : theme.orange)
+                .frame(width: 10, height: 10)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(helperIsHealthy ? "Fan control is on" : "Fan control is off")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(theme.textPrimary)
+                Text(helperCaption)
+                    .font(.system(size: 11))
+                    .foregroundColor(theme.textQuaternary)
+            }
+            Spacer()
+            Button(showingHelperActions ? "Done" : "Manage") { showingHelperActions.toggle() }
+                .buttonStyle(LinkButtonStyle())
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(theme.teal)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+    }
+
+    private var helperCaption: String {
+        switch fanMonitor.helperState {
+        case .checking: return "Checking the helper…"
+        case .running: return "Helper installed and responding"
+        case .needsApproval: return "Waiting for approval in System Settings"
+        case .needsInstall: return "Helper not installed"
+        case .needsUpdate: return "Helper needs an update"
+        case .unresponsive: return "Helper installed but not responding"
         }
     }
 
     // MARK: - General
 
     private var generalSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("GENERAL")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(theme.textTertiary)
-                .tracking(1.2)
-                .padding(.leading, 4)
-
-            VStack(spacing: 0) {
-                HStack {
-                    Image(systemName: "sunrise")
-                        .font(.system(size: 16))
-                        .foregroundColor(theme.textTertiary)
-                        .frame(width: 24)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Launch at Login")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(theme.textPrimary)
-                        Text("Start ChillMac when you log in")
-                            .font(.system(size: 11))
-                            .foregroundColor(theme.textQuaternary)
+        SettingsSection(title: "General") {
+            SwitchRow(
+                title: "Open at login",
+                isOn: Binding(get: { settings.launchAtLogin }, set: { settings.setLaunchAtLogin($0) }),
+                tint: theme.teal
+            )
+            CardDivider()
+            SettingsRow(title: "Appearance") {
+                Picker("", selection: Binding(
+                    get: { settings.appearanceMode },
+                    set: { settings.setAppearanceMode($0) }
+                )) {
+                    ForEach(AppearanceMode.allCases, id: \.self) { mode in
+                        Text(mode.label).tag(mode)
                     }
-                    Spacer()
-                    Toggle(isOn: Binding(
-                        get: { settings.launchAtLogin },
-                        set: { settings.setLaunchAtLogin($0) }
-                    )) {
-                        EmptyView()
-                    }
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .tint(.teal)
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .controlSize(.small)
+                .fixedSize()
             }
-            .background(theme.cardBg)
-            .cornerRadius(12)
-        }
-    }
-
-    // MARK: - Appearance
-
-    private var appearanceSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("APPEARANCE")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(theme.textTertiary)
-                .tracking(1.2)
-                .padding(.leading, 4)
-
-            HStack(spacing: 8) {
-                ForEach(AppearanceMode.allCases, id: \.self) { mode in
-                    Button(action: { settings.setAppearanceMode(mode) }) {
-                        VStack(spacing: 8) {
-                            Image(systemName: mode.icon)
-                                .font(.system(size: 20))
-                                .foregroundColor(settings.appearanceMode == mode ? modeAccent(mode) : theme.textQuaternary)
-
-                            Text(mode.label)
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(settings.appearanceMode == mode ? theme.textPrimary : theme.textTertiary)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(settings.appearanceMode == mode ? theme.cardBgHover : theme.cardBg)
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(settings.appearanceMode == mode ? modeAccent(mode).opacity(0.5) : Color.clear, lineWidth: 1)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
+            CardDivider()
+            SettingsRow(title: "Temperature units") {
+                TemperatureUnitPicker(useFahrenheit: $settings.useFahrenheit)
             }
         }
     }
 
-    private func modeAccent(_ mode: AppearanceMode) -> Color {
-        switch mode {
-        case .system: return .teal
-        case .light: return .orange
-        case .dark: return .blue
-        }
-    }
+    // MARK: - Menu Bar
 
-    // MARK: - Fan Control
-
-    private var fanControlSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("FAN CONTROL")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(theme.textTertiary)
-                .tracking(1.2)
-                .padding(.leading, 4)
-
-            VStack(spacing: 0) {
-                HStack {
-                    Image(systemName: "display")
-                        .font(.system(size: 16))
-                        .foregroundColor(theme.textTertiary)
-                        .frame(width: 24)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Keep Fans on Screen Sleep")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(theme.textPrimary)
-                        Text("Don't reset fans when display sleeps")
-                            .font(.system(size: 11))
-                            .foregroundColor(theme.textQuaternary)
-                    }
-                    Spacer()
-                    Toggle(isOn: $settings.keepFansOnScreenSleep) {
-                        EmptyView()
-                    }
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .tint(.orange)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-
-                Divider()
-                    .background(theme.dividerSubtle)
-
-                HStack {
-                    Image(systemName: "powerplug")
-                        .font(.system(size: 16))
-                        .foregroundColor(theme.textTertiary)
-                        .frame(width: 24)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Keep Fans When Closed on Power")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(theme.textPrimary)
-                        Text("Clamshell on AC. Fans stay as set through lid close, lock and sleep")
-                            .font(.system(size: 11))
-                            .foregroundColor(theme.textQuaternary)
-                    }
-                    Spacer()
-                    Toggle(isOn: $settings.keepFansClosedOnPower) {
-                        EmptyView()
-                    }
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .tint(.orange)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
+    private var menuBarSection: some View {
+        SettingsSection(title: "Menu bar") {
+            SettingsRow(title: "Show temperature", caption: Text(settings.menuBarTemperature.explanation)) {
+                MenuBarTemperaturePicker(selection: $settings.menuBarTemperature, compact: true)
             }
-            .background(theme.cardBg)
-            .cornerRadius(12)
         }
     }
 
-    // MARK: - Display
+    // MARK: - Cooling Behavior
 
-    private var displaySection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("DISPLAY")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(theme.textTertiary)
-                .tracking(1.2)
-                .padding(.leading, 4)
-
-            VStack(spacing: 0) {
-                // Scrollbar toggle
-                HStack {
-                    Image(systemName: "scroll")
-                        .font(.system(size: 16))
-                        .foregroundColor(theme.textTertiary)
-                        .frame(width: 24)
-                    Text("Show Scrollbars")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(theme.textPrimary)
-                    Spacer()
-                    Toggle(isOn: $settings.showScrollIndicators) {
-                        EmptyView()
-                    }
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .tint(.teal)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-
-                Divider()
-                    .background(theme.dividerSubtle)
-
-                // Menu bar temperature
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Image(systemName: "thermometer.medium")
-                            .font(.system(size: 16))
-                            .foregroundColor(theme.textTertiary)
-                            .frame(width: 24)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Temperature in Menu Bar")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(theme.textPrimary)
-                            Text(settings.menuBarTemperature.explanation)
-                                .font(.system(size: 11))
-                                .foregroundColor(theme.textQuaternary)
-                        }
-                        Spacer()
-                    }
-
-                    Picker("", selection: $settings.menuBarTemperature) {
-                        ForEach(MenuBarTemperatureMode.allCases, id: \.self) { mode in
-                            Text(mode.label).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-
-                Divider()
-                    .background(theme.dividerSubtle)
-
-                // FPS counter toggle
-                HStack {
-                    Image(systemName: "gauge.open.with.cells.fill")
-                        .font(.system(size: 16))
-                        .foregroundColor(theme.textTertiary)
-                        .frame(width: 24)
-                    Text("Show FPS Counter")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(theme.textPrimary)
-                    Spacer()
-                    Toggle(isOn: $settings.showFPS) {
-                        EmptyView()
-                    }
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .tint(.teal)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-
-                Divider()
-                    .background(theme.dividerSubtle)
-
-                // Reset popover height
-                HStack {
-                    Image(systemName: "arrow.up.and.down.square")
-                        .font(.system(size: 16))
-                        .foregroundColor(theme.textTertiary)
-                        .frame(width: 24)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Window Height")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(theme.textPrimary)
-                        Text("Drag the handle at the bottom to resize")
-                            .font(.system(size: 11))
-                            .foregroundColor(theme.textQuaternary)
-                    }
-                    Spacer()
-                    if abs(settings.popoverHeight - Double(AppSettings.popoverDefaultHeight)) > 10
-                        || abs(settings.detailPanelHeight - Double(AppSettings.detailPanelDefaultHeight)) > 10 {
-                        Button("Reset") {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                settings.popoverHeight = Double(AppSettings.popoverDefaultHeight)
-                                settings.detailPanelHeight = Double(AppSettings.detailPanelDefaultHeight)
-                            }
-                            NotificationCenter.default.post(name: .detailPanelHeightReset, object: nil)
-                        }
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.teal)
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-            }
-            .background(theme.cardBg)
-            .cornerRadius(12)
-        }
-    }
-
-    // MARK: - Battery Saver
-
-    private var batterySaverSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("BATTERY SAVER")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(theme.textTertiary)
-                .tracking(1.2)
-                .padding(.leading, 4)
-
-            VStack(spacing: 0) {
-                // Enable toggle
-                HStack {
-                    Image(systemName: "battery.25")
-                        .font(.system(size: 16))
-                        .foregroundColor(theme.textTertiary)
-                        .frame(width: 24)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Battery Saver")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(theme.textPrimary)
-                        Text("Disable fan control on low battery")
-                            .font(.system(size: 11))
-                            .foregroundColor(theme.textQuaternary)
-                    }
-                    Spacer()
-                    Toggle(isOn: $settings.batterySaverEnabled) {
-                        EmptyView()
-                    }
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .tint(.yellow)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-
+    private var coolingSection: some View {
+        SettingsSection(title: "Cooling behavior") {
+            VStack(alignment: .leading, spacing: 4) {
+                SwitchRow(
+                    title: "Save battery",
+                    caption: Text("Let macOS run the fans when battery drops below ")
+                        + Text("\(settings.batterySaverThreshold)%").fontWeight(.semibold).foregroundColor(theme.yellow),
+                    isOn: $settings.batterySaverEnabled,
+                    tint: theme.yellow
+                )
                 if settings.batterySaverEnabled {
-                    Divider()
-                        .background(theme.dividerSubtle)
-
-                    // Threshold slider
-                    HStack {
-                        Image(systemName: "gauge.low")
-                            .font(.system(size: 16))
-                            .foregroundColor(theme.textTertiary)
-                            .frame(width: 24)
-                        Text("Threshold")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(theme.textPrimary)
-                        Spacer()
-                        Text("\(settings.batterySaverThreshold)%")
-                            .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                            .foregroundColor(.yellow)
-                            .frame(width: 40, alignment: .trailing)
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.top, 10)
-                    .padding(.bottom, 4)
-
                     Slider(
                         value: Binding(
                             get: { Double(settings.batterySaverThreshold) },
@@ -511,137 +163,299 @@ struct SettingsView: View {
                         in: 5...50,
                         step: 5
                     )
-                    .tint(.yellow)
+                    .tint(theme.yellow)
+                    .controlSize(.small)
                     .padding(.horizontal, 14)
                     .padding(.bottom, 10)
-
-                    Divider()
-                        .background(theme.dividerSubtle)
-
-                    // Force performance toggle
-                    HStack {
-                        Image(systemName: "bolt.batteryblock.fill")
-                            .font(.system(size: 16))
-                            .foregroundColor(theme.textTertiary)
-                            .frame(width: 24)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Force Performance")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(theme.textPrimary)
-                            Text("Keep fan control on low battery")
-                                .font(.system(size: 11))
-                                .foregroundColor(theme.textQuaternary)
-                        }
-                        Spacer()
-                        Toggle(isOn: $settings.forcePerformanceOnBattery) {
-                            EmptyView()
-                        }
-                        .toggleStyle(.switch)
-                        .controlSize(.small)
-                        .tint(.orange)
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
-            .background(theme.cardBg)
-            .cornerRadius(12)
             .animation(.easeInOut(duration: 0.2), value: settings.batterySaverEnabled)
+            CardDivider()
+            SwitchRow(
+                title: "Keep cooling while display sleeps",
+                caption: Text("Otherwise fans reset to automatic"),
+                isOn: $settings.keepFansOnScreenSleep,
+                tint: theme.teal
+            )
+            CardDivider()
+            SwitchRow(
+                title: "Keep cooling with lid closed",
+                caption: Text("When plugged in and using an external display"),
+                isOn: $settings.keepFansClosedOnPower,
+                tint: theme.teal
+            )
         }
     }
 
-    // MARK: - Temperature
+    // MARK: - About
 
-    private var temperatureSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("TEMPERATURE")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(theme.textTertiary)
-                .tracking(1.2)
-                .padding(.leading, 4)
-
-            HStack(spacing: 8) {
-                Button(action: { settings.useFahrenheit = false }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "thermometer.medium")
-                            .font(.system(size: 16))
-                        Text("Celsius (°C)")
-                            .font(.system(size: 13, weight: .medium))
+    private var aboutSection: some View {
+        SettingsSection(title: "About") {
+            SettingsRow(title: "ChillMac \(updateController.currentVersion)", caption: updateCaption) {
+                if updateController.isChecking {
+                    ProgressView().controlSize(.small)
+                } else {
+                    // Both hand off to Sparkle, which downloads, verifies the signature, swaps
+                    // the bundle and relaunches.
+                    Button(updateController.updateAvailable ? "Update" : "Check for updates") {
+                        updateController.checkForUpdates()
                     }
-                    .foregroundColor(!settings.useFahrenheit ? theme.textPrimary : theme.textTertiary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(!settings.useFahrenheit ? theme.cardBgHover : theme.cardBg)
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(!settings.useFahrenheit ? Color.green.opacity(0.5) : Color.clear, lineWidth: 1)
-                    )
+                    .buttonStyle(LinkButtonStyle())
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(theme.teal)
+                    .disabled(!updateController.canCheckForUpdates)
                 }
-                .buttonStyle(.plain)
-
-                Button(action: { settings.useFahrenheit = true }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "thermometer.medium")
-                            .font(.system(size: 16))
-                        Text("Fahrenheit (°F)")
-                            .font(.system(size: 13, weight: .medium))
-                    }
-                    .foregroundColor(settings.useFahrenheit ? theme.textPrimary : theme.textTertiary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(settings.useFahrenheit ? theme.cardBgHover : theme.cardBg)
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(settings.useFahrenheit ? Color.orange.opacity(0.5) : Color.clear, lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.plain)
+            }
+            CardDivider()
+            if let onShowWelcome {
+                LinkRow(title: "Show welcome again", action: onShowWelcome)
+                CardDivider()
+            }
+            LinkRow(title: "Advanced") {
+                withAnimation(.easeInOut(duration: 0.2)) { showingAdvanced = true }
             }
         }
     }
 
-    // MARK: - Diagnostics
+    private var updateCaption: Text? {
+        if updateController.updateAvailable, let version = updateController.latestVersion {
+            return Text("v\(version) available").foregroundColor(theme.teal)
+        }
+        if updateController.hasChecked {
+            return Text("You’re up to date").foregroundColor(theme.green)
+        }
+        return nil
+    }
+}
 
-    private var diagnosticsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("DIAGNOSTICS")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(theme.textTertiary)
-                .tracking(1.2)
-                .padding(.leading, 4)
+// MARK: - Advanced
 
-            VStack(spacing: 0) {
-                HStack {
-                    Image(systemName: "doc.text.magnifyingglass")
-                        .font(.system(size: 16))
-                        .foregroundColor(theme.textTertiary)
-                        .frame(width: 24)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Export Diagnostics")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(theme.textPrimary)
-                        Text("Save system metrics log for troubleshooting")
-                            .font(.system(size: 11))
-                            .foregroundColor(theme.textQuaternary)
+private struct AdvancedSettingsView: View {
+    @ObservedObject var settings: AppSettings
+    let systemInfo: SystemInfo
+    let onBack: () -> Void
+    @Environment(\.theme) private var theme
+
+    private var heightIsCustom: Bool {
+        abs(settings.popoverHeight - Double(AppSettings.popoverDefaultHeight)) > 10
+            || abs(settings.detailPanelHeight - Double(AppSettings.detailPanelDefaultHeight)) > 10
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SettingsHeader(title: "Advanced", onBack: onBack)
+
+            ScrollView(.vertical, showsIndicators: settings.showScrollIndicators) {
+                VStack(alignment: .leading, spacing: 14) {
+                    SettingsSection(title: "Display") {
+                        SwitchRow(title: "Show scrollbars", isOn: $settings.showScrollIndicators, tint: theme.teal)
+                        CardDivider()
+                        SwitchRow(title: "Show FPS counter", isOn: $settings.showFPS, tint: theme.teal)
+                        CardDivider()
+                        SettingsRow(title: "Window height", caption: Text("Drag the handle at the bottom to resize")) {
+                            if heightIsCustom {
+                                Button("Reset") {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        settings.popoverHeight = Double(AppSettings.popoverDefaultHeight)
+                                        settings.detailPanelHeight = Double(AppSettings.detailPanelDefaultHeight)
+                                    }
+                                    NotificationCenter.default.post(name: .detailPanelHeightReset, object: nil)
+                                }
+                                .buttonStyle(LinkButtonStyle())
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(theme.teal)
+                            }
+                        }
                     }
-                    Spacer()
-                    Button("Export") {
-                        DiagnosticExporter.export(
-                            logger: DiagnosticLogger.shared,
-                            systemInfo: systemInfo
+
+                    SettingsSection(title: "Battery") {
+                        // The popover's battery saver banner sets this through "Override".
+                        // It stays reachable here so an override can be undone.
+                        SwitchRow(
+                            title: "Keep Smart cooling on low battery",
+                            caption: Text("Ignore Save battery while Smart cooling is on"),
+                            isOn: $settings.forcePerformanceOnBattery,
+                            tint: theme.orange
                         )
                     }
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.teal)
-                    .buttonStyle(.plain)
+
+                    SettingsSection(title: "Diagnostics") {
+                        SettingsRow(title: "Export diagnostics", caption: Text("Save a system metrics log for troubleshooting")) {
+                            Button("Export") {
+                                DiagnosticExporter.export(logger: DiagnosticLogger.shared, systemInfo: systemInfo)
+                            }
+                            .buttonStyle(LinkButtonStyle())
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(theme.teal)
+                        }
+                    }
                 }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
+            }
+        }
+    }
+}
+
+// MARK: - Helper actions
+
+/// Reinstall, open Login Items, or remove the privileged helper. Expands under the status row.
+private struct HelperActions: View {
+    @ObservedObject var monitor: FanMonitor
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("The helper is the small background process that sets fan speeds. Removing it hands the fans back to macOS; monitoring keeps working.")
+                .font(.system(size: 11))
+                .foregroundColor(theme.textQuaternary)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
+
+            Group {
+                actionRow("Reinstall", icon: "arrow.clockwise") { monitor.installHelper() }
+                CardDivider(leadingInset: 14)
+                actionRow("Open Login Items", icon: "gearshape") { HelperInstaller.openLoginItemsSettings() }
+                CardDivider(leadingInset: 14)
+                actionRow("Remove", icon: "trash", color: theme.red) { monitor.removeHelper() }
+                    .disabled(monitor.helperState == .needsInstall)
             }
-            .background(theme.cardBg)
-            .cornerRadius(12)
+            .disabled(monitor.helperBusy)
+        }
+    }
+
+    private func actionRow(_ title: String, icon: String, color: Color? = nil, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 13))
+                    .frame(width: 18)
+                Text(title)
+                    .font(.system(size: 13, weight: .medium))
+                Spacer()
+                if monitor.helperBusy {
+                    ProgressView().controlSize(.mini)
+                }
+            }
+            .foregroundColor(color ?? theme.textPrimary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(RowButtonStyle())
+    }
+}
+
+// MARK: - Building blocks
+
+/// Back chevron and a 22pt title.
+struct SettingsHeader: View {
+    let title: String
+    let onBack: () -> Void
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Button(action: onBack) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 18, weight: .semibold))
+            }
+            .buttonStyle(HoverIconButtonStyle(diameter: 30, tint: theme.teal, hoverTint: theme.teal))
+            .help("Back")
+            .padding(.leading, -6)
+            .keyboardShortcut(.cancelAction)
+
+            Text(title)
+                .font(.system(size: 22, weight: .bold))
+                .foregroundColor(theme.textPrimary)
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 18)
+        .padding(.bottom, 14)
+    }
+}
+
+/// Section header above one card of rows.
+struct SettingsSection<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: () -> Content
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            CardSectionHeader(title: title)
+            VStack(alignment: .leading, spacing: 0) {
+                content()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .cardBackground(theme)
+        }
+    }
+}
+
+/// A full-width row that navigates or performs an action, with a trailing chevron.
+private struct LinkRow: View {
+    let title: String
+    let action: () -> Void
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(theme.textPrimary)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(theme.textQuaternary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(RowButtonStyle())
+    }
+}
+
+/// °C | °F. Shared with onboarding.
+struct TemperatureUnitPicker: View {
+    @Binding var useFahrenheit: Bool
+
+    var body: some View {
+        Picker("", selection: $useFahrenheit) {
+            Text("°C").tag(false)
+            Text("°F").tag(true)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .controlSize(.small)
+        .fixedSize()
+    }
+}
+
+/// Never | When warm | Always. Shared with onboarding.
+struct MenuBarTemperaturePicker: View {
+    @Binding var selection: MenuBarTemperatureMode
+    /// A pop-up button for the trailing edge of a Settings row, where three segments
+    /// squeeze the row's title onto two lines. Onboarding has the width for segments.
+    var compact = false
+
+    var body: some View {
+        let picker = Picker("", selection: $selection) {
+            ForEach(MenuBarTemperatureMode.allCases, id: \.self) { mode in
+                Text(mode.label).tag(mode)
+            }
+        }
+        .labelsHidden()
+
+        if compact {
+            picker.pickerStyle(.menu).controlSize(.small).fixedSize()
+        } else {
+            picker.pickerStyle(.segmented)
         }
     }
 }

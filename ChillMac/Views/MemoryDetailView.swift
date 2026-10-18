@@ -3,267 +3,145 @@ import SwiftUI
 struct MemoryDetailView: View {
     @ObservedObject var memoryInfo: MemoryInfo
     @Environment(\.theme) private var theme
-    @State private var panelHeight: CGFloat = CGFloat(AppSettings.shared.detailPanelHeight)
 
     var body: some View {
-        ZStack {
-            theme.backgroundGradient
+        DetailPanelScaffold(title: "Memory") {
+            PanelHero(
+                status: status.text,
+                statusColor: status.color,
+                value: Self.formatGB(memoryInfo.availableMemory),
+                context: "free of \(Int(Double(memoryInfo.totalMemory) / 1_073_741_824)) GB"
+            )
 
-            VStack(alignment: .leading, spacing: 0) {
-                // Title
-                Text("Memory")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(theme.textPrimary)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 18)
-                    .padding(.bottom, 14)
+            VStack(alignment: .leading, spacing: 12) {
+                stackedBar
+                legend
+            }
+            .padding(.horizontal, 4)
 
-                ScrollView(.vertical, showsIndicators: AppSettings.shared.showScrollIndicators) {
-                    VStack(spacing: 16) {
-                        donutSection
-                        pressureSwapCards
-                        topConsumersSection
+            VStack(spacing: 0) {
+                PanelValueRow(
+                    icon: "gauge.with.dots.needle.33percent",
+                    iconColor: pressureColor,
+                    title: "Pressure",
+                    value: "\(pressureLabel) · \(Int(memoryInfo.pressurePercent.rounded()))%",
+                    valueColor: pressureColor
+                )
+                CardDivider()
+                PanelValueRow(
+                    icon: "arrow.up.arrow.down",
+                    iconColor: theme.teal,
+                    title: "Overflow to disk",
+                    caption: "Swap — slower than memory",
+                    value: MemoryInfo.formatBytes(memoryInfo.swapUsed)
+                )
+            }
+            .cardBackground(theme)
+
+            topConsumersSection
+        }
+    }
+
+    // MARK: - Status
+
+    private var status: (text: String, color: Color) {
+        if memoryInfo.pressurePercent > 90 { return ("Out of memory", theme.red) }
+        if memoryInfo.pressurePercent > 70 { return ("Getting tight", theme.yellow) }
+        return ("Plenty to spare", theme.green)
+    }
+
+    private var pressureLabel: String {
+        if memoryInfo.pressurePercent > 90 { return "High" }
+        if memoryInfo.pressurePercent > 70 { return "Elevated" }
+        return "Normal"
+    }
+
+    private var pressureColor: Color { status.color }
+
+    /// "29.7 GB": one decimal is plenty at panel scale.
+    private static func formatGB(_ bytes: UInt64) -> String {
+        String(format: "%.1f GB", Double(bytes) / 1_073_741_824)
+    }
+
+    // MARK: - Breakdown
+
+    private var segments: [(label: String, bytes: UInt64, color: Color)] {
+        [
+            ("Used by apps", memoryInfo.activeMemory, theme.green),
+            ("Reserved by macOS", memoryInfo.wiredMemory, theme.blue),
+            ("Compressed to save space", memoryInfo.compressedMemory, theme.teal),
+        ]
+    }
+
+    private var stackedBar: some View {
+        GeometryReader { geo in
+            let total = Double(max(memoryInfo.totalMemory, 1))
+            let visible = segments.filter { $0.bytes > 0 }
+            let gaps = CGFloat(visible.count) * 2
+            let usable = max(geo.size.width - gaps, 0)
+            HStack(spacing: 2) {
+                ForEach(visible, id: \.label) { segment in
+                    Rectangle()
+                        .fill(segment.color)
+                        .frame(width: usable * CGFloat(Double(segment.bytes) / total))
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(theme.track)
+            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        }
+        .frame(height: 14)
+        .animation(.easeInOut(duration: 0.4), value: memoryInfo.activeMemory)
+    }
+
+    private var legend: some View {
+        let items = segments.map { ($0.label, MemoryInfo.formatBytes($0.bytes), $0.color) }
+            + [("Free", MemoryInfo.formatBytes(memoryInfo.availableMemory), theme.track)]
+        return LazyVGrid(columns: [GridItem(.flexible(), alignment: .topLeading), GridItem(.flexible(), alignment: .topLeading)], spacing: 10) {
+            ForEach(items, id: \.0) { label, value, color in
+                HStack(alignment: .top, spacing: 8) {
+                    Circle()
+                        .fill(color)
+                        .frame(width: 8, height: 8)
+                        .padding(.top, 4)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(value)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(theme.textPrimary)
+                        Text(label)
+                            .font(.system(size: 11))
+                            .foregroundColor(theme.textTertiary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 16)
-                }
-
-                PanelResizeHandle(panelHeight: $panelHeight) {
-                    AppSettings.shared.detailPanelHeight = Double(panelHeight)
                 }
             }
         }
-        .frame(width: 370, height: panelHeight)
-    }
-
-    // MARK: - Donut Chart
-
-    private var usedMemory: UInt64 {
-        memoryInfo.activeMemory + memoryInfo.wiredMemory + memoryInfo.compressedMemory
-    }
-
-    private var donutSection: some View {
-        HStack(spacing: 14) {
-            // Donut chart — pad by half the stroke width so it doesn't clip
-            ZStack {
-                Circle()
-                    .stroke(theme.ringTrack, lineWidth: 20)
-
-                Circle()
-                    .trim(from: 0, to: arcEnd(for: .compressed))
-                    .stroke(Color.teal, style: StrokeStyle(lineWidth: 20, lineCap: .butt))
-                    .rotationEffect(.degrees(-90))
-
-                Circle()
-                    .trim(from: 0, to: arcEnd(for: .wired))
-                    .stroke(Color.blue, style: StrokeStyle(lineWidth: 20, lineCap: .butt))
-                    .rotationEffect(.degrees(-90))
-
-                Circle()
-                    .trim(from: 0, to: arcEnd(for: .active))
-                    .stroke(Color.green, style: StrokeStyle(lineWidth: 20, lineCap: .butt))
-                    .rotationEffect(.degrees(-90))
-
-                VStack(spacing: 2) {
-                    Text(MemoryInfo.formatBytes(memoryInfo.availableMemory))
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
-                        .foregroundColor(theme.textPrimary)
-                    Text("of \(Int(memoryInfo.totalMemory / 1_073_741_824)) GB available")
-                        .font(.system(size: 9))
-                        .foregroundColor(theme.textTertiary)
-                }
-            }
-            .padding(12)
-            .frame(width: 160, height: 160)
-
-            VStack(alignment: .leading, spacing: 14) {
-                LegendRow(color: .green, label: "Active", value: MemoryInfo.formatBytes(memoryInfo.activeMemory))
-                LegendRow(color: .blue, label: "Wired", value: MemoryInfo.formatBytes(memoryInfo.wiredMemory))
-                LegendRow(color: .teal, label: "Compressed", value: MemoryInfo.formatBytes(memoryInfo.compressedMemory))
-            }
-        }
-        .padding(.vertical, 4)
-    }
-
-    private enum MemoryType { case active, wired, compressed }
-
-    private func arcEnd(for type: MemoryType) -> CGFloat {
-        let total = Double(memoryInfo.totalMemory)
-        guard total > 0 else { return 0 }
-        switch type {
-        case .active:
-            return CGFloat(Double(memoryInfo.activeMemory) / total)
-        case .wired:
-            return CGFloat(Double(memoryInfo.activeMemory + memoryInfo.wiredMemory) / total)
-        case .compressed:
-            return CGFloat(Double(usedMemory) / total)
-        }
-    }
-
-    // MARK: - Pressure & Swap (equal height)
-
-    private var pressureSwapCards: some View {
-        HStack(alignment: .top, spacing: 12) {
-            // Pressure card
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: "gauge.with.needle")
-                        .font(.system(size: 14))
-                        .foregroundColor(pressureColor)
-                    Text("Pressure")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(theme.textPrimary)
-                    Spacer()
-                }
-
-                Text(String(format: "%.0f%%", memoryInfo.pressurePercent))
-                    .font(.system(size: 20, weight: .bold, design: .monospaced))
-                    .foregroundColor(pressureColor)
-
-                Text(pressureDescription)
-                    .font(.system(size: 11))
-                    .foregroundColor(theme.textQuaternary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Spacer(minLength: 0)
-            }
-            .padding(14)
-            .frame(maxHeight: .infinity)
-            .background(theme.cardBg)
-            .cornerRadius(12)
-
-            // Swap card
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: "arrow.triangle.swap")
-                        .font(.system(size: 14))
-                        .foregroundColor(.cyan)
-                    Text("Swap File")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(theme.textPrimary)
-                    Spacer()
-                }
-
-                Text(MemoryInfo.formatBytes(memoryInfo.swapUsed))
-                    .font(.system(size: 20, weight: .bold, design: .monospaced))
-                    .foregroundColor(.cyan)
-
-                Text("Virtual memory on disk")
-                    .font(.system(size: 11))
-                    .foregroundColor(theme.textQuaternary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Spacer(minLength: 0)
-            }
-            .padding(14)
-            .frame(maxHeight: .infinity)
-            .background(theme.cardBg)
-            .cornerRadius(12)
-        }
-        .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private var pressureColor: Color {
-        if memoryInfo.pressurePercent >= 80 { return .red }
-        if memoryInfo.pressurePercent >= 60 { return .orange }
-        return .green
-    }
-
-    private var pressureDescription: String {
-        if memoryInfo.pressurePercent >= 80 { return "Memory is under heavy load." }
-        if memoryInfo.pressurePercent >= 60 { return "Moderate memory usage." }
-        return "Your Mac is ready for more tasks."
     }
 
     // MARK: - Top Consumers
 
     private var topConsumersSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("TOP CONSUMERS")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(theme.textTertiary)
-                .tracking(1.2)
-                .padding(.leading, 4)
-                .padding(.top, 4)
+        VStack(alignment: .leading, spacing: 8) {
+            CardSectionHeader(title: "Using the most")
 
             VStack(spacing: 0) {
-                // Header row
-                HStack {
-                    Text("Application")
-                        .font(.system(size: 12))
-                        .foregroundColor(theme.textQuaternary)
-                    Spacer()
-                    Text("Usage")
-                        .font(.system(size: 12))
-                        .foregroundColor(theme.textQuaternary)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-
                 if memoryInfo.topProcesses.isEmpty {
                     PanelLoadingView(message: "Sampling processes…")
-                        .padding(.bottom, 6)
                 }
-
+                let top = Double(memoryInfo.topProcesses.map(\.memoryBytes).max() ?? 0)
                 ForEach(memoryInfo.topProcesses) { proc in
-                    HStack(spacing: 10) {
-                        // Real app icon or fallback
-                        if let icon = proc.icon {
-                            Image(nsImage: icon)
-                                .resizable()
-                                .frame(width: 24, height: 24)
-                                .cornerRadius(5)
-                        } else {
-                            Image(systemName: "app.fill")
-                                .font(.system(size: 20))
-                                .foregroundColor(.green.opacity(0.5))
-                                .frame(width: 24, height: 24)
-                        }
-
-                        Text(proc.name)
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(theme.textPrimary)
-                            .lineLimit(1)
-
-                        Spacer()
-
-                        Text(MemoryInfo.formatBytes(proc.memoryBytes))
-                            .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                            .foregroundColor(.green)
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 6)
+                    TopConsumerRow(
+                        icon: proc.icon,
+                        name: proc.name,
+                        fraction: top > 0 ? Double(proc.memoryBytes) / top : 0,
+                        value: MemoryInfo.formatBytes(proc.memoryBytes),
+                        color: theme.green
+                    )
                 }
             }
-            .background(theme.cardBgSecondary)
-            .cornerRadius(12)
-        }
-    }
-}
-
-// MARK: - Legend Row
-
-private struct LegendRow: View {
-    let color: Color
-    let label: String
-    let value: String
-    @Environment(\.theme) private var theme
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(color)
-                .frame(width: 10, height: 10)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(label)
-                    .font(.system(size: 12))
-                    .foregroundColor(theme.textSecondary)
-                Text(value)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(theme.textPrimary)
-            }
+            .padding(.vertical, 4)
+            .cardBackground(theme)
         }
     }
 }
