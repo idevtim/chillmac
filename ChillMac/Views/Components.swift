@@ -141,6 +141,65 @@ struct HoverIconButtonStyle: ButtonStyle {
     }
 }
 
+/// Inline text action such as "Manage" or "Export". On hover a rounded highlight appears
+/// behind the text. The highlight extends past the text without moving it, so swapping this
+/// in for `.plain` leaves the layout as it was.
+struct LinkButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        LinkLabel(configuration: configuration)
+    }
+
+    private struct LinkLabel: View {
+        let configuration: Configuration
+        @State private var isHovered = false
+        @Environment(\.isEnabled) private var isEnabled
+        @Environment(\.theme) private var theme
+
+        var body: some View {
+            configuration.label
+                .opacity(isEnabled ? (configuration.isPressed ? 0.7 : 1) : 0.4)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(isHovered && isEnabled ? theme.cardBgClickable : Color.clear)
+                )
+                .contentShape(Rectangle())
+                .padding(.horizontal, -7)
+                .padding(.vertical, -3)
+                .onHover { isHovered = $0 }
+                .animation(.easeInOut(duration: 0.12), value: isHovered)
+        }
+    }
+}
+
+/// Full-width tappable row inside a card. Highlights on hover like the popover's vitals rows.
+struct RowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        RowLabel(configuration: configuration)
+    }
+
+    private struct RowLabel: View {
+        let configuration: Configuration
+        @State private var isHovered = false
+        @Environment(\.isEnabled) private var isEnabled
+        @Environment(\.theme) private var theme
+
+        var body: some View {
+            configuration.label
+                .opacity(isEnabled ? 1 : 0.4)
+                .background(highlighted ? theme.cardBgHover : Color.clear)
+                .contentShape(Rectangle())
+                .onHover { isHovered = $0 }
+                .animation(.easeInOut(duration: 0.12), value: isHovered)
+        }
+
+        private var highlighted: Bool {
+            isEnabled && (isHovered || configuration.isPressed)
+        }
+    }
+}
+
 // MARK: - Detail panels
 
 /// Chrome every detail panel shares: gradient, 24pt title, scrolling content, resize handle.

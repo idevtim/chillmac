@@ -81,8 +81,8 @@ struct SettingsView: View {
                     .foregroundColor(theme.textQuaternary)
             }
             Spacer()
-            Button(showingHelperActions ? "Done" : "Manage…") { showingHelperActions.toggle() }
-                .buttonStyle(.plain)
+            Button(showingHelperActions ? "Done" : "Manage") { showingHelperActions.toggle() }
+                .buttonStyle(LinkButtonStyle())
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(theme.teal)
         }
@@ -201,7 +201,7 @@ struct SettingsView: View {
                     Button(updateController.updateAvailable ? "Update" : "Check for updates") {
                         updateController.checkForUpdates()
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(LinkButtonStyle())
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(theme.teal)
                     .disabled(!updateController.canCheckForUpdates)
@@ -262,7 +262,7 @@ private struct AdvancedSettingsView: View {
                                     }
                                     NotificationCenter.default.post(name: .detailPanelHeightReset, object: nil)
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(LinkButtonStyle())
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(theme.teal)
                             }
@@ -285,7 +285,7 @@ private struct AdvancedSettingsView: View {
                             Button("Export") {
                                 DiagnosticExporter.export(logger: DiagnosticLogger.shared, systemInfo: systemInfo)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(LinkButtonStyle())
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(theme.teal)
                         }
@@ -344,7 +344,7 @@ private struct HelperActions: View {
             .padding(.vertical, 9)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(RowButtonStyle())
     }
 }
 
@@ -360,12 +360,11 @@ struct SettingsHeader: View {
         HStack(spacing: 6) {
             Button(action: onBack) {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(theme.teal)
-                    .frame(width: 24, height: 24)
-                    .contentShape(Rectangle())
+                    .font(.system(size: 18, weight: .semibold))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(HoverIconButtonStyle(diameter: 30, tint: theme.teal, hoverTint: theme.teal))
+            .help("Back")
+            .padding(.leading, -6)
             .keyboardShortcut(.cancelAction)
 
             Text(title)
@@ -418,7 +417,7 @@ private struct LinkRow: View {
             .padding(.vertical, 10)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(RowButtonStyle())
     }
 }
 
