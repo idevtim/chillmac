@@ -365,9 +365,10 @@ struct PopoverView: View {
                 Button(action: { NSApp.terminate(nil) }) {
                     Image(systemName: "power")
                         .font(.system(size: 16))
-                        .foregroundColor(theme.textTertiary)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(HoverIconButtonStyle(hoverTint: theme.red))
+                .help("Quit ChillMac")
+                .padding(.leading, -7)
 
                 Spacer()
 
@@ -395,7 +396,6 @@ struct PopoverView: View {
                     ZStack(alignment: .topTrailing) {
                         Image(systemName: "gearshape.fill")
                             .font(.system(size: 16))
-                            .foregroundColor(theme.textTertiary)
 
                         if updateController.updateAvailable {
                             Circle()
@@ -405,10 +405,13 @@ struct PopoverView: View {
                         }
                     }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(HoverIconButtonStyle())
+                .help("Settings")
+                .padding(.trailing, -7)
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 12)
+            // The buttons' 30pt hover circles add 7pt above and below the icons.
+            .padding(.vertical, 5)
         }
         .background(theme.footerBg)
         .opacity(appeared ? 1 : 0)

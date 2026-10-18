@@ -101,6 +101,46 @@ struct PrimaryButtonStyle: ButtonStyle {
     }
 }
 
+/// Icon-only button that lights up under the pointer: the icon brightens and a soft circle
+/// appears behind it. The label should not set its own foreground colour.
+struct HoverIconButtonStyle: ButtonStyle {
+    var diameter: CGFloat = 30
+    /// Circle shown at rest, for buttons that already sit on one (the panel close button).
+    var restingFill: Color? = nil
+    /// Overrides the default `textTertiary` → `textPrimary` colours.
+    var tint: Color? = nil
+    var hoverTint: Color? = nil
+
+    func makeBody(configuration: Configuration) -> some View {
+        HoverIconLabel(configuration: configuration, style: self)
+    }
+
+    private struct HoverIconLabel: View {
+        let configuration: Configuration
+        let style: HoverIconButtonStyle
+        @State private var isHovered = false
+        @Environment(\.theme) private var theme
+
+        var body: some View {
+            configuration.label
+                .foregroundColor(isHovered ? style.hoverTint ?? theme.textPrimary : style.tint ?? theme.textTertiary)
+                .frame(width: style.diameter, height: style.diameter)
+                .background(Circle().fill(fill))
+                .scaleEffect(configuration.isPressed ? 0.92 : 1)
+                .contentShape(Circle())
+                .onHover { isHovered = $0 }
+                .animation(.easeInOut(duration: 0.12), value: isHovered)
+                .animation(.easeInOut(duration: 0.08), value: configuration.isPressed)
+        }
+
+        private var fill: Color {
+            if configuration.isPressed { return theme.cardBgHover }
+            if isHovered { return style.restingFill == nil ? theme.cardBgClickable : theme.cardBgHover }
+            return style.restingFill ?? .clear
+        }
+    }
+}
+
 // MARK: - Detail panels
 
 /// Chrome every detail panel shares: gradient, 24pt title, scrolling content, resize handle.

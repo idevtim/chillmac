@@ -161,12 +161,8 @@ struct DetailPanelCloseButton: View {
         Button(action: action) {
             Image(systemName: "xmark")
                 .font(.system(size: 11, weight: .bold))
-                .foregroundColor(theme.textSecondary)
-                .frame(width: 26, height: 26)
-                .background(Circle().fill(theme.ringTrack))
-                .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(HoverIconButtonStyle(diameter: 26, restingFill: theme.ringTrack, tint: theme.textSecondary))
         .accessibilityLabel("Close")
     }
 }
