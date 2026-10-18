@@ -79,6 +79,12 @@ final class DetailPanelController {
             display: false
         )
         panel.alphaValue = 0
+
+        // Lay out and draw the SwiftUI content once before anything moves. Otherwise its
+        // first layout and render land inside the slide-in, and a heavy panel (the CPU graph
+        // in particular) stalls the opening frames so the panel jumps in rather than sliding.
+        hostingView.layoutSubtreeIfNeeded()
+        panel.displayIfNeeded()
         panel.orderFront(nil)
         self.panel = panel
 

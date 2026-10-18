@@ -14,6 +14,8 @@ final class StatusBarController: NSObject {
     private var heightObserver: Any?
     private var detailResetObserver: Any?
     private var detailPanelObserver: Any?
+    /// Panel most recently opened, for the deferred start of its polling.
+    private var visiblePanelID: String?
     /// When the popover was last torn down. Guards against a single click both closing the
     /// popover and reopening it via two different handlers.
     private var lastPopoverCloseAt: Date = .distantPast
@@ -60,6 +62,8 @@ final class StatusBarController: NSObject {
             button.action = #selector(togglePopover(_:))
             button.target = self
             button.imagePosition = .imageLeading
+            // Equal-width digits, so the item keeps its width as the temperature changes.
+            button.font = NSFont.monospacedDigitSystemFont(ofSize: button.font?.pointSize ?? NSFont.systemFontSize, weight: .regular)
         }
 
         // Peak temperature drives the menu bar label. It keeps updating while the popover is
@@ -121,13 +125,32 @@ final class StatusBarController: NSObject {
             self?.detailPanel.close()
         }
 
-        // Gate expensive polling to only run when the relevant detail panel is visible
+        // Gate expensive polling to only run when the relevant detail panel is visible.
+        //
+        // Turning a panel's polling on is deferred until its 0.25s slide-in has finished.
+        // Becoming visible makes the CPU and Memory monitors snapshot every running app and
+        // its icon on the main thread, and their results then relayout the panel, and doing
+        // either mid-animation made the panel stutter as it opened. Turning polling off is
+        // immediate.
         detailPanelObserver = NotificationCenter.default.addObserver(forName: .detailPanelChanged, object: nil, queue: .main) { [weak self] notification in
             guard let self else { return }
             let panelID = notification.userInfo?["panelID"] as? String
-            self.cpuInfo.isDetailVisible = (panelID == "cpu")
-            self.memoryInfo.isDetailVisible = (panelID == "memory")
-            self.systemInfo.isDetailVisible = (panelID == "disk")
+            self.visiblePanelID = panelID
+            if panelID != "cpu" { self.cpuInfo.isDetailVisible = false }
+            if panelID != "memory" { self.memoryInfo.isDetailVisible = false }
+            if panelID != "disk" { self.systemInfo.isDetailVisible = false }
+            guard let panelID else { return }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                // The user may have closed or switched panels in the meantime.
+                guard let self, self.visiblePanelID == panelID else { return }
+                switch panelID {
+                case "cpu": self.cpuInfo.isDetailVisible = true
+                case "memory": self.memoryInfo.isDetailVisible = true
+                case "disk": self.systemInfo.isDetailVisible = true
+                default: break
+                }
+            }
         }
     }
 

@@ -223,8 +223,13 @@ struct PopoverView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "thermometer.medium")
                         .font(.system(size: 20))
-                    Text(peakTemperature.map(settings.formatBadgeTemperature) ?? "--")
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                    // Sized to the widest reading in the current unit, so the badge and the
+                    // header beside it hold still as the value ticks up and down.
+                    ZStack(alignment: .trailing) {
+                        Text(settings.useFahrenheit ? "188.8°" : "88.8°").hidden()
+                        Text(peakTemperature.map(settings.formatBadgeTemperature) ?? "--")
+                    }
+                    .font(.system(size: 24, weight: .bold, design: .rounded).monospacedDigit())
                 }
                 .foregroundColor(color)
 
