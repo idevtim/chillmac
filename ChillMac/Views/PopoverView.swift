@@ -22,6 +22,8 @@ struct PopoverView: View {
     @State private var appeared = false
     @State private var showingSettings = false
     @State private var liveHeight: CGFloat = 0
+    /// Natural height of the main page: header, scrolling content and footer together.
+    @State private var fittedHeight: CGFloat = 0
     @State private var dragStartHeight: CGFloat = 0
     @State private var activePanelID: String?
     @State private var badgeHovered = false
@@ -56,7 +58,13 @@ struct PopoverView: View {
                     .transition(.move(edge: .leading).combined(with: .opacity))
             }
         }
-        .frame(width: 420, height: liveHeight > 0 ? liveHeight : CGFloat(settings.popoverHeight))
+        .frame(width: 420, height: targetHeight)
+        .onPreferenceChange(PopoverContentHeightKey.self) { fittedHeight = $0 }
+        .onChange(of: targetHeight) { height in
+            guard liveHeight == 0 else { return }  // the drag posts its own sizes
+            settings.fittedPopoverHeight = showingSettings ? nil : height
+            NotificationCenter.default.post(name: .popoverHeightChanged, object: nil, userInfo: ["height": height])
+        }
         .environment(\.theme, theme)
         .preferredColorScheme(settings.preferredColorScheme)
         // Every content section is gated on `appeared`, so whatever sets it has to be
@@ -89,9 +97,20 @@ struct PopoverView: View {
         }
     }
 
+    /// The main page shrinks to fit its content, so a short page does not end in a block of
+    /// empty gradient. The height set with the drag handle is the ceiling: past it the page
+    /// scrolls. Settings and the SMC error state always use the full height.
+    private var targetHeight: CGFloat {
+        if liveHeight > 0 { return liveHeight }
+        let stored = CGFloat(settings.popoverHeight)
+        guard !showingSettings, monitor.smcError == nil, fittedHeight > 0 else { return stored }
+        return min(stored, max(AppSettings.popoverMinHeight, fittedHeight.rounded(.up)))
+    }
+
     private var mainContent: some View {
         VStack(spacing: 0) {
             headerSection
+                .measuredHeight()
 
             if let error = monitor.smcError {
                 errorSection(error)
@@ -113,10 +132,12 @@ struct PopoverView: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 16)
+                    .measuredHeight()
                 }
             }
 
             footerSection
+                .measuredHeight()
         }
     }
 
@@ -406,7 +427,7 @@ struct PopoverView: View {
                 DragGesture(coordinateSpace: .global)
                     .onChanged { value in
                         if liveHeight == 0 {
-                            liveHeight = CGFloat(settings.popoverHeight)
+                            liveHeight = targetHeight
                             dragStartHeight = liveHeight
                         }
                         let delta = value.location.y - value.startLocation.y
@@ -428,6 +449,22 @@ struct PopoverView: View {
 }
 
 // MARK: - Supporting Views
+
+/// Sums the heights of every view marked `measuredHeight()`.
+private struct PopoverContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value += nextValue()
+    }
+}
+
+private extension View {
+    func measuredHeight() -> some View {
+        background(GeometryReader { geo in
+            Color.clear.preference(key: PopoverContentHeightKey.self, value: geo.size.height)
+        })
+    }
+}
 
 struct CardSectionHeader: View {
     let title: String

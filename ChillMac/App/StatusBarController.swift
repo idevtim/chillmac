@@ -14,7 +14,6 @@ final class StatusBarController: NSObject {
     private var heightObserver: Any?
     private var detailResetObserver: Any?
     private var detailPanelObserver: Any?
-    private var lastPopoverHeight: CGFloat = 0
     /// When the popover was last torn down. Guards against a single click both closing the
     /// popover and reopening it via two different handlers.
     private var lastPopoverCloseAt: Date = .distantPast
@@ -99,7 +98,6 @@ final class StatusBarController: NSObject {
         }
 
         // Update popover appearance and size when settings change
-        lastPopoverHeight = CGFloat(AppSettings.shared.popoverHeight)
         settingsSub = AppSettings.shared.objectWillChange.sink { [weak self] _ in
             DispatchQueue.main.async {
                 guard let self else { return }
@@ -107,14 +105,8 @@ final class StatusBarController: NSObject {
                 self.popover.contentViewController?.view.appearance = AppSettings.shared.nsAppearance
                 // Mode and °F/°C both change the label without the temperature moving.
                 self.updateStatusItemTitle(peak: self.fanMonitor.peakTemperature)
-
-                // Handle height changes from settings (e.g. Reset button), not during live drag
-                let newHeight = CGFloat(AppSettings.shared.popoverHeight)
-                if self.popover.isShown && abs(newHeight - self.lastPopoverHeight) >= 1 {
-                    let clamped = min(max(newHeight, AppSettings.popoverMinHeight), AppSettings.popoverMaxHeight)
-                    self.popover.contentSize = NSSize(width: 420, height: clamped)
-                    self.lastPopoverHeight = clamped
-                }
+                // Height changes (the Reset button, fitting to content) arrive from the
+                // popover itself as `.popoverHeightChanged`, since only it knows the fitted size.
             }
         }
 
@@ -122,7 +114,6 @@ final class StatusBarController: NSObject {
         heightObserver = NotificationCenter.default.addObserver(forName: .popoverHeightChanged, object: nil, queue: .main) { [weak self] notification in
             guard let self, let height = notification.userInfo?["height"] as? CGFloat else { return }
             self.popover.contentSize = NSSize(width: 420, height: height)
-            self.lastPopoverHeight = height
         }
 
         // Close detail panel when height is reset from settings
@@ -318,7 +309,7 @@ final class StatusBarController: NSObject {
                 onShowWelcome: { [weak self] in self?.showOnboarding() }
             )
         )
-        let height = CGFloat(AppSettings.shared.popoverHeight)
+        let height = AppSettings.shared.fittedPopoverHeight ?? CGFloat(AppSettings.shared.popoverHeight)
         hosting.view.frame = NSRect(x: 0, y: 0, width: 420, height: height)
         hosting.view.appearance = AppSettings.shared.nsAppearance
         popover.contentSize = NSSize(width: 420, height: height)

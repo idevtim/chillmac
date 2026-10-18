@@ -152,6 +152,10 @@ final class AppSettings: ObservableObject {
     /// leaves fans in manual mode across events where macOS would otherwise take over.
     @AppStorage("keepFansClosedOnPower") var keepFansClosedOnPower = false
 
+    /// Height the main page last fitted to, so the next open starts at that size instead of
+    /// the full height and then visibly shrinking. Not persisted and not published.
+    var fittedPopoverHeight: CGFloat?
+
     static let popoverMinHeight: CGFloat = 400
     static let popoverMaxHeight: CGFloat = 900
     static let popoverDefaultHeight: CGFloat = 640
