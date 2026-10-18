@@ -116,12 +116,14 @@ struct FanListPlaceholder: View {
 /// orange to match the rest of the Smart UI.
 struct CoolingModePicker: View {
     @Binding var selection: CoolingMode
+    @State private var hovered: CoolingMode?
     @Environment(\.theme) private var theme
 
     var body: some View {
         HStack(spacing: 2) {
             ForEach(CoolingMode.allCases, id: \.self) { mode in
                 let isSelected = selection == mode
+                let isHovered = hovered == mode && !isSelected
                 Button(action: { selection = mode }) {
                     HStack(spacing: 5) {
                         Image(systemName: mode.icon)
@@ -129,20 +131,24 @@ struct CoolingModePicker: View {
                         Text(mode.label)
                             .font(.system(size: 13, weight: .semibold))
                     }
-                    .foregroundColor(labelColor(mode, isSelected: isSelected))
+                    .foregroundColor(isHovered ? theme.textPrimary : labelColor(mode, isSelected: isSelected))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 6)
                     .background(
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(isSelected ? selectedFill : Color.clear)
+                            .fill(isSelected ? selectedFill : isHovered ? hoverFill : Color.clear)
                             .shadow(color: isSelected && theme.isLight ? .black.opacity(0.15) : .clear, radius: 1, y: 1)
                     )
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .onHover { inside in
+                    if inside { hovered = mode } else if hovered == mode { hovered = nil }
+                }
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
         }
+        .animation(.easeInOut(duration: 0.12), value: hovered)
         .padding(2)
         .background(theme.segmentedBg)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
@@ -150,6 +156,11 @@ struct CoolingModePicker: View {
 
     private var selectedFill: Color {
         theme.isLight ? .white : Color.white.opacity(0.18)
+    }
+
+    /// Halfway to selected, so a hovered segment reads as clickable without looking chosen.
+    private var hoverFill: Color {
+        theme.isLight ? Color.white.opacity(0.55) : Color.white.opacity(0.09)
     }
 
     private func labelColor(_ mode: CoolingMode, isSelected: Bool) -> Color {
@@ -163,6 +174,7 @@ struct CoolingModePicker: View {
 /// Smart cooling's four levels as chips, with the selected level's description underneath.
 struct IntensityGrid: View {
     @Binding var selection: PerformanceLevel
+    @State private var hovered: PerformanceLevel?
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -187,27 +199,32 @@ struct IntensityGrid: View {
 
     private func chip(_ level: PerformanceLevel) -> some View {
         let isSelected = selection == level
+        let isHovered = hovered == level && !isSelected
         return Button(action: { withAnimation(.easeInOut(duration: 0.15)) { selection = level } }) {
             VStack(spacing: 4) {
                 Image(systemName: level.icon)
                     .font(.system(size: 16))
-                    .foregroundColor(isSelected ? theme.orange : theme.textTertiary)
+                    .foregroundColor(isSelected ? theme.orange : isHovered ? theme.textSecondary : theme.textTertiary)
                     .frame(height: 20)
                 Text(level.label)
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(isSelected ? theme.textPrimary : theme.textSecondary)
+                    .foregroundColor(isSelected || isHovered ? theme.textPrimary : theme.textSecondary)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
-            .background(isSelected ? theme.soft(theme.orange) : theme.segmentedBg)
+            .background(isSelected ? theme.soft(theme.orange) : isHovered ? theme.cardBgHover : theme.segmentedBg)
             .overlay(
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .stroke(isSelected ? theme.orange : Color.clear, lineWidth: 1)
+                    .stroke(isSelected ? theme.orange : isHovered ? theme.orange.opacity(0.4) : Color.clear, lineWidth: 1)
             )
             .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .onHover { inside in
+            if inside { hovered = level } else if hovered == level { hovered = nil }
+        }
+        .animation(.easeInOut(duration: 0.12), value: hovered)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
