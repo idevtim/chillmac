@@ -39,6 +39,11 @@ final class FanMonitor: ObservableObject {
     /// User overrides that persist across poll cycles
     @Published var manualOverrides: [Int: Bool] = [:]   // fanIndex → manual on/off
     @Published var targetOverrides: [Int: Double] = [:]  // fanIndex → target RPM
+    /// Shown in the Cooling card while a fan command has not taken. Cleared by the next
+    /// command that does, and by switching mode.
+    @Published var fanControlNotice: FanControlNotice?
+    /// Smart cooling holds off sending until then after a refused command.
+    private var fanControlBackoffUntil: Date?
 
     /// Set by AppDelegate after helper is ready
     var helper: HelperConnection?
@@ -382,6 +387,8 @@ final class FanMonitor: ObservableObject {
 
         settings.coolingMode = mode
         settings.performanceMode = (mode == .smart)
+        fanControlNotice = nil
+        fanControlBackoffUntil = nil
         updatePollInterval()
 
         switch mode {
@@ -403,6 +410,17 @@ final class FanMonitor: ObservableObject {
         }
     }
 
+    /// Switches Smart cooling's level. The ramp limits are there so the fans don't audibly
+    /// hunt as temperatures drift, but under them a step down to Quiet took around half a
+    /// minute to be heard. A level the user just picked is applied in one step, right away.
+    func setPerformanceLevel(_ level: PerformanceLevel) {
+        let settings = AppSettings.shared
+        guard settings.performanceLevel != level else { return }
+        settings.performanceLevel = level
+        lastSentRPM.removeAll()
+        resumePerformanceImmediately()
+    }
+
     /// Puts one fan in manual mode at a speed it can already be heard at: the target Smart
     /// was holding, else its current speed, else its minimum.
     private func takeManualControl(of fan: FanInfo) {
@@ -414,13 +432,28 @@ final class FanMonitor: ObservableObject {
         helper.setFanMode(fanIndex: fan.id, isAuto: false) { [weak self] success, error in
             DispatchQueue.main.async {
                 guard let self else { return }
+                if error == kFanHandoverPendingMessage {
+                    // macOS has not let go yet. Keep the fan shown as manual and ask again;
+                    // the retry picks up any target the slider set in the meantime.
+                    self.setFanControlNotice(.handingOver)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+                        guard let self, AppSettings.shared.coolingMode == .manual,
+                              self.manualOverrides[fan.id] == true else { return }
+                        self.takeManualControl(of: self.fans.first { $0.id == fan.id } ?? fan)
+                    }
+                    return
+                }
                 guard success else {
                     NSLog("FanMonitor: manual mode failed for fan \(fan.id) — \(error ?? "unknown")")
                     self.manualOverrides[fan.id] = false
                     self.targetOverrides[fan.id] = nil
+                    self.setFanControlNotice(.refused(error))
                     return
                 }
-                self.requestManualFanSpeed(fanIndex: fan.id, rpm: Int(initialRPM)) { _ in }
+                self.setFanControlNotice(nil)
+                self.requestManualFanSpeed(fanIndex: fan.id, rpm: Int(initialRPM)) { [weak self] message in
+                    self?.setFanControlNotice(.refused(message))
+                }
             }
         }
     }
@@ -934,6 +967,10 @@ final class FanMonitor: ObservableObject {
             performanceCurvePercent = curvePercent
         }
 
+        // After a refusal, give the fans a rest before asking again: each fresh attempt can
+        // hold the helper for its whole handover window.
+        if let backoff = fanControlBackoffUntil, backoff > Date() { return }
+
         // Send each fan to its target with per-level rate limiting
         for fan in fans {
             let pct = fanPcts[fan.id] ?? floor
@@ -959,8 +996,29 @@ final class FanMonitor: ObservableObject {
             lastSentRPM[fan.id] = rounded
             targetOverrides[fan.id] = rounded
             manualOverrides[fan.id] = true
-            helper.setFanSpeed(fanIndex: fan.id, rpm: Int(rounded)) { _, _ in }
+            helper.setFanSpeed(fanIndex: fan.id, rpm: Int(rounded)) { [weak self] success, error in
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    guard success else {
+                        // Not ours after all, so the next poll tries again instead of
+                        // assuming the fan is already at this target.
+                        self.manualOverrides[fan.id] = false
+                        if error == kFanHandoverPendingMessage {
+                            self.setFanControlNotice(.handingOver)
+                        } else {
+                            self.fanControlBackoffUntil = Date().addingTimeInterval(30)
+                            self.setFanControlNotice(.refused(error))
+                        }
+                        return
+                    }
+                    self.setFanControlNotice(nil)
+                }
+            }
         }
+    }
+
+    private func setFanControlNotice(_ notice: FanControlNotice?) {
+        if fanControlNotice != notice { fanControlNotice = notice }
     }
 
     // MARK: - Manual Speed Coalescing
@@ -1001,7 +1059,9 @@ final class FanMonitor: ObservableObject {
         guard let rpm = pendingManualRPM.removeValue(forKey: fanIndex), let helper else { return }
         lastManualSendAt[fanIndex] = Date()
         helper.setFanSpeed(fanIndex: fanIndex, rpm: rpm) { success, error in
-            guard !success else { return }
+            // During the handover `takeManualControl` is already retrying, and it sends the
+            // latest target once the fan is released.
+            guard !success, error != kFanHandoverPendingMessage else { return }
             DispatchQueue.main.async { onFailure(error ?? "Failed to set fan speed") }
         }
     }
@@ -1021,4 +1081,13 @@ final class FanMonitor: ObservableObject {
         guard value.isFinite else { return 0 }
         return min(max(value, 0), 20000)
     }
+}
+
+/// Why fan control is not in effect yet, for the Cooling card.
+enum FanControlNotice: Equatable {
+    /// macOS is still releasing the fans after ChillMac asked for them. Expected for up to
+    /// half a minute after launch on some Macs; commands are being retried.
+    case handingOver
+    /// The fans could not be taken over. Carries the helper's reason, when it gave one.
+    case refused(String?)
 }

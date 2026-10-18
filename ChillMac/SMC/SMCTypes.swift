@@ -59,6 +59,10 @@ enum SMCError: Error, LocalizedError {
     case keyNotFound(String)
     case readFailed(kern_return_t)
     case writeFailed(kern_return_t)
+    /// The SMC received the write and refused it, with its own result code.
+    case writeRejected(String, UInt8)
+    /// The fan was told to take a manual speed but stayed under macOS control.
+    case fanStayedAutomatic(Int)
     case unknownDataType(String)
 
     var errorDescription: String? {
@@ -68,6 +72,8 @@ enum SMCError: Error, LocalizedError {
         case .keyNotFound(let key): return "SMC key not found: \(key)"
         case .readFailed(let code): return "SMC read failed with code: \(code)"
         case .writeFailed(let code): return "SMC write failed with code: \(code)"
+        case .writeRejected(let key, let code): return "The SMC refused the write to \(key) (code \(code))"
+        case .fanStayedAutomatic(let index): return "Fan \(index + 1) stayed under macOS control"
         case .unknownDataType(let type): return "Unknown SMC data type: \(type)"
         }
     }

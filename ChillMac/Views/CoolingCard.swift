@@ -32,8 +32,15 @@ struct CoolingCard: View {
                     .lineSpacing(2)
                     .fixedSize(horizontal: false, vertical: true)
 
+                if let notice = monitor.fanControlNotice {
+                    FanControlNoticeView(notice: notice)
+                }
+
                 if mode == .smart {
-                    IntensityGrid(selection: $settings.performanceLevel)
+                    IntensityGrid(selection: Binding(
+                        get: { settings.performanceLevel },
+                        set: { monitor.setPerformanceLevel($0) }
+                    ))
                         .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
@@ -80,6 +87,31 @@ struct CoolingCard: View {
                 FanRowView(fan: fan, monitor: monitor, mode: mode)
             }
         }
+    }
+}
+
+/// Status line for fan control that has not taken effect yet.
+private struct FanControlNoticeView: View {
+    let notice: FanControlNotice
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 6) {
+            switch notice {
+            case .handingOver:
+                ProgressView()
+                    .controlSize(.mini)
+                    .frame(width: 12, height: 14)
+                Text("Taking over the fans from macOS. This can take a few seconds after ChillMac starts.")
+                    .foregroundColor(theme.textTertiary)
+            case .refused(let reason):
+                Image(systemName: "exclamationmark.triangle.fill")
+                Text("macOS kept control of the fans. \(reason ?? "The helper did not say why.")")
+            }
+        }
+        .font(.system(size: 12))
+        .foregroundColor(theme.red)
+        .fixedSize(horizontal: false, vertical: true)
     }
 }
 

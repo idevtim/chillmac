@@ -133,6 +133,13 @@ final class SMCConnection {
         guard result == kIOReturnSuccess else {
             throw SMCError.writeFailed(result)
         }
+        // The IOKit call succeeding only means the request reached the SMC. The SMC's own
+        // verdict is in `result`, and a refused write (key locked by thermalmonitord, not
+        // writable, wrong size) comes back here. Ignoring it made fan control report
+        // success while the fans stayed on automatic.
+        guard output.result == 0 else {
+            throw SMCError.writeRejected(key, output.result)
+        }
     }
 
     /// Get key info (dataSize, dataType) for debugging
@@ -152,7 +159,9 @@ final class SMCConnection {
 
         var output = SMCParamStruct()
         let result = callSMC(&input, output: &output)
-        guard result == kIOReturnSuccess else {
+        // A missing key also returns kIOReturnSuccess, with the SMC's code in `result` and a
+        // zero size. Caching that would turn every later write to the key into a no-op.
+        guard result == kIOReturnSuccess, output.result == 0 else {
             throw SMCError.keyNotFound(key)
         }
         let info = (dataSize: output.keyInfo.dataSize, dataType: output.keyInfo.dataType)
@@ -177,6 +186,11 @@ final class SMCConnection {
     }
 
     /// Write per-fan mode key (F{i}Md) — used on Apple Silicon
+    /// Raw F{i}Md value: 0 automatic, non-zero forced.
+    func readFanModeByte(index: Int) throws -> UInt8 {
+        try readKey(SMCKey.fanMode(index)).bytes.0
+    }
+
     func writeFanModeKey(index: Int, forced: Bool) throws {
         try writeKey(SMCKey.fanMode(index), bytes: [forced ? 1 : 0])
     }

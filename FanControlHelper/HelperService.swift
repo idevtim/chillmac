@@ -57,8 +57,7 @@ class HelperService: NSObject, HelperProtocol {
         do {
             try HelperService.withSMC { smc in
                 #if arch(arm64)
-                try HelperService.enableTestModeIfNeededLocked(smc: smc)
-                try smc.writeFanModeKey(index: fanIndex, forced: true)
+                try HelperService.forceFanLocked(smc: smc, fanIndex: fanIndex)
                 #else
                 try HelperService.setIntelForcedMode(smc: smc, fanIndex: fanIndex, forced: true)
                 #endif
@@ -79,26 +78,27 @@ class HelperService: NSObject, HelperProtocol {
                 if isAuto {
                     #if arch(arm64)
                     try smc.writeFanModeKey(index: fanIndex, forced: false)
-                    let fanCount = try smc.readFanCount()
-                    var anyManual = false
-                    for i in 0..<fanCount {
-                        if i != fanIndex, let mode = try? smc.readFanMode(index: i), mode {
-                            anyManual = true
-                            break
+                    HelperService.forcedFans.remove(fanIndex)
+                    // Decided from what this daemon forced, not by reading the other fans'
+                    // modes: the SMC reflects a mode write only after a short delay, so a
+                    // fan released a moment ago can still read as forced.
+                    if HelperService.forcedFans.isEmpty && HelperService.hasSetTestMode {
+                        do {
+                            try smc.writeTestMode(enabled: false)
+                            HelperService.hasSetTestMode = false
+                            HelperService.testModeEnabledAt = nil
+                            HelperService.log("  cleared test mode (all fans auto)")
+                        } catch {
+                            // The fan itself is back on auto, which is what was asked for.
+                            HelperService.log("  could not clear test mode: \(error)")
                         }
-                    }
-                    if !anyManual {
-                        try smc.writeTestMode(enabled: false)
-                        HelperService.hasSetTestMode = false
-                        HelperService.log("  cleared test mode (all fans auto)")
                     }
                     #else
                     try HelperService.setIntelForcedMode(smc: smc, fanIndex: fanIndex, forced: false)
                     #endif
                 } else {
                     #if arch(arm64)
-                    try HelperService.enableTestModeIfNeededLocked(smc: smc)
-                    try smc.writeFanModeKey(index: fanIndex, forced: true)
+                    try HelperService.forceFanLocked(smc: smc, fanIndex: fanIndex)
                     #else
                     try HelperService.setIntelForcedMode(smc: smc, fanIndex: fanIndex, forced: true)
                     #endif
@@ -241,6 +241,25 @@ class HelperService: NSObject, HelperProtocol {
     #endif
 
     #if arch(arm64)
+    /// When test mode was last switched on. Owned by `smcQueue`.
+    private static var testModeEnabledAt: Date?
+    /// Fans this daemon has put in forced mode. Owned by `smcQueue`.
+    private static var forcedFans: Set<Int> = []
+    /// How long a successful `F{i}Md` write gets to show up when read back. The SMC applies
+    /// it asynchronously, and reading straight after the write can still return 0.
+    private static let modeSettleTime: TimeInterval = 2
+
+    /// How long after switching test mode on the SMC may keep refusing `F{i}Md` writes.
+    /// thermalmonitord does not release the fans the moment `Ftst` is set, and until it does
+    /// the SMC refuses the mode write (result 130). On a MacBook Pro this took about 15
+    /// seconds after ChillMac started. Earlier versions wrote once, did not check the result,
+    /// and reported success while the fans stayed on automatic.
+    private static let handoverWindow: TimeInterval = 30
+
+    /// How long one command keeps retrying a refused write before replying. Short, so the
+    /// shared queue is never held for the whole handover; the app asks again instead.
+    private static let attemptBudget: TimeInterval = 1
+
     /// Must be called from inside `withSMC` — it reads and writes `hasSetTestMode`,
     /// which is owned by `smcQueue`.
     private static func enableTestModeIfNeededLocked(smc: SMCConnection) throws {
@@ -248,7 +267,71 @@ class HelperService: NSObject, HelperProtocol {
         log("  enabling test mode (Ftst=1)")
         try smc.writeTestMode(enabled: true)
         hasSetTestMode = true
+        testModeEnabledAt = Date()
         log("  test mode enabled")
+    }
+
+    /// Puts one fan in forced mode and confirms it took, by reading `F{i}Md` back.
+    ///
+    /// While the handover window is open a refusal is expected: test mode stays on so the
+    /// handover keeps going, and the reply is `kFanHandoverPendingMessage` so the app retries
+    /// rather than reporting an error. After the window a refusal is final, and if no fan is
+    /// forced test mode is switched back off, leaving the fans with macOS as before.
+    /// Must be called from inside `withSMC`.
+    private static func forceFanLocked(smc: SMCConnection, fanIndex: Int) throws {
+        try enableTestModeIfNeededLocked(smc: smc)
+        let handoverEnds = (testModeEnabledAt ?? .distantPast).addingTimeInterval(handoverWindow)
+        let budgetEnds = min(Date().addingTimeInterval(attemptBudget), handoverEnds)
+
+        var lastError: Error = SMCError.fanStayedAutomatic(fanIndex)
+        var attempts = 0
+        while true {
+            attempts += 1
+            do {
+                try smc.writeFanModeKey(index: fanIndex, forced: true)
+                if waitForForcedMode(smc: smc, fanIndex: fanIndex) {
+                    forcedFans.insert(fanIndex)
+                    if attempts > 1 { log("  fan \(fanIndex) forced after \(attempts) attempts") }
+                    return
+                }
+                lastError = SMCError.fanStayedAutomatic(fanIndex)
+            } catch {
+                lastError = error
+            }
+            guard Date() < budgetEnds else { break }
+            usleep(250_000)
+        }
+
+        if Date() < handoverEnds {
+            log("  fan \(fanIndex) not released yet: \(lastError)")
+            throw HandoverPending()
+        }
+
+        log("  fan \(fanIndex) could not be forced: \(lastError)")
+        forcedFans.remove(fanIndex)
+        if forcedFans.isEmpty {
+            try? smc.writeTestMode(enabled: false)
+            hasSetTestMode = false
+            testModeEnabledAt = nil
+        }
+        throw lastError
+    }
+
+    private struct HandoverPending: LocalizedError {
+        var errorDescription: String? { kFanHandoverPendingMessage }
+    }
+
+    /// Reads `F{i}Md` until it shows forced or `modeSettleTime` runs out. Returns at once
+    /// when the fan was already forced, which is the usual case for Smart's repeat writes.
+    /// An unreadable mode is not evidence of failure; only a 0 that persists is.
+    private static func waitForForcedMode(smc: SMCConnection, fanIndex: Int) -> Bool {
+        let deadline = Date().addingTimeInterval(modeSettleTime)
+        while true {
+            guard let mode = try? smc.readFanModeByte(index: fanIndex) else { return true }
+            if mode != 0 { return true }
+            guard Date() < deadline else { return false }
+            usleep(50_000)
+        }
     }
     #endif
 
