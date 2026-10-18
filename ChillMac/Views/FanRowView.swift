@@ -66,16 +66,8 @@ struct FanRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
-                Image(systemName: "fan.fill")
-                    .font(.system(size: 20))
-                    .foregroundColor(fan.currentRPM > 0 ? theme.green : theme.textSubtle)
-                    .rotationEffect(.degrees(fan.currentRPM > 0 ? 360 : 0))
-                    .animation(
-                        fan.currentRPM > 0
-                            ? .linear(duration: max(0.5, 3000 / fan.currentRPM)).repeatForever(autoreverses: false)
-                            : .default,
-                        value: fan.currentRPM > 0
-                    )
+                SpinningFanIcon(rpm: fan.currentRPM, maxRPM: fan.maxRPM,
+                                color: fan.currentRPM > 0 ? theme.green : theme.textSubtle)
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(fan.name)
@@ -137,5 +129,57 @@ struct FanRowView: View {
         monitor.requestManualFanSpeed(fanIndex: fan.id, rpm: rpm) { message in
             errorMessage = message
         }
+    }
+}
+
+/// Fan glyph that turns while the fan does, faster as the RPM rises.
+///
+/// Driven by a clock rather than a repeating SwiftUI animation: a repeating animation only
+/// starts when its value changes, so a fan already running when the popover first draws
+/// would sit still. The angle is accumulated frame by frame, so a change in speed eases the
+/// rate instead of making the blades jump.
+private struct SpinningFanIcon: View {
+    let rpm: Double
+    let maxRPM: Double
+    let color: Color
+
+    @State private var spin = Spin()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private final class Spin {
+        var angle: Double = 0
+        var lastTick: Date?
+    }
+
+    /// Degrees per second on screen. A real fan's speed would just blur, so this maps the
+    /// fan's range onto a slow-to-brisk turn.
+    private var degreesPerSecond: Double {
+        guard rpm > 0 else { return 0 }
+        let fraction = maxRPM > 0 ? min(rpm / maxRPM, 1) : 0.5
+        return 120 + fraction * 600
+    }
+
+    var body: some View {
+        if rpm > 0 && !reduceMotion {
+            TimelineView(.animation(minimumInterval: 1.0 / 30)) { context in
+                glyph.rotationEffect(.degrees(angle(at: context.date)))
+            }
+        } else {
+            glyph.rotationEffect(.degrees(spin.angle))
+        }
+    }
+
+    private var glyph: some View {
+        Image(systemName: "fan.fill")
+            .font(.system(size: 20))
+            .foregroundColor(color)
+    }
+
+    private func angle(at date: Date) -> Double {
+        // Cap the step so a pause (popover closed, then reopened) doesn't fling the blades.
+        let elapsed = spin.lastTick.map { min(date.timeIntervalSince($0), 0.1) } ?? 0
+        spin.lastTick = date
+        spin.angle = (spin.angle + elapsed * degreesPerSecond).truncatingRemainder(dividingBy: 360)
+        return spin.angle
     }
 }
