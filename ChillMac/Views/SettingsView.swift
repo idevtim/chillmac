@@ -136,19 +136,9 @@ struct SettingsView: View {
 
     private var menuBarSection: some View {
         SettingsSection(title: "Menu bar") {
-            VStack(alignment: .leading, spacing: 8) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Show temperature")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(theme.textPrimary)
-                    Text(settings.menuBarTemperature.explanation)
-                        .font(.system(size: 11))
-                        .foregroundColor(theme.textQuaternary)
-                }
-                MenuBarTemperaturePicker(selection: $settings.menuBarTemperature)
+            SettingsRow(title: "Show temperature", caption: Text(settings.menuBarTemperature.explanation)) {
+                MenuBarTemperaturePicker(selection: $settings.menuBarTemperature, compact: true)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
         }
     }
 
@@ -401,6 +391,7 @@ struct SettingsSection<Content: View>: View {
             VStack(alignment: .leading, spacing: 0) {
                 content()
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .cardBackground(theme)
         }
     }
@@ -450,14 +441,22 @@ struct TemperatureUnitPicker: View {
 /// Never | When warm | Always. Shared with onboarding.
 struct MenuBarTemperaturePicker: View {
     @Binding var selection: MenuBarTemperatureMode
+    /// A pop-up button for the trailing edge of a Settings row, where three segments
+    /// squeeze the row's title onto two lines. Onboarding has the width for segments.
+    var compact = false
 
     var body: some View {
-        Picker("", selection: $selection) {
+        let picker = Picker("", selection: $selection) {
             ForEach(MenuBarTemperatureMode.allCases, id: \.self) { mode in
                 Text(mode.label).tag(mode)
             }
         }
-        .pickerStyle(.segmented)
         .labelsHidden()
+
+        if compact {
+            picker.pickerStyle(.menu).controlSize(.small).fixedSize()
+        } else {
+            picker.pickerStyle(.segmented)
+        }
     }
 }
