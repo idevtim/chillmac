@@ -113,6 +113,13 @@ scripts/
 - **XPCSecurity** builds the code signing requirement both ends pin each other to (team derived from the running binary, with the shipped team as a floor)
 - The helper's listener enforces that requirement, so XPC rejects unauthorized callers before **HelperDelegate** is consulted
 - Apple Silicon uses `Ftst` (test mode) key to bypass thermalmonitord; signal handlers ensure cleanup on exit
+- On M3/M4, thermalmonitord holds the fans (mode 3) and refuses mode writes (SMC result 130)
+  until several seconds after `Ftst` goes 0→1 (~15 s measured on an M3 Max). Once `Ftst` is on,
+  mode writes take effect at once. So the helper writes the mode directly first, unlocks only
+  on refusal, reports `kFanHandoverPendingMessage` during the handover so the app retries, and
+  keeps `Ftst` on for 60 s after the last fan goes auto so a quick relaunch skips the wait.
+  M5 has no `Ftst` and spells the mode key `F{i}md`; `SMCConnection.fanModeKey` resolves it.
+  Always check the SMC's `result` byte on writes: a refused write still returns kIOReturnSuccess
 - `#if DEBUG` allows unsigned helper connections during development
 - **Only one copy of ChillMac.app may exist on disk while testing fan control.** macOS
   launch constraints SIGKILL the bundled daemon when duplicate bundle IDs with mismatched

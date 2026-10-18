@@ -8,6 +8,8 @@ enum SMCKey {
     static func fanMaxSpeed(_ index: Int) -> String    { "F\(index)Mx" }
     static func fanTargetSpeed(_ index: Int) -> String { "F\(index)Tg" }
     static func fanMode(_ index: Int) -> String        { "F\(index)Md" }
+    /// M5's spelling of `fanMode`.
+    static func fanModeLowercase(_ index: Int) -> String { "F\(index)md" }
 
     /// Bitmask: one bit per fan, 1 = forced mode
     static let forceMode = "FS! "

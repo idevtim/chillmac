@@ -8,6 +8,8 @@ final class SMCConnection {
     /// SMC key size and type are fixed properties of the hardware, so one lookup is enough
     /// for the life of the connection.
     private var keyInfoCache: [UInt32: (dataSize: UInt32, dataType: UInt32)] = [:]
+    /// Resolved fan mode key per fan. See `fanModeKey(_:)`.
+    private var fanModeKeyCache: [Int: String] = [:]
 
     init() throws {
         let service = IOServiceGetMatchingService(
@@ -93,8 +95,24 @@ final class SMCConnection {
     }
 
     func readFanMode(index: Int) throws -> Bool {
-        let output = try readKey(SMCKey.fanMode(index))
+        let output = try readKey(fanModeKey(index))
         return output.bytes.0 != 0
+    }
+
+    /// The fan's mode key. M1 to M4 spell it `F{i}Md`; M5 spells it `F{i}md`, and has no
+    /// `F{i}Md` at all, so writing the M1 spelling there can never take effect.
+    func fanModeKey(_ index: Int) -> String {
+        if let cached = fanModeKeyCache[index] { return cached }
+        let upper = SMCKey.fanMode(index)
+        let lower = SMCKey.fanModeLowercase(index)
+        let key = (try? getKeyInfo(upper)) == nil && (try? getKeyInfo(lower)) != nil ? lower : upper
+        fanModeKeyCache[index] = key
+        return key
+    }
+
+    /// Whether the SMC has `key`. M5 has no `Ftst`, for example.
+    func hasKey(_ key: String) -> Bool {
+        (try? getKeyInfo(key)) != nil
     }
 
     // MARK: - Temperature Reads
@@ -186,13 +204,13 @@ final class SMCConnection {
     }
 
     /// Write per-fan mode key (F{i}Md) — used on Apple Silicon
-    /// Raw F{i}Md value: 0 automatic, non-zero forced.
+    /// Raw fan mode: 0 automatic, 1 forced, 3 held by thermalmonitord (M3 and later).
     func readFanModeByte(index: Int) throws -> UInt8 {
-        try readKey(SMCKey.fanMode(index)).bytes.0
+        try readKey(fanModeKey(index)).bytes.0
     }
 
     func writeFanModeKey(index: Int, forced: Bool) throws {
-        try writeKey(SMCKey.fanMode(index), bytes: [forced ? 1 : 0])
+        try writeKey(fanModeKey(index), bytes: [forced ? 1 : 0])
     }
 
     /// Write FS! force bitmask — used on Intel
