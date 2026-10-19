@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="assets/hero.svg" alt="ChillMac — Stay cool, stay fast." width="860">
+  <img src="assets/hero.svg" alt="ChillMac. Stay cool, stay fast." width="860">
 </p>
 
 # ChillMac
 
-A free, open-source macOS menu bar app for monitoring your system and controlling fan speeds. Keep your Mac chilly.
+A free, open-source macOS menu bar app that tells you how your Mac is doing at a glance and lets you take control of its fans. Keep your Mac chilly.
 
 **[Download ChillMac.dmg](https://github.com/idevtim/chillmac/releases/latest/download/ChillMac.dmg)** · [All releases](https://github.com/idevtim/chillmac/releases)
 
@@ -23,15 +23,18 @@ A free, open-source macOS menu bar app for monitoring your system and controllin
 
 ## Features
 
-- **Fan Control** — Live RPM display in the menu bar with per-fan manual speed sliders
-- **Performance Mode** — Automatic fan curves with Low/Medium/High/Max presets
-- **CPU Monitor** — Real-time usage graph, top consuming apps, temperature, and uptime
-- **Memory Monitor** — Usage breakdown with donut chart, pressure, swap, and top consumers
-- **Battery Monitor** — Charge gauge, health percentage, cycle count, and temperature
-- **Disk Monitor** — Storage breakdown by category with SSD temperature
-- **Temperature Sensors** — Color-coded readings for CPU, GPU, memory, SSD, battery, and more
-- **Auto-Update** — Checks for new releases in the background, badges the menu bar icon, and installs in one click
-- Apple Silicon and Intel Mac support
+- **At-a-glance status**: the popover opens with a plain-language summary ("Running cool", "Getting warm") and your hottest sensor, followed by one compact list of vitals
+- **One Cooling control**: pick **Automatic** (macOS runs the fans), **Smart** (fans follow temperature, at Quiet, Balanced, Cool or Max intensity) or **Manual** (a fixed speed per fan)
+- **Menu bar temperature**: show it never, only when your Mac is warm, or always
+- **CPU**: live usage graph, top consuming apps, temperature, and uptime
+- **Memory**: usage breakdown, pressure, swap, and top consumers
+- **Battery**: charge, health, cycle count, and temperature
+- **Disk**: storage by category (Apps, Documents, Downloads, Desktop, Other) with SSD temperature
+- **Temperatures**: every detected sensor, grouped into CPU, GPU, Memory, Storage and Battery, color-coded from cool to hot
+- **Guided setup**: a short welcome explains the fan control helper before asking for it. Monitoring works without it
+- **Light and dark appearance**, following macOS or set by hand
+- **Auto-update**: checks for new releases in the background, badges the menu bar icon, and installs in one click
+- Apple Silicon (M1 to M5) and Intel Mac support
 
 ## Install
 
@@ -39,10 +42,10 @@ A free, open-source macOS menu bar app for monitoring your system and controllin
 
 1. [Download `ChillMac.dmg`](https://github.com/idevtim/chillmac/releases/latest/download/ChillMac.dmg) (always the latest release)
 2. Open the DMG and drag ChillMac to Applications
-3. Launch ChillMac — it'll appear in your menu bar
-4. On first launch, you'll be prompted for admin credentials to install the fan control helper
+3. Launch ChillMac. It appears in your menu bar and opens a short welcome
+4. To control the fans, install the fan control helper from the welcome (or later from Settings), then allow ChillMac in **System Settings › General › Login Items & Extensions**
 
-The DMG is signed, notarized, and stapled by Apple — Gatekeeper will let it through.
+The DMG is signed, notarized, and stapled by Apple, so Gatekeeper lets it through.
 
 ### Homebrew
 
@@ -80,10 +83,10 @@ Two-process architecture with privilege separation:
 Menu Bar App (UI + read-only SMC) ──XPC──> Helper Daemon (root, write SMC)
 ```
 
-- **Main app** (unprivileged) — Reads SMC sensors every 2 seconds and displays a SwiftUI popover with system dashboards.
-- **Helper daemon** (root) — Installed via `SMAppService`, handles fan speed/mode writes over XPC. Validates the caller's code signature before accepting connections.
+- **Main app** (unprivileged): reads SMC sensors every 2 seconds and shows the SwiftUI popover and detail panels.
+- **Helper daemon** (root): installed via `SMAppService`, handles fan speed and mode writes over XPC. Both ends check each other's code signature before talking.
 
-On Apple Silicon, the helper manages SMC test mode to bypass `thermalmonitord` for manual fan control. Signal handlers ensure cleanup if the helper exits unexpectedly. Fans always reset to automatic mode on app launch and quit.
+On M3 and M4 Macs, macOS's `thermalmonitord` holds the fans until the helper switches on SMC test mode, and then takes several seconds to let go. While that happens the Cooling card shows "Taking over the fans from macOS". The helper keeps test mode on for a minute after the fans go back to automatic, so reopening ChillMac or switching modes is instant. M1 and M5 Macs accept fan control without a handover. Signal handlers clean up if the helper exits unexpectedly, and fans always return to automatic when ChillMac quits.
 
 ## Contributing
 
@@ -102,7 +105,7 @@ xcodegen generate
 xcodebuild -project ChillMac.xcodeproj -scheme ChillMac build
 ```
 
-There's no test suite — testing is done manually via the UI. If you're adding a feature, just make sure the app builds and the feature works as expected.
+There's no test suite; testing is done manually via the UI. If you're adding a feature, just make sure the app builds and the feature works as expected.
 
 ## Project Structure
 
@@ -120,4 +123,4 @@ scripts/            Build and release tooling
 
 ## License
 
-MIT — see [LICENSE](LICENSE) for details.
+MIT, see [LICENSE](LICENSE) for details.
