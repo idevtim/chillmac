@@ -12,13 +12,13 @@ A free, open-source macOS menu bar app that tells you how your Mac is doing at a
 
 <p align="center">
   <img src="assets/screenshots/popover-main.png" alt="ChillMac menu bar popover with system temperature, hardware stats, performance mode, and per-fan RPM controls" width="420">
-  <img src="assets/screenshots/popover-settings.png" alt="ChillMac settings view with preferences and configuration options" width="420">
+  <img src="assets/screenshots/popover-settings.png" alt="ChillMac Settings with fan control status, appearance, menu bar temperature, and cooling behavior options" width="420">
 </p>
 
 <p align="center">
-  <img src="assets/screenshots/panel-memory.png" alt="ChillMac memory detail panel showing usage breakdown, pressure, swap, and top consumers" width="370">
-  <img src="assets/screenshots/panel-battery.png" alt="ChillMac battery detail panel showing charge, health, cycles, and temperature" width="370">
-  <img src="assets/screenshots/panel-temperatures.png" alt="ChillMac temperature sensors panel showing CPU, GPU, memory, and SSD readings" width="370">
+  <img src="assets/screenshots/panel-memory.png" alt="ChillMac Memory panel showing free memory, a usage breakdown bar, pressure, swap, and the apps using the most" width="370">
+  <img src="assets/screenshots/panel-battery.png" alt="ChillMac Battery panel showing charge, health, charge cycles, temperature, and capacity details" width="370">
+  <img src="assets/screenshots/panel-temperatures.png" alt="ChillMac Temperatures panel showing the coolest, average, and hottest readings and sensors grouped by CPU, GPU, Memory, and Storage" width="370">
 </p>
 
 ## Features

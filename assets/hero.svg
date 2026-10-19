@@ -29,9 +29,15 @@
       <use href="#blade" transform="rotate(240 50 50)"/>
     </g>
     <path id="hub" fill-rule="evenodd" d="M41,50 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0 Z M46.5,50 a3.5,3.5 0 1,1 7,0 a3.5,3.5 0 1,1 -7,0 Z"/>
+    <!-- The fan rows' glyph, after SF Symbols' fan.fill: four rounded blades, ringed hub. -->
+    <path id="rowBlade" d="M53,41 C42,40 30,30 33,17 C36,5 56,1 65,9 C74,17 68,31 59,40 Z"/>
     <symbol id="fan" viewBox="0 0 100 100" overflow="visible">
-      <use href="#blades"/>
-      <use href="#hub"/>
+      <use href="#rowBlade"/>
+      <use href="#rowBlade" transform="rotate(90 50 50)"/>
+      <use href="#rowBlade" transform="rotate(180 50 50)"/>
+      <use href="#rowBlade" transform="rotate(270 50 50)"/>
+      <circle cx="50" cy="50" r="10"/>
+      <circle cx="50" cy="50" r="5" fill="none" stroke="#0f1f33" stroke-width="2.6"/>
     </symbol>
   </defs>
 
@@ -99,8 +105,8 @@
       <rect width="410" height="34" rx="9" fill="#ffffff" fill-opacity="0.06"/>
       <rect x="138" y="2" width="134" height="30" rx="7" fill="#ffffff" fill-opacity="0.18"/>
       <text x="69" y="22" font-size="14" font-weight="600" fill="#ffffff" fill-opacity="0.65" text-anchor="middle">Automatic</text>
-      <path d="M200,9 l-7,10 h5 l-2,7 l8,-11 h-5 l2,-6 Z" fill="#FF9F0A"/>
-      <text x="212" y="22" font-size="14" font-weight="700" fill="#FF9F0A">Smart</text>
+      <path d="M182,9 l-7,10 h5 l-2,7 l8,-11 h-5 l2,-6 Z" fill="#FF9F0A"/>
+      <text x="191" y="22" font-size="14" font-weight="700" fill="#FF9F0A">Smart</text>
       <text x="341" y="22" font-size="14" font-weight="600" fill="#ffffff" fill-opacity="0.65" text-anchor="middle">Manual</text>
     </g>
 
@@ -111,7 +117,7 @@
     <g transform="translate(48 193)">
       <g>
         <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="1.6s" repeatCount="indefinite"/>
-        <use href="#fan" x="-14" y="-14" width="28" height="28" fill="#30D158"/>
+        <use href="#fan" x="-15" y="-15" width="30" height="30" fill="#30D158"/>
       </g>
     </g>
     <text x="72" y="189" font-size="15" font-weight="700" fill="#ffffff">Left Fan</text>
@@ -125,7 +131,7 @@
     <g transform="translate(48 239)">
       <g>
         <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="1.4s" repeatCount="indefinite"/>
-        <use href="#fan" x="-14" y="-14" width="28" height="28" fill="#30D158"/>
+        <use href="#fan" x="-15" y="-15" width="30" height="30" fill="#30D158"/>
       </g>
     </g>
     <text x="72" y="235" font-size="15" font-weight="700" fill="#ffffff">Right Fan</text>
