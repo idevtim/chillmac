@@ -11,7 +11,7 @@ A free, open-source macOS menu bar app that tells you how your Mac is doing at a
 ## Screenshots
 
 <p align="center">
-  <img src="assets/screenshots/popover-main.png" alt="ChillMac menu bar popover with system temperature, hardware stats, performance mode, and per-fan RPM controls" width="420">
+  <img src="assets/screenshots/popover-main.png" alt="ChillMac popover showing a plain-language status, the hottest sensor, CPU, memory, battery and disk vitals, the Cooling control set to Smart, and both fans' RPM" width="420">
   <img src="assets/screenshots/popover-settings.png" alt="ChillMac Settings with fan control status, appearance, menu bar temperature, and cooling behavior options" width="420">
 </p>
 
