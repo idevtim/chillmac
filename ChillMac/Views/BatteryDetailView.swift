@@ -45,7 +45,7 @@ struct BatteryDetailView: View {
                     icon: "thermometer.medium",
                     iconColor: tempColor,
                     title: "Temperature",
-                    value: "\(tempLabel) · \(settings.formatTemperature(batteryInfo.temperature))",
+                    value: batteryInfo.temperature.map { "\(tempLabel) · \(settings.formatTemperature($0))" } ?? "Not reported",
                     valueColor: tempColor
                 )
             }
@@ -127,18 +127,24 @@ struct BatteryDetailView: View {
     }
 
     private var tempLabel: String {
-        if batteryInfo.temperature >= 40 { return "Hot" }
-        if batteryInfo.temperature >= 35 { return "Warm" }
+        let temperature = batteryInfo.temperature ?? 0
+        if temperature >= 40 { return "Hot" }
+        if temperature >= 35 { return "Warm" }
         return "Normal"
     }
 
     private var tempColor: Color {
-        if batteryInfo.temperature >= 40 { return theme.red }
-        if batteryInfo.temperature >= 35 { return theme.orange }
+        guard let temperature = batteryInfo.temperature else { return theme.textTertiary }
+        if temperature >= 40 { return theme.red }
+        if temperature >= 35 { return theme.orange }
         return theme.green
     }
 
     // MARK: - Details
+
+    private func capacityText(_ mAh: Int) -> String {
+        mAh > 0 ? "\(mAh.formatted()) mAh" : "Not reported"
+    }
 
     private var detailsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -147,9 +153,9 @@ struct BatteryDetailView: View {
             VStack(spacing: 0) {
                 BatteryDetailRow(label: "Condition", value: batteryInfo.condition)
                 CardDivider()
-                BatteryDetailRow(label: "Current capacity", value: "\(batteryInfo.maxCapacity.formatted()) mAh")
+                BatteryDetailRow(label: "Current capacity", value: capacityText(batteryInfo.maxCapacity))
                 CardDivider()
-                BatteryDetailRow(label: "Original capacity", value: "\(batteryInfo.designCapacity.formatted()) mAh")
+                BatteryDetailRow(label: "Original capacity", value: capacityText(batteryInfo.designCapacity))
             }
             .cardBackground(theme)
         }

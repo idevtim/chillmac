@@ -45,7 +45,7 @@ struct DiagnosticSample: Codable {
     let helperMemoryBytes: UInt64?
     let batteryCharge: Int
     let batteryIsCharging: Bool
-    let batteryTemperature: Double
+    let batteryTemperature: Double?
     let fans: [FanSample]
     let peakTemperature: Double
     let peakTemperatureLabel: String

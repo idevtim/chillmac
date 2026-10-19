@@ -3,11 +3,11 @@ import IOKit.ps
 
 final class BatteryInfo: ObservableObject {
     @Published var currentCharge: Int = 0        // 0-100
-    @Published var maxCapacity: Int = 0          // mAh
-    @Published var designCapacity: Int = 0       // mAh
+    @Published var maxCapacity: Int = 0          // mAh, 0 when not reported
+    @Published var designCapacity: Int = 0       // mAh, 0 when not reported
     @Published var cycleCount: Int = 0
     @Published var healthPercent: Int = 100
-    @Published var temperature: Double = 0       // Celsius
+    @Published var temperature: Double?          // Celsius, nil when not reported
     @Published var isCharging: Bool = false
     @Published var isPluggedIn: Bool = false
     @Published var timeRemaining: String = "..."
@@ -22,6 +22,8 @@ final class BatteryInfo: ObservableObject {
     private var appleReportedHealth: Int?
     private var lastHealthProbe: Date?
     private let healthQueue = DispatchQueue(label: "com.idevtim.ChillMac.batteryHealth", qos: .utility)
+    /// For the battery temperature fallback. Only touched on `healthQueue`.
+    private var smc: SMCConnection?
 
     func startMonitoring() {
         guard timer == nil else { return }
@@ -89,19 +91,35 @@ final class BatteryInfo: ObservableObject {
         guard service != 0 else { return }
         defer { IOObjectRelease(service) }
 
+        // Recent macOS (seen on 27) keeps most battery keys only inside the BatteryData
+        // dictionary, and its top-level MaxCapacity is a percentage, not mAh. Reading the
+        // top level alone showed "100 mAh" for both capacities, so each value is looked
+        // up at the top level first, then in BatteryData.
+        let batteryData = IORegistryEntryCreateCFProperty(service, "BatteryData" as CFString, kCFAllocatorDefault, 0)?
+            .takeRetainedValue() as? [String: Any] ?? [:]
+        func value(_ key: String) -> Int? {
+            getIntProperty(service, key) ?? batteryData[key] as? Int
+        }
+
         // NominalChargeCapacity is the gauge's temperature/age-corrected full charge
         // capacity and is what macOS bases Maximum Capacity on. AppleRawMaxCapacity is
         // the uncorrected reading and runs several percent low, so it is only a fallback.
-        let maxCap = getIntProperty(service, "NominalChargeCapacity")
-            ?? getIntProperty(service, "AppleRawMaxCapacity")
-            ?? getIntProperty(service, "MaxCapacity") ?? 0
-        let designCap = getIntProperty(service, "DesignCapacity") ?? maxCap
+        // MaxCapacity is mAh on Intel but a percentage on Apple Silicon, hence the floor.
+        let maxCap = value("NominalChargeCapacity")
+            ?? value("AppleRawMaxCapacity")
+            ?? value("FullChargeCapacity")
+            ?? getIntProperty(service, "MaxCapacity").flatMap { $0 > 100 ? $0 : nil }
+            ?? 0
+        let designCap = value("DesignCapacity") ?? 0
         let cycles = getIntProperty(service, "CycleCount") ?? 0
-        let tempRaw = getIntProperty(service, "Temperature") ?? 0
-        let temp = Double(tempRaw) / 100.0  // centi-degrees to degrees
+        // The registry reports centi-degrees, when it reports at all; macOS 27 dropped the
+        // key, so fall back to the SMC's battery sensors.
+        let temp = (getIntProperty(service, "Temperature") ?? getIntProperty(service, "VirtualTemperature"))
+            .map { Double($0) / 100.0 }
+            ?? readSMCBatteryTemperature()
 
         let computedHealth: Int
-        if designCap > 0 {
+        if designCap > 0 && maxCap > 0 {
             computedHealth = min(100, Int((Double(maxCap) / Double(designCap) * 100).rounded()))
         } else {
             computedHealth = 100
@@ -111,7 +129,11 @@ final class BatteryInfo: ObservableObject {
             if self.maxCapacity != maxCap { self.maxCapacity = maxCap }
             if self.designCapacity != designCap { self.designCapacity = designCap }
             if self.cycleCount != cycles { self.cycleCount = cycles }
-            if abs(self.temperature - temp) >= 0.05 { self.temperature = temp }
+            if let temp {
+                if abs((self.temperature ?? -100) - temp) >= 0.05 { self.temperature = temp }
+            } else if self.temperature != nil {
+                self.temperature = nil
+            }
             let health = self.appleReportedHealth ?? computedHealth
             if self.healthPercent != health { self.healthPercent = health }
             let condition = Self.conditionLabel(forHealth: health)
@@ -179,6 +201,14 @@ final class BatteryInfo: ObservableObject {
             if let value = Int(digits) { return value }
         }
         return nil
+    }
+
+    /// Hottest of the SMC's battery sensors. Must be called on `healthQueue`.
+    private func readSMCBatteryTemperature() -> Double? {
+        if smc == nil { smc = try? SMCConnection() }
+        guard let smc else { return nil }
+        let readings = ["TB0T", "TB1T", "TB2T"].compactMap { try? smc.readTemperature(key: $0) }
+        return readings.filter { $0 > 0 && $0 < 100 }.max()
     }
 
     private func getIntProperty(_ service: io_object_t, _ key: String) -> Int? {
