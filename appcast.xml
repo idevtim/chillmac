@@ -3,6 +3,39 @@
     <channel>
         <title>ChillMac</title>
         <item>
+            <title>2.0.0</title>
+            <pubDate>Sun, 18 Oct 2026 20:01:19 -0400</pubDate>
+            <link>https://github.com/idevtim/chillmac</link>
+            <sparkle:fullReleaseNotesLink>https://github.com/idevtim/chillmac/releases</sparkle:fullReleaseNotesLink>
+            <sparkle:version>2.0.0</sparkle:version>
+            <sparkle:shortVersionString>2.0.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[## Highlights
+
+ChillMac 2.0 is a full redesign. The popover now leads with how your Mac is doing, keeps the numbers to one compact list, and replaces the old Performance Mode and per-fan switches with a single Cooling control. Your settings carry over: if Performance Mode was on, you're now on Smart cooling at the same intensity.
+
+This update includes a new fan control helper, so macOS will ask you to allow ChillMac again in System Settings › General › Login Items & Extensions. Monitoring keeps working in the meantime, and later updates go back to one click.
+
+## Fixed
+
+- **Manual fan control on newer Macs.** On some Apple Silicon Macs, including the M4 Max, macOS took a moment to hand over the fans, ChillMac gave up too early, and the fans quietly stayed on automatic. ChillMac now waits for the handover, and if macOS still keeps control, the Cooling card says so.
+
+## Added
+
+- **One Cooling control.** Choose Automatic (macOS runs the fans), Smart (fans follow temperature) or Manual (you set each fan's speed). Smart's levels are now called Quiet, Balanced, Cool and Max.
+- **A welcome for new installs.** A short setup window explains the fan control helper before asking for it, then walks through cooling and menu bar options. Reopen it anytime from Settings.
+- **New app icon.** The snowflake is replaced by a fan, which also appears in the menu bar.
+
+## Improvements
+
+- **Easier-to-read panels.** Memory, Battery, Temperatures, CPU and Disk each open with a plain-language summary, and temperature sensors are grouped so you can expand only the ones you care about.
+- **Simpler Settings.** Fewer sections, clearer wording, and a place to reinstall or remove the fan control helper.
+- **Friendlier fan control setup.** Without the helper, ChillMac now explains what it does and what it never touches, instead of showing a warning. Monitoring works either way.
+]]></description>
+            <enclosure url="https://github.com/idevtim/chillmac/releases/download/v2.0.0/ChillMac-2.0.0.zip" length="2219019" type="application/octet-stream" sparkle:edSignature="7VxaoahrmaT5X8yPACnWDFMpi65WIwfRH3S73Wsb7K4EzdqYoi3LbSB1kJpgcBW5CBg1XfC+brcJeLpuVGb/BA=="/>
+        </item>
+        <item>
             <title>1.10.0</title>
             <pubDate>Wed, 14 Oct 2026 10:58:57 -0400</pubDate>
             <link>https://github.com/idevtim/chillmac</link>
@@ -42,37 +75,6 @@ Two things you can now switch on: the current temperature beside the menu bar ic
 - **Keep Fans When Closed on Power.** Settings, under Fan Control. While on AC, fans stay exactly as ChillMac set them through closing the lid, locking the screen and sleeping, instead of being handed straight back to macOS. Useful for a docked Mac driving an external display. On battery nothing changes, so closing the lid away from a charger still returns the fans to automatic
 ]]></description>
             <enclosure url="https://github.com/idevtim/chillmac/releases/download/v1.9.1/ChillMac-1.9.1.zip" length="2483466" type="application/octet-stream" sparkle:edSignature="hKquJw5wYJJ4uv2fv7kz/NzHftAnJLoTHzGLxEeAYCh2ucc2KpLRbso0eXxFZDVlQl/gFJZwi1fFesxxn1eIBQ=="/>
-        </item>
-        <item>
-            <title>1.9.0</title>
-            <pubDate>Mon, 07 Sep 2026 10:48:41 -0400</pubDate>
-            <link>https://github.com/idevtim/chillmac</link>
-            <sparkle:fullReleaseNotesLink>https://github.com/idevtim/chillmac/releases</sparkle:fullReleaseNotesLink>
-            <sparkle:version>1.9.0</sparkle:version>
-            <sparkle:shortVersionString>1.9.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[## Highlights
-
-Fan control now tells you when it cannot work instead of pretending it can. If the privileged helper is not installed or has not been approved, ChillMac says so and gives you a button to fix it.
-
-This release re-registers that helper, so macOS will ask you to approve ChillMac once under Login Items & Extensions. Fan control stays unavailable until you do. Later releases go back to a single click.
-
-## Fixed
-
-- **The window could open completely blank.** The popover sometimes showed only its background with every card invisible, reported on both Apple Silicon and Intel Macs
-- **The menu bar icon closes the window again.** Clicking it while the window was open closed and immediately reopened it, so it never appeared to close at all
-- **Fan control did nothing on Intel Macs from 2018 onward.** Those machines need a different SMC key than older Intel models, and ChillMac only ever wrote the old one. Sliders moved and reported success while the fan stayed on automatic
-- **Performance Mode no longer claims fans it cannot reach.** With the helper missing, the toggle, the curve percentage and the sliders all looked live. Monitoring was never affected: temperature, RPM, CPU, memory and battery readings have always been accurate
-- **The privileged helper now verifies who is talking to it.** It previously accepted fan commands from any process on your Mac, and now accepts them only from ChillMac
-- **Fans are reliably returned to automatic when you quit.** That request was sent as the app exited and usually did not arrive, leaving fans pinned at their last manual speed
-- **Two crashes and a hang.** One in memory reporting, one in the FPS counter, and a stall that could freeze the app while it read hardware information
-
-## Improvements
-
-- **Smoother sliders and lighter background work.** Setting a fan speed takes a fraction of the work it used to, dragging a slider sends a couple of commands instead of one per step, and battery and disk readings moved off the main thread
-]]></description>
-            <enclosure url="https://github.com/idevtim/chillmac/releases/download/v1.9.0/ChillMac-1.9.0.zip" length="2467944" type="application/octet-stream" sparkle:edSignature="jRGXryXdSCSYUXjgxiMrEqKUlFMf9vnf972+KHJvvlaWJt6iJDWTrJOhlHgrlyePZmOYsyies+RXM9NFDeLEDA=="/>
         </item>
     </channel>
 </rss>
