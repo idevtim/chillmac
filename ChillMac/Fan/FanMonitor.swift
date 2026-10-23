@@ -226,6 +226,7 @@ final class FanMonitor: ObservableObject {
 
     /// Main thread only.
     private func applyHelperState(_ state: HelperInstaller.HelperState) {
+        scheduleHelperRecheck(after: state)
         guard helperState != state else { return }
         let couldControlFans = helperState.canControlFans
         helperState = state
@@ -242,6 +243,30 @@ final class FanMonitor: ObservableObject {
             if performanceCurvePercent != 0 { performanceCurvePercent = 0 }
             if AppSettings.shared.coolingMode == .manual { AppSettings.shared.coolingMode = .auto }
         }
+    }
+
+    /// Pending background re-check while the daemon is not answering, and the wait before
+    /// the next one. Main thread only.
+    private var helperRecheck: DispatchWorkItem?
+    private var helperRecheckDelay: TimeInterval = 2
+
+    /// Keeps probing a helper that is registered but did not answer. launchd starts the
+    /// daemon on demand, and at login or right after an update it can miss the probe's
+    /// timeout. The popover re-checks on every open, but Smart cooling has to take over
+    /// the fans without anyone opening it, so until the daemon answers it is asked again
+    /// here, backing off to once a minute. Main thread only.
+    private func scheduleHelperRecheck(after state: HelperInstaller.HelperState) {
+        helperRecheck?.cancel()
+        helperRecheck = nil
+        guard state == .unresponsive else {
+            helperRecheckDelay = 2
+            return
+        }
+
+        let work = DispatchWorkItem { [weak self] in self?.refreshHelperState() }
+        helperRecheck = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + helperRecheckDelay, execute: work)
+        helperRecheckDelay = min(helperRecheckDelay * 2, 60)
     }
 
     // MARK: - System Event Observers
