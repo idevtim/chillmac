@@ -208,6 +208,9 @@ final class DiagnosticLogger {
     // MARK: - Sampling
 
     private func takeSample() {
+        // Before the first poll there is nothing to record but placeholders (no fans, 0°C).
+        if let fanMonitor, !fanMonitor.hasCompletedFirstPoll { return }
+
         // Snapshot fan-monitor values on main (cheap) — they're @Published so must be read here.
         // Unmeasured values become nil rather than inheriting the UI's 0/false placeholders.
         let fans = fanMonitor?.fans.map {
@@ -224,6 +227,12 @@ final class DiagnosticLogger {
         let peakGpu = fanMonitor?.peakGpuTemperature ?? 0
         let peakSsd = fanMonitor?.peakSsdTemperature ?? 0
         let perfCurve = fanMonitor?.performanceCurvePercent ?? 0
+        // macOS 27 dropped the registry's battery temperature, so fall back to the SMC's
+        // battery sensors (TB0T and friends) that the fan monitor already reads.
+        let smcBatteryTemp = fanMonitor?.sensors
+            .filter { $0.id.hasPrefix("TB") }
+            .map(\.temperature)
+            .max()
         let timestamp = Date()
         let totalMem = ProcessInfo.processInfo.physicalMemory
         let thermal = readThermalState()
@@ -258,7 +267,7 @@ final class DiagnosticLogger {
                 helperMemoryBytes: self.freshHelperMemory(asOf: timestamp),
                 batteryCharge: batt.charge,
                 batteryIsCharging: batt.isCharging,
-                batteryTemperature: batt.temperature,
+                batteryTemperature: batt.temperature ?? smcBatteryTemp,
                 fans: fans,
                 peakTemperature: peak,
                 peakTemperatureLabel: peakLabel,
@@ -454,23 +463,26 @@ final class DiagnosticLogger {
         return maxUtilization
     }
 
-    private func readBatteryState() -> (charge: Int, isCharging: Bool, temperature: Double) {
+    /// `temperature` is nil when the registry does not report one, so an unreadable value is
+    /// logged as null rather than as 0°C.
+    private func readBatteryState() -> (charge: Int, isCharging: Bool, temperature: Double?) {
         guard let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
               let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() as? [CFTypeRef],
               let first = sources.first,
               let desc = IOPSGetPowerSourceDescription(snapshot, first)?.takeUnretainedValue() as? [String: Any] else {
-            return (0, false, 0)
+            return (0, false, nil)
         }
 
         let charge = desc[kIOPSCurrentCapacityKey] as? Int ?? 0
         let isCharging = (desc[kIOPSIsChargingKey] as? Bool) ?? false
 
-        var temperature = 0.0
+        var temperature: Double?
         let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSmartBattery"))
         if service != IO_OBJECT_NULL {
-            if let tempObj = IORegistryEntryCreateCFProperty(service, "Temperature" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() {
-                if let tempVal = tempObj as? Int {
-                    temperature = Double(tempVal) / 100.0
+            for key in ["Temperature", "VirtualTemperature"] where temperature == nil {
+                if let value = IORegistryEntryCreateCFProperty(service, key as CFString, kCFAllocatorDefault, 0)?
+                    .takeRetainedValue() as? Int, value > 0 {
+                    temperature = Double(value) / 100.0
                 }
             }
             IOObjectRelease(service)

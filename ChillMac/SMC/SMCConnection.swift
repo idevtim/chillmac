@@ -94,9 +94,11 @@ final class SMCConnection {
         return decodeFanValue(output)
     }
 
+    /// Whether the fan is forced (mode 1). On M3/M4 thermalmonitord holds idle fans in mode
+    /// 3, which is macOS in charge, not manual control, so only 1 counts.
     func readFanMode(index: Int) throws -> Bool {
         let output = try readKey(fanModeKey(index))
-        return output.bytes.0 != 0
+        return output.bytes.0 == 1
     }
 
     /// The fan's mode key. M1 to M4 spell it `F{i}Md`; M5 spells it `F{i}md`, and has no

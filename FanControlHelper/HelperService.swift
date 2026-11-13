@@ -79,6 +79,7 @@ class HelperService: NSObject, HelperProtocol {
                     #if arch(arm64)
                     try smc.writeFanModeKey(index: fanIndex, forced: false)
                     HelperService.forcedFans.remove(fanIndex)
+                    HelperService.adoptTestModeIfOnLocked(smc: smc)
                     // Decided from what this daemon forced, not by reading the other fans'
                     // modes: the SMC reflects a mode write only after a short delay, so a
                     // fan released a moment ago can still read as forced.
@@ -275,6 +276,34 @@ class HelperService: NSObject, HelperProtocol {
         hasSetTestMode = true
         testModeEnabledAt = Date()
         log("  test mode enabled")
+    }
+
+    /// Takes ownership of a test mode this process did not switch on.
+    ///
+    /// `hasSetTestMode` lives only in memory, so a daemon that was restarted (killed, crashed,
+    /// or replaced by an update) while `Ftst` was 1 starts out believing it is off. Fan mode
+    /// writes then succeed directly, nothing ever schedules a release, and `Ftst` stays on
+    /// until the Mac sleeps or reboots. With `Ftst` on and the fans on automatic, the SMC
+    /// holds them at minimum regardless of temperature: diagnostics showed an M3 Max at
+    /// 103°C with both fans pinned near 1,350 RPM for over seven hours.
+    /// Must be called on `smcQueue`.
+    private static func adoptTestModeIfOnLocked(smc: SMCConnection) {
+        guard !hasSetTestMode, (try? smc.readKey(SMCKey.testMode).bytes.0) == 1 else { return }
+        log("  test mode found on from an earlier run; taking ownership")
+        hasSetTestMode = true
+        if testModeEnabledAt == nil { testModeEnabledAt = Date() }
+    }
+
+    /// Called once at daemon launch. Adopts a test mode left on by a previous instance and
+    /// schedules its release, which is cancelled as soon as the app forces a fan again.
+    static func reconcileTestModeAtLaunch() {
+        try? withSMC { smc in
+            guard smc.hasKey(SMCKey.testMode) else { return }
+            adoptTestModeIfOnLocked(smc: smc)
+            if hasSetTestMode && forcedFans.isEmpty {
+                scheduleTestModeReleaseLocked()
+            }
+        }
     }
 
     /// Switches test mode off once `releaseGrace` has passed, unless a fan was forced again
