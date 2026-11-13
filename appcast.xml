@@ -3,6 +3,33 @@
     <channel>
         <title>ChillMac</title>
         <item>
+            <title>2.0.3</title>
+            <pubDate>Fri, 13 Nov 2026 14:30:00 -0500</pubDate>
+            <link>https://github.com/idevtim/chillmac</link>
+            <sparkle:fullReleaseNotesLink>https://github.com/idevtim/chillmac/releases</sparkle:fullReleaseNotesLink>
+            <sparkle:version>2.0.3</sparkle:version>
+            <sparkle:shortVersionString>2.0.3</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[## Highlights
+
+Fans on Automatic now actually speed up when your Mac gets hot. The menu bar also gets the four-blade fan you see in the app.
+
+This update changes ChillMac's fan helper, so macOS will ask you to approve ChillMac again under Login Items & Extensions. Fan control waits until you do. Later releases go back to one click.
+
+## Fixed
+
+- **Fans stuck at minimum on Automatic.** If ChillMac's fan helper restarted while it had the fans unlocked, it lost track of that and never handed them back to macOS. The fans then sat near their lowest speed no matter how hot the Mac got, until the next sleep or restart. The helper now notices and returns the fans to macOS. Smart and Manual cooling were not affected.
+- **"Fans are quiet" when they were not.** The header only looked at temperature, so it said the fans were quiet even with Smart on Cool spinning them at 4,000 RPM. It now checks the fans themselves.
+- **Diagnostics accuracy.** Exports no longer log idle fans held by macOS as manual, record battery temperature on macOS 27 instead of 0°, and skip the empty sample taken at launch.
+
+## Changed
+
+- **Menu bar icon.** Now the same four-blade fan used throughout the app.
+]]></description>
+            <enclosure url="https://github.com/idevtim/chillmac/releases/download/v2.0.3/ChillMac-2.0.3.zip" length="2226076" type="application/octet-stream" sparkle:edSignature="BpxA7rn4VGpxMBq/Uud0ZpHgKkt7dElvXZgi8NskqHacweR9WmDbfHTpARUYy4SsmnZBnjM94sSTJLGkFY4xCg=="/>
+        </item>
+        <item>
             <title>2.0.2</title>
             <pubDate>Fri, 23 Oct 2026 16:18:51 -0400</pubDate>
             <link>https://github.com/idevtim/chillmac</link>
@@ -40,39 +67,6 @@ Temperatures, the menu bar reading and the detail panels were accurate throughou
 Only the Battery panel was affected. Fan control, the menu bar reading and the other panels were accurate throughout.
 ]]></description>
             <enclosure url="https://github.com/idevtim/chillmac/releases/download/v2.0.1/ChillMac-2.0.1.zip" length="2220390" type="application/octet-stream" sparkle:edSignature="xByqWoa3wtQ3ETPfMc4ndLXQ1e+j/hek0+YfOayfDNCnPhMCycoYGiahKNGAnIUyiPZCpMfKOblq28LnS8lYAA=="/>
-        </item>
-        <item>
-            <title>2.0.0</title>
-            <pubDate>Sun, 18 Oct 2026 20:01:19 -0400</pubDate>
-            <link>https://github.com/idevtim/chillmac</link>
-            <sparkle:fullReleaseNotesLink>https://github.com/idevtim/chillmac/releases</sparkle:fullReleaseNotesLink>
-            <sparkle:version>2.0.0</sparkle:version>
-            <sparkle:shortVersionString>2.0.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[## Highlights
-
-ChillMac 2.0 is a full redesign. The popover now leads with how your Mac is doing, keeps the numbers to one compact list, and replaces the old Performance Mode and per-fan switches with a single Cooling control. Your settings carry over: if Performance Mode was on, you're now on Smart cooling at the same intensity.
-
-This update includes a new fan control helper, so macOS will ask you to allow ChillMac again in System Settings › General › Login Items & Extensions. Monitoring keeps working in the meantime, and later updates go back to one click.
-
-## Fixed
-
-- **Manual fan control on newer Macs.** On some Apple Silicon Macs, including the M4 Max, macOS took a moment to hand over the fans, ChillMac gave up too early, and the fans quietly stayed on automatic. ChillMac now waits for the handover, and if macOS still keeps control, the Cooling card says so.
-
-## Added
-
-- **One Cooling control.** Choose Automatic (macOS runs the fans), Smart (fans follow temperature) or Manual (you set each fan's speed). Smart's levels are now called Quiet, Balanced, Cool and Max.
-- **A welcome for new installs.** A short setup window explains the fan control helper before asking for it, then walks through cooling and menu bar options. Reopen it anytime from Settings.
-- **New app icon.** The snowflake is replaced by a fan, which also appears in the menu bar.
-
-## Improvements
-
-- **Easier-to-read panels.** Memory, Battery, Temperatures, CPU and Disk each open with a plain-language summary, and temperature sensors are grouped so you can expand only the ones you care about.
-- **Simpler Settings.** Fewer sections, clearer wording, and a place to reinstall or remove the fan control helper.
-- **Friendlier fan control setup.** Without the helper, ChillMac now explains what it does and what it never touches, instead of showing a warning. Monitoring works either way.
-]]></description>
-            <enclosure url="https://github.com/idevtim/chillmac/releases/download/v2.0.0/ChillMac-2.0.0.zip" length="2219019" type="application/octet-stream" sparkle:edSignature="7VxaoahrmaT5X8yPACnWDFMpi65WIwfRH3S73Wsb7K4EzdqYoi3LbSB1kJpgcBW5CBg1XfC+brcJeLpuVGb/BA=="/>
         </item>
     </channel>
 </rss>
