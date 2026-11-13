@@ -30,4 +30,10 @@ signal(SIGINT) { _ in
     exit(0)
 }
 
+#if arch(arm64)
+// A previous instance may have exited without clearing Ftst. Left on, it pins fans that are
+// meant to be automatic at their minimum, so reclaim it before taking commands.
+HelperService.reconcileTestModeAtLaunch()
+#endif
+
 RunLoop.current.run()

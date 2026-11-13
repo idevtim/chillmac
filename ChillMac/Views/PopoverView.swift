@@ -197,12 +197,25 @@ struct PopoverView: View {
         }
     }
 
+    /// True when every fan is stopped or close to its minimum. Above that a MacBook Pro is
+    /// audible even while temperatures are fine, e.g. Smart on Cool or Max holds a high floor,
+    /// so "quiet" has to come from the fans themselves rather than from the temperature.
+    private var fansAreQuiet: Bool {
+        monitor.fans.allSatisfy { $0.currentRPM <= $0.minRPM * 1.15 }
+    }
+
     private var statusSubtitle: String {
         guard monitor.helperReady else { return "macOS is handling the fans." }
         let level = settings.performanceLevel
         switch (thermalStatus, settings.coolingMode) {
-        case (.good, _):
+        case (.good, _) where fansAreQuiet:
             return "Nothing to do — fans are quiet."
+        case (.good, .smart):
+            return "Smart cooling is keeping it that way."
+        case (.good, .manual):
+            return "Fans are holding the speed you set."
+        case (.good, .auto):
+            return "macOS has the fans spinning."
         case (.warm, .smart):
             return "Smart cooling is on it."
         case (.warm, .manual):

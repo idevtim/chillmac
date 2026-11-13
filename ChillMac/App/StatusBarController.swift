@@ -169,7 +169,20 @@ final class StatusBarController: NSObject {
         }
     }
 
-    private static let fanImage = NSImage.fanMarkTemplate(pointSize: 16)
+    private static let fanImage = fanGlyph(accessibilityDescription: "ChillMac")
+
+    /// The four-blade `fan.fill` symbol the fan rows use, so the menu bar matches what the
+    /// popover shows. Falls back to the three-blade logo mark if the symbol is unavailable.
+    private static func fanGlyph(accessibilityDescription: String) -> NSImage {
+        let config = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
+        guard let symbol = NSImage(systemSymbolName: "fan.fill", accessibilityDescription: accessibilityDescription)?
+            .withSymbolConfiguration(config)
+        else {
+            return NSImage.fanMarkTemplate(pointSize: 16, accessibilityDescription: accessibilityDescription)
+        }
+        symbol.isTemplate = true
+        return symbol
+    }
 
     /// The fan with a small download arrow in its bottom-right corner, signalling that an
     /// update is waiting.
@@ -178,7 +191,7 @@ final class StatusBarController: NSObject {
     /// to Dark Mode. A ring is cut out of the fan around the badge, which is what keeps the
     /// two shapes apart at menu bar size without relying on colour.
     private static let badgedFanImage: NSImage? = {
-        let fan = NSImage.fanMarkTemplate(pointSize: 16, accessibilityDescription: "ChillMac, update available")
+        let fan = fanGlyph(accessibilityDescription: "ChillMac, update available")
         guard let arrow = NSImage(systemSymbolName: "arrow.down.circle.fill", accessibilityDescription: nil)
         else { return fanImage }
 
