@@ -162,22 +162,61 @@ enum HelperInstaller {
             // register() on a live registration throws "already registered" and changes
             // nothing, so an in-place update has to unregister first.
             unregister()
+            waitForUnregistration()
         }
 
         var failure: String?
-        do {
-            try service.register()
-            NSLog("HelperInstaller: registered successfully")
-        } catch {
+        if let error = registerRetryingWhileBusy() {
             let nsError = error as NSError
             NSLog("HelperInstaller: registration failed — \(error)")
             failure = "macOS refused to install the helper: \(nsError.localizedDescription) (\(nsError.domain) \(nsError.code))"
             // Fall through: the status read below is more trustworthy than the throw. A
             // first registration reports failure on some systems while still leaving the
             // service awaiting approval, which is a state the user can act on.
+        } else {
+            NSLog("HelperInstaller: registered successfully")
         }
 
         return InstallResult(state: currentState(), failure: failure)
+    }
+
+    /// `unregister()` returns before launchd has finished tearing the job down. Until it
+    /// has, the status still reads as registered and a new `register()` is refused.
+    private static func waitForUnregistration(timeout: TimeInterval = 3) {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            let status = service.status
+            if status == .notRegistered || status == .notFound { return }
+            Thread.sleep(forTimeInterval: 0.25)
+        }
+        NSLog("HelperInstaller: registration still present %.0fs after unregister", timeout)
+    }
+
+    /// Registers, retrying while macOS answers "Operation not permitted".
+    ///
+    /// That refusal is transient right after an unregister: macOS is still removing the old
+    /// registration and rejects the new one, then accepts the identical request a few
+    /// seconds later. Reinstall used to surface it as a hard failure that a second click
+    /// fixed. Anything else is returned at once, and so is a refusal that leaves the service
+    /// registered or awaiting approval, since that is success as far as the user goes.
+    private static func registerRetryingWhileBusy() -> Error? {
+        let pauses: [TimeInterval] = [1, 2, 3, 4]
+        var attempt = 0
+        while true {
+            do {
+                try service.register()
+                return nil
+            } catch {
+                let nsError = error as NSError
+                let isBusy = nsError.domain == "SMAppServiceErrorDomain" && nsError.code == 1
+                let status = service.status
+                if status == .enabled || status == .requiresApproval { return nil }
+                guard isBusy, attempt < pauses.count else { return error }
+                NSLog("HelperInstaller: register refused (attempt \(attempt + 1)), retrying in \(pauses[attempt])s")
+                Thread.sleep(forTimeInterval: pauses[attempt])
+                attempt += 1
+            }
+        }
     }
 
     /// Unregister the daemon so a new version can be registered.
