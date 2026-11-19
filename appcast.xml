@@ -3,6 +3,23 @@
     <channel>
         <title>ChillMac</title>
         <item>
+            <title>2.0.6</title>
+            <pubDate>Thu, 19 Nov 2026 17:13:13 -0500</pubDate>
+            <link>https://github.com/idevtim/chillmac</link>
+            <sparkle:fullReleaseNotesLink>https://github.com/idevtim/chillmac/releases</sparkle:fullReleaseNotesLink>
+            <sparkle:version>2.0.6</sparkle:version>
+            <sparkle:shortVersionString>2.0.6</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[Reinstalling the fan helper now works on the first try.
+
+## Fixed
+
+- **"Operation not permitted" when reinstalling the helper.** Reinstall removed the old helper and installed the new one in the same instant, before macOS had finished the removal, so macOS refused it and pressing the button again was the only way through. ChillMac now waits for the removal to finish and retries for a few seconds if macOS is still busy. Fan control and monitoring were otherwise unaffected.
+]]></description>
+            <enclosure url="https://github.com/idevtim/chillmac/releases/download/v2.0.6/ChillMac-2.0.6.zip" length="2243251" type="application/octet-stream" sparkle:edSignature="rz+T/TUM6Sb/wUZXkwZ3TNL2RjQHaf/BISuDxazJ7cuy0sP0+PATNP6z1pYCkE1yOEI5T0B4IDoNMTB/XXZpAw=="/>
+        </item>
+        <item>
             <title>2.0.5</title>
             <pubDate>Thu, 19 Nov 2026 16:38:01 -0500</pubDate>
             <link>https://github.com/idevtim/chillmac</link>
@@ -44,33 +61,6 @@
 - **Diagnostics.** Exports now include the fan helper's status and the last install error, so setup problems can be diagnosed from the file alone.
 ]]></description>
             <enclosure url="https://github.com/idevtim/chillmac/releases/download/v2.0.4/ChillMac-2.0.4.zip" length="2237120" type="application/octet-stream" sparkle:edSignature="BNUK4zL8jbz3FEumduN82srSK9inur+jA+lA3tNfo3ZqgJyalk61pEkwUnCwmoPeYxuk7E6i4csg51l0Ms+dCg=="/>
-        </item>
-        <item>
-            <title>2.0.3</title>
-            <pubDate>Fri, 13 Nov 2026 14:30:00 -0500</pubDate>
-            <link>https://github.com/idevtim/chillmac</link>
-            <sparkle:fullReleaseNotesLink>https://github.com/idevtim/chillmac/releases</sparkle:fullReleaseNotesLink>
-            <sparkle:version>2.0.3</sparkle:version>
-            <sparkle:shortVersionString>2.0.3</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[## Highlights
-
-Fans on Automatic now actually speed up when your Mac gets hot. The menu bar also gets the four-blade fan you see in the app.
-
-This update changes ChillMac's fan helper, so macOS will ask you to approve ChillMac again under Login Items & Extensions. Fan control waits until you do. Later releases go back to one click.
-
-## Fixed
-
-- **Fans stuck at minimum on Automatic.** If ChillMac's fan helper restarted while it had the fans unlocked, it lost track of that and never handed them back to macOS. The fans then sat near their lowest speed no matter how hot the Mac got, until the next sleep or restart. The helper now notices and returns the fans to macOS. Smart and Manual cooling were not affected.
-- **"Fans are quiet" when they were not.** The header only looked at temperature, so it said the fans were quiet even with Smart on Cool spinning them at 4,000 RPM. It now checks the fans themselves.
-- **Diagnostics accuracy.** Exports no longer log idle fans held by macOS as manual, record battery temperature on macOS 27 instead of 0°, and skip the empty sample taken at launch.
-
-## Changed
-
-- **Menu bar icon.** Now the same four-blade fan used throughout the app.
-]]></description>
-            <enclosure url="https://github.com/idevtim/chillmac/releases/download/v2.0.3/ChillMac-2.0.3.zip" length="2226076" type="application/octet-stream" sparkle:edSignature="BpxA7rn4VGpxMBq/Uud0ZpHgKkt7dElvXZgi8NskqHacweR9WmDbfHTpARUYy4SsmnZBnjM94sSTJLGkFY4xCg=="/>
         </item>
     </channel>
 </rss>
