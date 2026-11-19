@@ -11,6 +11,9 @@ struct HelperStatusCard: View {
     let isBusy: Bool
     /// Why the last install attempt failed, shown under the explanation. Nil hides it.
     var errorMessage: String? = nil
+    /// A helper from an old ChillMac blocks installation; offer to remove it instead.
+    var offerLegacyRemoval = false
+    var onRemoveLegacy: () -> Void = {}
     let onInstall: () -> Void
     let onOpenLoginItems: () -> Void
     @Binding var isCollapsed: Bool
@@ -171,6 +174,9 @@ struct HelperStatusCard: View {
     }
 
     private var action: Action? {
+        if offerLegacyRemoval, state != .running {
+            return Action(label: "Remove old helper", perform: onRemoveLegacy)
+        }
         switch state {
         case .checking, .running:
             return nil

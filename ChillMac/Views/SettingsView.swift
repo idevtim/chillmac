@@ -79,7 +79,7 @@ struct SettingsView: View {
                 Text(helperCaption)
                     .font(.system(size: 11))
                     .foregroundColor(theme.textQuaternary)
-                if let error = fanMonitor.helperInstallError, !fanMonitor.helperBusy {
+                if let error = fanMonitor.helperProblem, !fanMonitor.helperBusy {
                     Text(error)
                         .font(.system(size: 11))
                         .foregroundColor(theme.orange)
@@ -322,6 +322,10 @@ private struct HelperActions: View {
                 .padding(.vertical, 10)
 
             Group {
+                if monitor.shouldOfferLegacyRemoval {
+                    actionRow("Remove old helper", icon: "trash") { monitor.removeLegacyHelperAndInstall() }
+                    CardDivider(leadingInset: 14)
+                }
                 actionRow("Reinstall", icon: "arrow.clockwise") { monitor.installHelper() }
                 CardDivider(leadingInset: 14)
                 actionRow("Open Login Items", icon: "gearshape") { HelperInstaller.openLoginItemsSettings() }

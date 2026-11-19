@@ -38,6 +38,7 @@ struct HelperSnapshot: Codable {
     let serviceStatus: String
     let lastInstallError: String?
     let locationProblem: String?
+    let legacyHelperInstalled: Bool
     let appPath: String
     let coolingMode: String
 }
@@ -76,6 +77,7 @@ enum DiagnosticExporter {
                 serviceStatus: HelperInstaller.serviceStatusDescription,
                 lastInstallError: fanMonitor.helperInstallError,
                 locationProblem: HelperInstaller.locationProblem,
+                legacyHelperInstalled: HelperInstaller.legacyHelperInstalled,
                 appPath: (Bundle.main.bundlePath as NSString).abbreviatingWithTildeInPath,
                 coolingMode: settings.coolingMode.rawValue
             ),
