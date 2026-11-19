@@ -3,6 +3,27 @@
     <channel>
         <title>ChillMac</title>
         <item>
+            <title>2.0.5</title>
+            <pubDate>Thu, 19 Nov 2026 16:38:01 -0500</pubDate>
+            <link>https://github.com/idevtim/chillmac</link>
+            <sparkle:fullReleaseNotesLink>https://github.com/idevtim/chillmac/releases</sparkle:fullReleaseNotesLink>
+            <sparkle:version>2.0.5</sparkle:version>
+            <sparkle:shortVersionString>2.0.5</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[If fan control setup was failing with "Operation not permitted", ChillMac can now fix it for you with one password prompt.
+
+## Fixed
+
+- **Fan control setup blocked by an old helper.** ChillMac versions before 1.8.1 installed their fan helper differently, and updating never removed it. That leftover copy made macOS refuse to install the current one. ChillMac now spots it and offers a "Remove old helper" button that asks for your password once, removes it, and sets up fan control. Monitoring was never affected.
+
+## Improvements
+
+- **Diagnostics.** Exports now note whether an old helper is still installed.
+]]></description>
+            <enclosure url="https://github.com/idevtim/chillmac/releases/download/v2.0.5/ChillMac-2.0.5.zip" length="2242138" type="application/octet-stream" sparkle:edSignature="Q2nYNBe7myfbUTOtgYLTJPVVAtzcaRO4D5o3fHEGl2TLVVXIZQYRpFC8nhExn0NXIATBPFXLZGQRKnSm4Vw+CA=="/>
+        </item>
+        <item>
             <title>2.0.4</title>
             <pubDate>Thu, 19 Nov 2026 15:51:16 -0500</pubDate>
             <link>https://github.com/idevtim/chillmac</link>
@@ -50,25 +71,6 @@ This update changes ChillMac's fan helper, so macOS will ask you to approve Chil
 - **Menu bar icon.** Now the same four-blade fan used throughout the app.
 ]]></description>
             <enclosure url="https://github.com/idevtim/chillmac/releases/download/v2.0.3/ChillMac-2.0.3.zip" length="2226076" type="application/octet-stream" sparkle:edSignature="BpxA7rn4VGpxMBq/Uud0ZpHgKkt7dElvXZgi8NskqHacweR9WmDbfHTpARUYy4SsmnZBnjM94sSTJLGkFY4xCg=="/>
-        </item>
-        <item>
-            <title>2.0.2</title>
-            <pubDate>Fri, 23 Oct 2026 16:18:51 -0400</pubDate>
-            <link>https://github.com/idevtim/chillmac</link>
-            <sparkle:fullReleaseNotesLink>https://github.com/idevtim/chillmac/releases</sparkle:fullReleaseNotesLink>
-            <sparkle:version>2.0.2</sparkle:version>
-            <sparkle:shortVersionString>2.0.2</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[Smart cooling now takes over the fans on its own after ChillMac starts.
-
-## Fixed
-
-- **Fans waited for the menu bar to be opened.** At login or right after an update, ChillMac's fan helper can take a few seconds to start, and ChillMac only checked on it again when you opened the menu bar. Until then the fans stayed with macOS. ChillMac now keeps checking in the background and takes over as soon as the helper is ready.
-
-Temperatures, the menu bar reading and the detail panels were accurate throughout. Only the start of Smart cooling was delayed.
-]]></description>
-            <enclosure url="https://github.com/idevtim/chillmac/releases/download/v2.0.2/ChillMac-2.0.2.zip" length="2221772" type="application/octet-stream" sparkle:edSignature="UL09jfS5dZdD8GP6HnyFD+Qh3kUNugLGXcl0Prztm700YeAH295IKsiIemezJyvfnl3H/eUraKGm0HXkcYrRCg=="/>
         </item>
     </channel>
 </rss>
