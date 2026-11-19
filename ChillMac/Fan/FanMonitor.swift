@@ -140,6 +140,11 @@ final class FanMonitor: ObservableObject {
     /// can take several seconds, so the UI needs something to show for the button press.
     @Published private(set) var helperBusy = false
 
+    /// Why the last install attempt did not get the helper running, in words the user can
+    /// act on. Nil after a success, or once the state moves on to something that explains
+    /// itself. Without this a refused registration left the Install button looking dead.
+    @Published private(set) var helperInstallError: String?
+
     /// Re-reads the helper's state without trying to install anything.
     ///
     /// Called on launch and every time the popover opens. That second call is what makes
@@ -172,16 +177,20 @@ final class FanMonitor: ObservableObject {
 
         helperQueue.async { [weak self] in
             var state = HelperInstaller.currentState()
+            var failure: String?
             NSLog("FanMonitor: helper state at launch — \(state)")
 
             if (state == .needsInstall && installIfMissing) || state == .needsUpdate {
-                state = Self.installAndSettle()
+                let result = Self.installAndSettle()
+                state = result.state
+                failure = result.failure
             }
 
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.helperInstallInFlight = false
                 self.applyHelperState(state)
+                self.helperInstallError = failure
                 completion()
             }
         }
@@ -193,12 +202,15 @@ final class FanMonitor: ObservableObject {
         guard !helperInstallInFlight else { return }
         helperInstallInFlight = true
 
+        helperInstallError = nil
+
         helperQueue.async { [weak self] in
-            let state = Self.installAndSettle()
+            let result = Self.installAndSettle()
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.helperInstallInFlight = false
-                self.applyHelperState(state)
+                self.applyHelperState(result.state)
+                self.helperInstallError = result.failure
             }
         }
     }
@@ -213,20 +225,42 @@ final class FanMonitor: ObservableObject {
     ///
     /// Polls until the state is conclusive: `running` means done, `needsApproval` means the
     /// user has to act and no amount of waiting changes it. Must be called on `helperQueue`.
-    private static func installAndSettle() -> HelperInstaller.HelperState {
-        var state = HelperInstaller.install()
-        let deadline = Date().addingTimeInterval(6)
+    ///
+    /// Any other outcome comes back with a reason. The state alone cannot carry one: a
+    /// refused registration leaves it at `needsInstall`, exactly where it started, so the UI
+    /// saw no change at all and the button simply reappeared.
+    private static func installAndSettle() -> HelperInstaller.InstallResult {
+        let attempt = HelperInstaller.install()
+        // Nothing was registered, so there is nothing to wait for.
+        if HelperInstaller.locationProblem != nil { return attempt }
 
+        var state = attempt.state
+        let deadline = Date().addingTimeInterval(6)
         while state != .running, state != .needsApproval, Date() < deadline {
             Thread.sleep(forTimeInterval: 0.75)
             state = HelperInstaller.currentState()
         }
-        return state
+
+        switch state {
+        case .running, .needsApproval:
+            return HelperInstaller.InstallResult(state: state, failure: nil)
+        case .unresponsive:
+            return HelperInstaller.InstallResult(
+                state: state,
+                failure: attempt.failure ?? "The helper was installed but did not start. Check that only one copy of ChillMac is on this Mac, in Applications, then try again."
+            )
+        default:
+            return HelperInstaller.InstallResult(
+                state: state,
+                failure: attempt.failure ?? "macOS did not install the helper. Make sure ChillMac is in your Applications folder, then try again."
+            )
+        }
     }
 
     /// Main thread only.
     private func applyHelperState(_ state: HelperInstaller.HelperState) {
         scheduleHelperRecheck(after: state)
+        if state == .running || state == .needsApproval { helperInstallError = nil }
         guard helperState != state else { return }
         let couldControlFans = helperState.canControlFans
         helperState = state

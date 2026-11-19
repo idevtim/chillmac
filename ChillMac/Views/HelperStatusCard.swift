@@ -9,6 +9,8 @@ import SwiftUI
 struct HelperStatusCard: View {
     let state: HelperInstaller.HelperState
     let isBusy: Bool
+    /// Why the last install attempt failed, shown under the explanation. Nil hides it.
+    var errorMessage: String? = nil
     let onInstall: () -> Void
     let onOpenLoginItems: () -> Void
     @Binding var isCollapsed: Bool
@@ -76,6 +78,13 @@ struct HelperStatusCard: View {
                         .font(.system(size: 12))
                         .foregroundColor(theme.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
+                    if let errorMessage, !isBusy {
+                        Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(theme.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 4)
+                    }
                 }
             }
 

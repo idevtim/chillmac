@@ -18,7 +18,7 @@ struct SettingsView: View {
     var body: some View {
         ZStack {
             if showingAdvanced {
-                AdvancedSettingsView(settings: settings, systemInfo: systemInfo) {
+                AdvancedSettingsView(settings: settings, systemInfo: systemInfo, fanMonitor: fanMonitor) {
                     withAnimation(.easeInOut(duration: 0.2)) { showingAdvanced = false }
                 }
                 .transition(.move(edge: .trailing).combined(with: .opacity))
@@ -79,6 +79,12 @@ struct SettingsView: View {
                 Text(helperCaption)
                     .font(.system(size: 11))
                     .foregroundColor(theme.textQuaternary)
+                if let error = fanMonitor.helperInstallError, !fanMonitor.helperBusy {
+                    Text(error)
+                        .font(.system(size: 11))
+                        .foregroundColor(theme.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             Spacer()
             Button(showingHelperActions ? "Done" : "Manage") { showingHelperActions.toggle() }
@@ -234,6 +240,7 @@ struct SettingsView: View {
 private struct AdvancedSettingsView: View {
     @ObservedObject var settings: AppSettings
     let systemInfo: SystemInfo
+    let fanMonitor: FanMonitor
     let onBack: () -> Void
     @Environment(\.theme) private var theme
 
@@ -283,7 +290,7 @@ private struct AdvancedSettingsView: View {
                     SettingsSection(title: "Diagnostics") {
                         SettingsRow(title: "Export diagnostics", caption: Text("Save a system metrics log for troubleshooting")) {
                             Button("Export") {
-                                DiagnosticExporter.export(logger: DiagnosticLogger.shared, systemInfo: systemInfo)
+                                DiagnosticExporter.export(logger: DiagnosticLogger.shared, systemInfo: systemInfo, fanMonitor: fanMonitor)
                             }
                             .buttonStyle(LinkButtonStyle())
                             .font(.system(size: 12, weight: .medium))

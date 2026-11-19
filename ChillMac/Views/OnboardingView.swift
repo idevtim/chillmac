@@ -370,7 +370,12 @@ struct OnboardingView: View {
             }
             .buttonStyle(.plain)
 
-            if monitor.helperState == .unresponsive || monitor.helperState == .needsUpdate {
+            if let error = monitor.helperInstallError, !monitor.helperBusy {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .font(.system(size: 12))
+                    .foregroundColor(theme.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if monitor.helperState == .unresponsive || monitor.helperState == .needsUpdate {
                 Text(monitor.helperState == .needsUpdate
                      ? "An older helper is installed. Installing replaces it."
                      : "A helper is installed but not answering. Installing again usually fixes this.")

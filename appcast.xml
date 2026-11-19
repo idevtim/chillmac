@@ -3,6 +3,28 @@
     <channel>
         <title>ChillMac</title>
         <item>
+            <title>2.0.4</title>
+            <pubDate>Thu, 19 Nov 2026 15:51:16 -0500</pubDate>
+            <link>https://github.com/idevtim/chillmac</link>
+            <sparkle:fullReleaseNotesLink>https://github.com/idevtim/chillmac/releases</sparkle:fullReleaseNotesLink>
+            <sparkle:version>2.0.4</sparkle:version>
+            <sparkle:shortVersionString>2.0.4</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[Setting up fan control now tells you what went wrong instead of quietly doing nothing.
+
+## Fixed
+
+- **Install button that did nothing.** When macOS refused to install the fan helper, ChillMac only wrote the reason to its log, so pressing Install in setup or in the menu looked like a dead button. The reason now appears next to the button. Monitoring was never affected; only fan control was unavailable.
+- **Running outside Applications.** When macOS runs ChillMac from the disk image or a temporary copy, the helper can't be installed reliably. ChillMac now spots this and asks you to move it to Applications first.
+
+## Improvements
+
+- **Diagnostics.** Exports now include the fan helper's status and the last install error, so setup problems can be diagnosed from the file alone.
+]]></description>
+            <enclosure url="https://github.com/idevtim/chillmac/releases/download/v2.0.4/ChillMac-2.0.4.zip" length="2237120" type="application/octet-stream" sparkle:edSignature="BNUK4zL8jbz3FEumduN82srSK9inur+jA+lA3tNfo3ZqgJyalk61pEkwUnCwmoPeYxuk7E6i4csg51l0Ms+dCg=="/>
+        </item>
+        <item>
             <title>2.0.3</title>
             <pubDate>Fri, 13 Nov 2026 14:30:00 -0500</pubDate>
             <link>https://github.com/idevtim/chillmac</link>
@@ -47,26 +69,6 @@ This update changes ChillMac's fan helper, so macOS will ask you to approve Chil
 Temperatures, the menu bar reading and the detail panels were accurate throughout. Only the start of Smart cooling was delayed.
 ]]></description>
             <enclosure url="https://github.com/idevtim/chillmac/releases/download/v2.0.2/ChillMac-2.0.2.zip" length="2221772" type="application/octet-stream" sparkle:edSignature="UL09jfS5dZdD8GP6HnyFD+Qh3kUNugLGXcl0Prztm700YeAH295IKsiIemezJyvfnl3H/eUraKGm0HXkcYrRCg=="/>
-        </item>
-        <item>
-            <title>2.0.1</title>
-            <pubDate>Sun, 18 Oct 2026 20:43:20 -0400</pubDate>
-            <link>https://github.com/idevtim/chillmac</link>
-            <sparkle:fullReleaseNotesLink>https://github.com/idevtim/chillmac/releases</sparkle:fullReleaseNotesLink>
-            <sparkle:version>2.0.1</sparkle:version>
-            <sparkle:shortVersionString>2.0.1</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[Battery details are back on macOS 27.
-
-## Fixed
-
-- **Battery capacity.** On macOS 27, Current and Original capacity both showed 100 mAh, because macOS moved where it reports them. ChillMac now finds the real figures, and says "Not reported" if a Mac doesn't provide one.
-- **Battery temperature.** macOS 27 stopped reporting it in the usual place, so the Battery panel showed 0°. ChillMac now reads it from the Mac's own battery sensors instead.
-
-Only the Battery panel was affected. Fan control, the menu bar reading and the other panels were accurate throughout.
-]]></description>
-            <enclosure url="https://github.com/idevtim/chillmac/releases/download/v2.0.1/ChillMac-2.0.1.zip" length="2220390" type="application/octet-stream" sparkle:edSignature="xByqWoa3wtQ3ETPfMc4ndLXQ1e+j/hek0+YfOayfDNCnPhMCycoYGiahKNGAnIUyiPZCpMfKOblq28LnS8lYAA=="/>
         </item>
     </channel>
 </rss>
