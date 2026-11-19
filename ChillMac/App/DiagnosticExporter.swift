@@ -8,6 +8,7 @@ struct DiagnosticReport: Codable {
     let appVersion: String
     let system: SystemSnapshot
     let settings: SettingsSnapshot
+    let helper: HelperSnapshot
     let sleepIntervals: [SleepInterval]
     let history: [DiagnosticSample]
 }
@@ -30,12 +31,24 @@ struct SettingsSnapshot: Codable {
     let keepFansOnScreenSleep: Bool
 }
 
+/// Fan control helper status at export time. Reports of "the helper won't install" were
+/// unanswerable without it: the history only shows that the helper never replied, not why.
+struct HelperSnapshot: Codable {
+    let state: String
+    let serviceStatus: String
+    let lastInstallError: String?
+    let locationProblem: String?
+    let appPath: String
+    let coolingMode: String
+}
+
 // MARK: - Exporter
 
 enum DiagnosticExporter {
     static func export(
         logger: DiagnosticLogger,
-        systemInfo: SystemInfo
+        systemInfo: SystemInfo,
+        fanMonitor: FanMonitor
     ) {
         let settings = AppSettings.shared
 
@@ -57,6 +70,14 @@ enum DiagnosticExporter {
                 batterySaverThreshold: settings.batterySaverThreshold,
                 useFahrenheit: settings.useFahrenheit,
                 keepFansOnScreenSleep: settings.keepFansOnScreenSleep
+            ),
+            helper: HelperSnapshot(
+                state: String(describing: fanMonitor.helperState),
+                serviceStatus: HelperInstaller.serviceStatusDescription,
+                lastInstallError: fanMonitor.helperInstallError,
+                locationProblem: HelperInstaller.locationProblem,
+                appPath: (Bundle.main.bundlePath as NSString).abbreviatingWithTildeInPath,
+                coolingMode: settings.coolingMode.rawValue
             ),
             sleepIntervals: logger.sleepIntervalsSnapshot(),
             history: logger.snapshot()

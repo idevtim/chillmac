@@ -56,10 +56,51 @@ enum HelperInstaller {
 
     // MARK: - Installation
 
+    /// What came of an install attempt. `failure` is the reason to show the user when the
+    /// attempt did not get the helper running or awaiting approval; nil otherwise.
+    struct InstallResult {
+        let state: HelperState
+        let failure: String?
+    }
+
+    /// Why the daemon cannot be registered from where this copy of the app is running, or nil.
+    ///
+    /// SMAppService records the daemon by its path inside this bundle. A downloaded app that
+    /// was opened without being moved runs from a randomized, read-only App Translocation
+    /// path, and one opened straight from the disk image runs from a volume that disappears
+    /// on eject. Registering from either fails or points launchd at a path that is about to
+    /// vanish, and until now the failure was only logged, so pressing Install did nothing.
+    static var locationProblem: String? {
+        let url = Bundle.main.bundleURL
+        if url.path.contains("/AppTranslocation/") {
+            return "macOS is running ChillMac from a temporary, read-only copy, so the helper can't be installed. Move ChillMac to your Applications folder, then open it from there."
+        }
+        if (try? url.resourceValues(forKeys: [.volumeIsReadOnlyKey]))?.volumeIsReadOnly == true {
+            return "ChillMac is running from the disk image. Drag it to your Applications folder, eject the disk image, then open ChillMac from Applications."
+        }
+        return nil
+    }
+
+    /// Raw `SMAppService` status, for diagnostics.
+    static var serviceStatusDescription: String {
+        switch service.status {
+        case .notRegistered: return "notRegistered"
+        case .enabled: return "enabled"
+        case .requiresApproval: return "requiresApproval"
+        case .notFound: return "notFound"
+        @unknown default: return "unknown(\(service.status.rawValue))"
+        }
+    }
+
     /// Registers the daemon, replacing any existing registration first so a version bump or
-    /// a broken install is actually superseded. Blocking; returns the resulting state.
-    @discardableResult
-    static func install() -> HelperState {
+    /// a broken install is actually superseded. Blocking; returns the resulting state and,
+    /// when registration was refused, macOS's reason.
+    static func install() -> InstallResult {
+        if let problem = locationProblem {
+            NSLog("HelperInstaller: not registering from \(Bundle.main.bundlePath) — \(problem)")
+            return InstallResult(state: currentState(), failure: problem)
+        }
+
         let status = service.status
         if status == .enabled || status == .requiresApproval {
             // register() on a live registration throws "already registered" and changes
@@ -67,17 +108,20 @@ enum HelperInstaller {
             unregister()
         }
 
+        var failure: String?
         do {
             try service.register()
             NSLog("HelperInstaller: registered successfully")
         } catch {
+            let nsError = error as NSError
             NSLog("HelperInstaller: registration failed — \(error)")
+            failure = "macOS refused to install the helper: \(nsError.localizedDescription) (\(nsError.domain) \(nsError.code))"
             // Fall through: the status read below is more trustworthy than the throw. A
             // first registration reports failure on some systems while still leaving the
             // service awaiting approval, which is a state the user can act on.
         }
 
-        return currentState()
+        return InstallResult(state: currentState(), failure: failure)
     }
 
     /// Unregister the daemon so a new version can be registered.

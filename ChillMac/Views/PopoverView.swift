@@ -325,6 +325,7 @@ struct PopoverView: View {
                         HelperStatusCard(
                             state: monitor.helperState,
                             isBusy: monitor.helperBusy,
+                            errorMessage: monitor.helperInstallError,
                             onInstall: { monitor.installHelper() },
                             onOpenLoginItems: { HelperInstaller.openLoginItemsSettings() },
                             isCollapsed: $settings.helperInviteCollapsed
