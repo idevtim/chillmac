@@ -256,6 +256,15 @@ struct OnboardingView: View {
                 Button("Continue") { go(to: .cooling) }
                     .buttonStyle(style)
                     .keyboardShortcut(.defaultAction)
+            } else if monitor.shouldOfferLegacyRemoval {
+                Button {
+                    awaitingInstall = true
+                    monitor.removeLegacyHelperAndInstall()
+                } label: {
+                    Label("Remove old helper", systemImage: "trash")
+                }
+                .buttonStyle(style)
+                .keyboardShortcut(.defaultAction)
             } else {
                 Button(action: installHelper) {
                     Label("Install helper", systemImage: "lock.fill")
@@ -370,7 +379,7 @@ struct OnboardingView: View {
             }
             .buttonStyle(.plain)
 
-            if let error = monitor.helperInstallError, !monitor.helperBusy {
+            if let error = monitor.helperProblem, !monitor.helperBusy {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .font(.system(size: 12))
                     .foregroundColor(theme.orange)

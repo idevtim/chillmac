@@ -145,6 +145,27 @@ final class FanMonitor: ObservableObject {
     /// itself. Without this a refused registration left the Install button looking dead.
     @Published private(set) var helperInstallError: String?
 
+    /// A helper from ChillMac before 1.8.1 is still installed and blocks ours. The UI then
+    /// offers to remove it instead of an install that cannot succeed.
+    @Published private(set) var legacyHelperDetected = false
+
+    /// What to tell the user about fan control setup, if anything: the last install failure,
+    /// or the leftover helper even before they have pressed anything.
+    var helperProblem: String? {
+        helperInstallError ?? (shouldOfferLegacyRemoval ? HelperInstaller.legacyHelperMessage : nil)
+    }
+
+    /// Whether setup should offer to remove the leftover helper instead of installing.
+    /// Only where it actually blocks us: once ours is registered (running or awaiting
+    /// approval) the old files are inert and the normal next step stays in place.
+    var shouldOfferLegacyRemoval: Bool {
+        guard legacyHelperDetected else { return false }
+        switch helperState {
+        case .needsInstall, .needsUpdate, .unresponsive: return true
+        case .checking, .running, .needsApproval: return false
+        }
+    }
+
     /// Re-reads the helper's state without trying to install anything.
     ///
     /// Called on launch and every time the popover opens. That second call is what makes
@@ -157,9 +178,11 @@ final class FanMonitor: ObservableObject {
 
         helperQueue.async { [weak self] in
             let state = HelperInstaller.currentState()
+            let legacy = HelperInstaller.legacyHelperInstalled
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.helperRefreshInFlight = false
+                self.legacyHelperDetected = legacy
                 self.applyHelperState(state)
             }
         }
@@ -185,10 +208,12 @@ final class FanMonitor: ObservableObject {
                 state = result.state
                 failure = result.failure
             }
+            let legacy = HelperInstaller.legacyHelperInstalled
 
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.helperInstallInFlight = false
+                self.legacyHelperDetected = legacy
                 self.applyHelperState(state)
                 self.helperInstallError = failure
                 completion()
@@ -206,9 +231,44 @@ final class FanMonitor: ObservableObject {
 
         helperQueue.async { [weak self] in
             let result = Self.installAndSettle()
+            let legacy = HelperInstaller.legacyHelperInstalled
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.helperInstallInFlight = false
+                self.legacyHelperDetected = legacy
+                self.applyHelperState(result.state)
+                self.helperInstallError = result.failure
+            }
+        }
+    }
+
+    /// Removes the pre-1.8.1 helper (macOS asks for an administrator password), then
+    /// installs the current one. Sits behind the "Remove old helper" button.
+    func removeLegacyHelperAndInstall() {
+        guard !helperInstallInFlight else { return }
+        helperInstallInFlight = true
+        helperInstallError = nil
+
+        helperQueue.async { [weak self] in
+            var result: HelperInstaller.InstallResult
+            if let failure = HelperInstaller.removeLegacyHelper() {
+                result = HelperInstaller.InstallResult(state: HelperInstaller.currentState(), failure: failure)
+            } else {
+                result = Self.installAndSettle()
+                // launchd can keep the old registration until restart even once the files
+                // are gone. Say so rather than leave the user retrying.
+                if let failure = result.failure {
+                    result = HelperInstaller.InstallResult(
+                        state: result.state,
+                        failure: failure + " The old helper was removed; restart your Mac, then set up fan control again."
+                    )
+                }
+            }
+            let legacy = HelperInstaller.legacyHelperInstalled
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.helperInstallInFlight = false
+                self.legacyHelperDetected = legacy
                 self.applyHelperState(result.state)
                 self.helperInstallError = result.failure
             }
@@ -232,7 +292,7 @@ final class FanMonitor: ObservableObject {
     private static func installAndSettle() -> HelperInstaller.InstallResult {
         let attempt = HelperInstaller.install()
         // Nothing was registered, so there is nothing to wait for.
-        if HelperInstaller.locationProblem != nil { return attempt }
+        if HelperInstaller.locationProblem != nil || HelperInstaller.legacyHelperInstalled { return attempt }
 
         var state = attempt.state
         let deadline = Date().addingTimeInterval(6)

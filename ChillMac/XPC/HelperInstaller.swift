@@ -81,6 +81,59 @@ enum HelperInstaller {
         return nil
     }
 
+    // MARK: - Legacy helper
+
+    /// Where ChillMac before 1.8.1 installed its helper through SMJobBless.
+    private static let legacyHelperPaths = [
+        "/Library/LaunchDaemons/\(kHelperMachServiceName).plist",
+        "/Library/PrivilegedHelperTools/\(kHelperMachServiceName)",
+    ]
+
+    /// Whether a helper installed by ChillMac before 1.8.1 is still on disk.
+    ///
+    /// It uses the same launchd label as the current helper, and while launchd has it loaded
+    /// macOS refuses to register ours with "Operation not permitted". Nothing removes it on
+    /// update, so anyone who installed an early version and kept updating ends up unable
+    /// to set up fan control. Both paths are world-readable, so no privileges are needed.
+    static var legacyHelperInstalled: Bool {
+        legacyHelperPaths.contains { FileManager.default.fileExists(atPath: $0) }
+    }
+
+    /// Unloads and deletes the pre-1.8.1 helper. Asks for an administrator password through
+    /// the standard macOS prompt. Blocking; returns nil on success or the reason it failed.
+    static func removeLegacyHelper() -> String? {
+        let paths = legacyHelperPaths.map { "'\($0)'" }.joined(separator: " ")
+        // bootout fails harmlessly when the job is not loaded, so it must not stop the rm.
+        let shell = "/bin/launchctl bootout system/\(kHelperMachServiceName) 2>/dev/null; /bin/rm -f \(paths)"
+        let script = "do shell script \"\(shell)\" with prompt \"ChillMac needs to remove an old fan helper left by an earlier version.\" with administrator privileges"
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        process.arguments = ["-e", script]
+        let errorPipe = Pipe()
+        process.standardError = errorPipe
+        process.standardOutput = FileHandle.nullDevice
+
+        do {
+            try process.run()
+        } catch {
+            return "Couldn't remove the old helper: \(error.localizedDescription)"
+        }
+        process.waitUntilExit()
+
+        if process.terminationStatus != 0 {
+            let message = String(data: errorPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            NSLog("HelperInstaller: legacy helper removal failed — \(message)")
+            if message.contains("-128") { return "The old helper wasn't removed because the password prompt was canceled." }
+            return "Couldn't remove the old helper. \(message.trimmingCharacters(in: .whitespacesAndNewlines))"
+        }
+        if legacyHelperInstalled { return "The old helper is still on disk after removal." }
+        NSLog("HelperInstaller: removed legacy helper")
+        return nil
+    }
+
+    static let legacyHelperMessage = "A fan helper from an older version of ChillMac is still installed and is blocking the new one. Remove it to continue."
+
     /// Raw `SMAppService` status, for diagnostics.
     static var serviceStatusDescription: String {
         switch service.status {
@@ -99,6 +152,9 @@ enum HelperInstaller {
         if let problem = locationProblem {
             NSLog("HelperInstaller: not registering from \(Bundle.main.bundlePath) — \(problem)")
             return InstallResult(state: currentState(), failure: problem)
+        }
+        if legacyHelperInstalled {
+            return InstallResult(state: currentState(), failure: legacyHelperMessage)
         }
 
         let status = service.status
